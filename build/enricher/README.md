@@ -21,8 +21,8 @@ these stages in order:
    `goimports`, `golangci-lint`, `govulncheck`, `gosec`, and Go unit tests before
    compiling the binary.
 2. Tags the image as both
-   `ghcr.io/twistingmercury/librarian-enricher:<version>` and
-   `ghcr.io/twistingmercury/librarian-enricher:latest`. The version defaults to
+   `ghcr.io/twistingmercury/mnemonic-enricher:<version>` and
+   `ghcr.io/twistingmercury/mnemonic-enricher:latest`. The version defaults to
    the most recent Git tag, or `dev` when no tag is available.
 3. Starts the isolated stack in `src/tests/docker-compose.yaml` and runs the
    end-to-end tests against the newly built `latest` image.
@@ -53,7 +53,7 @@ docker build --rm --no-cache \
   --build-arg BUILD_COMMIT="$(git rev-parse --short HEAD)" \
   --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   --target final \
-  --tag ghcr.io/twistingmercury/librarian-enricher:latest \
+  --tag ghcr.io/twistingmercury/mnemonic-enricher:latest \
   src
 ```
 
@@ -91,20 +91,20 @@ Before using it, provide all of the following:
 
 - PostgreSQL migration files at `src/migrations/postgres`, supplied by the
   companion Mnemonic API project.
-- Registry access to pull `ghcr.io/twistingmercury/librarian-mcp:latest-dev` for
+- Registry access to pull `ghcr.io/twistingmercury/mnemonic-mcp:latest-dev` for
   `dev_api`.
 - A local
-  `ghcr.io/twistingmercury/librarian-enricher:latest-dev` image for
+  `ghcr.io/twistingmercury/mnemonic-enricher:latest-dev` image for
   `dev_enricher`. The local build script creates `latest`, not `latest-dev`, so tag
   it explicitly when appropriate:
 
   ```bash
   docker tag \
-    ghcr.io/twistingmercury/librarian-enricher:latest \
-    ghcr.io/twistingmercury/librarian-enricher:latest-dev
+    ghcr.io/twistingmercury/mnemonic-enricher:latest \
+    ghcr.io/twistingmercury/mnemonic-enricher:latest-dev
   ```
 
-- A repository-root `.env` file containing a valid `LIBRARIAN_OPENAI_API_KEY`.
+- A repository-root `.env` file containing a valid `MNEMONIC_OPENAI_API_KEY`.
   Start with `cp src/.env.example .env`, then edit the copy. Do not commit `.env`.
 
 After supplying those external assets, validate the service names and start the

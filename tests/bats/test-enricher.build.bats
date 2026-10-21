@@ -210,3 +210,42 @@ teardown() {
     run grep -c -e '^push' "${DOCKER_LOG}"
     assert_output "0"
 }
+
+@test "${COMPONENT} build - tags the default image ghcr.io/twistingmercury/mnemonic-${COMPONENT} and latest" {
+    run "${SCRIPT_PATH}"
+
+    assert_success
+    run build_invocation
+    assert_output --partial "--tag ghcr.io/twistingmercury/mnemonic-${COMPONENT}:v0.5.1 --tag ghcr.io/twistingmercury/mnemonic-${COMPONENT}:latest "
+}
+
+@test "${COMPONENT} build - passes no docker build argument naming the placeholder librarian" {
+    run "${SCRIPT_PATH}"
+
+    assert_success
+    # The checkout directory may itself be named after the placeholder, and the
+    # parked compose services keep their old names until the compose side moves.
+    local logged
+    logged="$(build_invocation | sed "s#${REPO_ROOT}##g")"
+    refute_regex_placeholder "${logged}"
+}
+
+@test "${COMPONENT} Dockerfile - stamps the version through the mnemonic module path" {
+    local dockerfile="${REPO_ROOT}/build/${COMPONENT}/${COMPONENT}.Dockerfile"
+    local module_path="github.com/twistingmercury/mnemonic/internal/${COMPONENT}/version"
+
+    run grep -F -e "-X '${module_path}.version=\${BUILD_VER}'" \
+        -e "-X '${module_path}.buildDate=\${BUILD_DATE}'" \
+        -e "-X '${module_path}.commit=\${BUILD_COMMIT}'" "${dockerfile}"
+
+    assert_success
+    assert_equal "${#lines[@]}" "3"
+}
+
+@test "${COMPONENT} Dockerfile - labels the source as the mnemonic repository" {
+    local dockerfile="${REPO_ROOT}/build/${COMPONENT}/${COMPONENT}.Dockerfile"
+
+    run grep -F -e 'org.opencontainers.image.source="https://github.com/twistingmercury/mnemonic"' "${dockerfile}"
+
+    assert_success
+}

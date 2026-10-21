@@ -1,7 +1,7 @@
 # Build context is the repo root; the Go service Dockerfiles in build/<name>/
 # COPY only LICENSE and parts of src/. Keep everything else out of the context.
 
-# VCS and the temporary fork references
+# VCS and the temporary fork references (the fork checkouts keep their old names)
 .git
 .gitignore
 .dockerignore

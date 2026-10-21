@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJ_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 COMPONENT="api"
-IMAGE_NAME="${IMAGE_NAME:-ghcr.io/twistingmercury/librarian-api}"
+IMAGE_NAME="${IMAGE_NAME:-ghcr.io/twistingmercury/mnemonic-api}"
 BUILD_VER="${BUILD_VER:-$("${PROJ_ROOT}/build/version.sh" "${COMPONENT}")}"
 BUILD_DATE="${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 BUILD_COMMIT="${BUILD_COMMIT:-$(git -C "${PROJ_ROOT}" rev-parse --short HEAD 2>/dev/null || echo 'unknown')}"

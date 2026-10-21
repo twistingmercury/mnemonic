@@ -74,10 +74,22 @@ expected_build() {
     local commit="${4}"
     local image_tag="${5}"
     local extra_flags="${6:-}"
-    local image="ghcr.io/twistingmercury/librarian-${component}"
+    local image="ghcr.io/twistingmercury/mnemonic-${component}"
 
     printf "build --rm %s--progress=plain --file %s/build/%s/%s.Dockerfile --build-arg BUILD_VER=%s --build-arg BUILD_DATE=%s --build-arg BUILD_COMMIT=%s --target final --tag %s:%s --tag %s:latest %s" \
         "${extra_flags}" "${REPO_ROOT}" "${component}" "${component}" \
         "${version}" "${build_date}" "${commit}" \
         "${image}" "${image_tag}" "${image}" "${REPO_ROOT}"
+}
+
+# Fails, printing the text, when it names the placeholder "librarian".
+refute_regex_placeholder() {
+    local text="${1}"
+
+    if printf "%s" "${text}" | grep -q -i -e 'librarian'; then
+        printf "placeholder name found in:\n%s\n" "${text}" >&2
+        return 1
+    fi
+
+    return 0
 }

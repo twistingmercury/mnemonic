@@ -42,9 +42,9 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
     go test -v ./cmd/api/... ./internal/... -coverprofile=coverage.out
 
 ARG LD_FLAGS="-s -w \
-    -X 'github.com/twistingmercury/librarian/internal/api/version.version=${BUILD_VER}' \
-    -X 'github.com/twistingmercury/librarian/internal/api/version.buildDate=${BUILD_DATE}' \
-    -X 'github.com/twistingmercury/librarian/internal/api/version.commit=${BUILD_COMMIT}'"
+    -X 'github.com/twistingmercury/mnemonic/internal/api/version.version=${BUILD_VER}' \
+    -X 'github.com/twistingmercury/mnemonic/internal/api/version.buildDate=${BUILD_DATE}' \
+    -X 'github.com/twistingmercury/mnemonic/internal/api/version.commit=${BUILD_COMMIT}'"
 
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
     GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" \
@@ -62,7 +62,7 @@ ARG BUILD_COMMIT=unknown
 
 LABEL org.opencontainers.image.title="mnemonic-api" \
     org.opencontainers.image.description="Admin REST API for reusable knowledge-graph patterns" \
-    org.opencontainers.image.source="https://github.com/twistingmercury/librarian" \
+    org.opencontainers.image.source="https://github.com/twistingmercury/mnemonic" \
     org.opencontainers.image.licenses="Apache-2.0" \
     org.opencontainers.image.authors="Jeremy K. Johnson" \
     org.opencontainers.image.created="${BUILD_DATE}" \

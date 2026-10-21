@@ -34,9 +34,9 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
     go test -v ./cmd/enricher/... ./internal/... -coverprofile=coverage.out
 
 ARG LD_FLAGS="-s -w \
-    -X 'github.com/twistingmercury/librarian/internal/enricher/version.version=${BUILD_VER}' \
-    -X 'github.com/twistingmercury/librarian/internal/enricher/version.buildDate=${BUILD_DATE}' \
-    -X 'github.com/twistingmercury/librarian/internal/enricher/version.commit=${BUILD_COMMIT}'"
+    -X 'github.com/twistingmercury/mnemonic/internal/enricher/version.version=${BUILD_VER}' \
+    -X 'github.com/twistingmercury/mnemonic/internal/enricher/version.buildDate=${BUILD_DATE}' \
+    -X 'github.com/twistingmercury/mnemonic/internal/enricher/version.commit=${BUILD_COMMIT}'"
 
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
     go build --ldflags "${LD_FLAGS}" -o /out/mnemonic-enricher ./cmd/enricher
@@ -53,7 +53,7 @@ ARG BUILD_COMMIT=unknown
 
 LABEL org.opencontainers.image.title="mnemonic-enricher" \
     org.opencontainers.image.description="Backend server providing enrichment services for patterns within Mnemonic MCP server." \
-    org.opencontainers.image.source="https://github.com/twistingmercury/librarian" \
+    org.opencontainers.image.source="https://github.com/twistingmercury/mnemonic" \
     org.opencontainers.image.licenses="Apache-2.0" \
     org.opencontainers.image.authors="Jeremy K. Johnson" \
     org.opencontainers.image.created="${BUILD_DATE}" \

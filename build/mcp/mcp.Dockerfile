@@ -34,9 +34,9 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
     go test -v ./cmd/mcp/... ./internal/...
 
 ARG LD_FLAGS="-s -w \
-    -X 'github.com/twistingmercury/librarian/internal/mcp/version.version=${BUILD_VER}' \
-    -X 'github.com/twistingmercury/librarian/internal/mcp/version.buildDate=${BUILD_DATE}' \
-    -X 'github.com/twistingmercury/librarian/internal/mcp/version.commit=${BUILD_COMMIT}'"
+    -X 'github.com/twistingmercury/mnemonic/internal/mcp/version.version=${BUILD_VER}' \
+    -X 'github.com/twistingmercury/mnemonic/internal/mcp/version.buildDate=${BUILD_DATE}' \
+    -X 'github.com/twistingmercury/mnemonic/internal/mcp/version.commit=${BUILD_COMMIT}'"
 
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
     go build --ldflags "${LD_FLAGS}" -o /out/mnemonic ./cmd/mcp
@@ -53,7 +53,7 @@ ARG BUILD_COMMIT=unknown
 
 LABEL org.opencontainers.image.title="mnemonic" \
     org.opencontainers.image.description="Mnemonic MCP service for semantic pattern search and retrieval" \
-    org.opencontainers.image.source="https://github.com/twistingmercury/librarian" \
+    org.opencontainers.image.source="https://github.com/twistingmercury/mnemonic" \
     org.opencontainers.image.licenses="Apache-2.0" \
     org.opencontainers.image.authors="Jeremy K. Johnson" \
     org.opencontainers.image.created="${BUILD_DATE}" \

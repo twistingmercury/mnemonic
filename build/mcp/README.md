@@ -16,7 +16,7 @@ Run builds from a Git checkout with:
 
 - Docker and Docker Compose available to the current user
 - GNU Make
-- `ghcr.io/twistingmercury/librarian-api:latest-dev` available locally or
+- `ghcr.io/twistingmercury/mnemonic-api:latest-dev` available locally or
   pullable from GHCR for the end-to-end suite
 
 ## Run the build
@@ -59,7 +59,7 @@ tests.
 | `BUILD_VER`    | Latest Git tag, or `dev`                     | Binary and image version             |
 | `BUILD_DATE`   | Current UTC time in RFC 3339 format          | Image and binary build timestamp     |
 | `BUILD_COMMIT` | Current short Git commit, or `unknown`       | Image and binary source revision     |
-| `IMAGE_NAME`   | `ghcr.io/twistingmercury/librarian-mcp`           | Image repository                     |
+| `IMAGE_NAME`   | `ghcr.io/twistingmercury/mnemonic-mcp`       | Image repository                     |
 | `IMAGE_TAG`    | Value of `BUILD_VER`                         | Primary local image tag              |
 | `LOCAL`        | `0`; root `make build` overrides this to `1` | Enables additional local cleanup     |
 
@@ -102,7 +102,7 @@ docker compose -f src/tests/docker-compose.yaml config --quiet
 To check for a local copy of the companion API image, run:
 
 ```bash
-docker image inspect ghcr.io/twistingmercury/librarian-api:latest-dev
+docker image inspect ghcr.io/twistingmercury/mnemonic-api:latest-dev
 ```
 
 If it is absent locally, Docker Compose pulls it from GHCR when accessible.
@@ -110,7 +110,7 @@ If it is absent locally, Docker Compose pulls it from GHCR when accessible.
 After a successful run, inspect the generated tags with:
 
 ```bash
-docker image ls ghcr.io/twistingmercury/librarian-mcp
+docker image ls ghcr.io/twistingmercury/mnemonic-mcp
 ```
 
 For failures:

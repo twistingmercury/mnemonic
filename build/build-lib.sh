@@ -15,7 +15,7 @@ build_lib::run_quiet() {
     local log
     local rc=0
 
-    log="$(mktemp 2>/dev/null || mktemp -t 'librarian-build')"
+    log="$(mktemp 2>/dev/null || mktemp -t 'mnemonic-build')"
     "$@" >"${log}" 2>&1 || rc=$?
     if [ "${rc}" -ne 0 ]; then
         cat "${log}"
