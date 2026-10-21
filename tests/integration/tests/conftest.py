@@ -5,8 +5,10 @@ from collections.abc import Callable, Iterator
 
 import pytest
 
+from mnemonic_e2e.amqp import Amqp
 from mnemonic_e2e.api import ApiClient, Pattern, pattern_payload
 from mnemonic_e2e.config import Settings
+from mnemonic_e2e.db import Graph, Pg
 from mnemonic_e2e.mcp import McpClient
 from mnemonic_e2e.stub import StubClient
 
@@ -31,6 +33,23 @@ def mcp(settings: Settings) -> McpClient:
 @pytest.fixture(scope="session")
 def stub(settings: Settings) -> StubClient:
     return StubClient(settings.openai_stub_url)
+
+
+@pytest.fixture(scope="session")
+def pg(settings: Settings) -> Pg:
+    return Pg(settings.database_url)
+
+
+@pytest.fixture(scope="session")
+def graph(settings: Settings) -> Iterator[Graph]:
+    g = Graph(settings.neo4j_uri, settings.neo4j_user, settings.neo4j_password, settings.neo4j_database)
+    yield g
+    g.close()
+
+
+@pytest.fixture(scope="session")
+def amqp(settings: Settings) -> Amqp:
+    return Amqp(settings.rabbitmq_url)
 
 
 @pytest.fixture

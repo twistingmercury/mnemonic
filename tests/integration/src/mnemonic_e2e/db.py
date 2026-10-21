@@ -68,7 +68,12 @@ _INSERT_CHUNK = """
     insert into pattern_chunks (pattern_id, section_title, chunk_index, content, embedding, enrichment_status)
     values (%s, %s, %s, %s, %s::vector, %s) returning id::text
 """
-_INSERT_JOB = "insert into enrichment_jobs (chunk_id, status, attempts) values (%s, %s, %s) returning id::text"
+_INSERT_JOB = """
+    insert into enrichment_jobs (chunk_id, status, attempts, max_attempts)
+    values (%s, %s, %s, %s) returning id::text
+"""
+# The max_attempts the API gives every job it creates.
+DEFAULT_MAX_ATTEMPTS = 3
 _DELETE_PATTERN = "delete from patterns where id = %s"
 
 
@@ -110,9 +115,11 @@ class Pg:
         vector = None if embedding is None else vector_literal(embedding)
         return self._insert(_INSERT_CHUNK, (pattern_id, title, index, content, vector, status))
 
-    def seed_job(self, chunk_id: str, status: str = "pending", attempts: int = 0) -> str:
+    def seed_job(
+        self, chunk_id: str, status: str = "pending", attempts: int = 0, max_attempts: int = DEFAULT_MAX_ATTEMPTS
+    ) -> str:
         """Insert an enrichment job for chunk_id and return its id."""
-        return self._insert(_INSERT_JOB, (chunk_id, status, attempts))
+        return self._insert(_INSERT_JOB, (chunk_id, status, attempts, max_attempts))
 
     def delete_pattern(self, pattern_id: str) -> None:
         """Remove a seeded pattern; its chunks and jobs go with it (on delete cascade)."""

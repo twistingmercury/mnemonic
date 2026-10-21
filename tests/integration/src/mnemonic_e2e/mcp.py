@@ -1,6 +1,7 @@
 """MCP client: tool calls through the official SDK, plus raw POSTs for edge cases."""
 
 import asyncio
+import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -52,6 +53,18 @@ def tool_call_request(name: str, args: dict[str, Any]) -> tuple[dict[str, str], 
     return headers, body
 
 
+def json_rpc_message(response: HttpResponse) -> Any:
+    """The JSON-RPC message of a raw MCP response, whether sent as plain JSON or as one SSE event."""
+    if not response.headers.get("content-type", "").startswith("text/event-stream"):
+        return response.json()
+
+    for line in response.text.splitlines():
+        if line.startswith("data:"):
+            return json.loads(line.removeprefix("data:"))
+
+    raise ValueError(f"SSE response has no data line: {response.text!r}")
+
+
 def _root_cause(exc: BaseException) -> BaseException:
     """The first exception at the bottom of nested exception groups."""
     while isinstance(exc, BaseExceptionGroup):
@@ -90,3 +103,7 @@ class McpClient:
             **headers,
         }
         return send(self._client, "POST", self._url, headers=merged, json=body)
+
+    def get(self, headers: dict[str, str]) -> HttpResponse:
+        """GET the MCP endpoint with exactly these headers."""
+        return send(self._client, "GET", self._url, headers=headers)

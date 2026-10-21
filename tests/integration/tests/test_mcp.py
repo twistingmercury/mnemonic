@@ -5,8 +5,8 @@ import pytest
 from mcp import types
 from mcp.shared.exceptions import MCPError
 
-from mnemonic_e2e._http import TIMEOUT_S
-from mnemonic_e2e.mcp import McpClient, ToolResult, text_of, tool_call_request
+from mnemonic_e2e._http import TIMEOUT_S, HttpResponse
+from mnemonic_e2e.mcp import McpClient, ToolResult, json_rpc_message, text_of, tool_call_request
 
 
 def test_tool_call_request_mirrors_method_and_name_into_headers() -> None:
@@ -144,3 +144,39 @@ def test_call_tool_unreachable_error_names_the_url_and_the_cause(fake_sdk: type[
         McpClient("http://mcp.test:8081").call_tool("t", {})
 
     assert "Name or service not known" in str(info.value)
+
+
+def test_get_sends_a_get_with_the_given_headers_to_the_mcp_path() -> None:
+    seen: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(405, headers={"Allow": "POST"})
+
+    response = McpClient("http://mcp.test:8081", transport=httpx.MockTransport(handle)).get({"Accept": "x"})
+
+    assert response.status == 405
+    assert response.headers["allow"] == "POST"
+    assert seen[0].method == "GET"
+    assert str(seen[0].url) == "http://mcp.test:8081/mcp"
+    assert seen[0].headers["Accept"] == "x"
+
+
+def test_json_rpc_message_reads_a_plain_json_body() -> None:
+    response = HttpResponse(200, {"content-type": "application/json"}, b'{"jsonrpc":"2.0","id":1,"result":{}}')
+
+    assert json_rpc_message(response) == {"jsonrpc": "2.0", "id": 1, "result": {}}
+
+
+def test_json_rpc_message_reads_the_data_line_of_an_sse_body() -> None:
+    body = b'event: message\nid: 1\ndata: {"jsonrpc":"2.0","id":1,"result":{"isError":false}}\n\n'
+    response = HttpResponse(200, {"content-type": "text/event-stream"}, body)
+
+    assert json_rpc_message(response) == {"jsonrpc": "2.0", "id": 1, "result": {"isError": False}}
+
+
+def test_json_rpc_message_rejects_an_sse_body_without_data() -> None:
+    response = HttpResponse(200, {"content-type": "text/event-stream"}, b"event: message\n\n")
+
+    with pytest.raises(ValueError, match="no data line"):
+        json_rpc_message(response)
