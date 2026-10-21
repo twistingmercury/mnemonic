@@ -1,7 +1,7 @@
 ---
-version: 1
+version: 2
 date: 2026-10-21
-notes: "Imported from librarian-docs; service versions, service names and back-link updated for the monorepo."
+notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
 ---
 
 # Mnemonic Requirements
@@ -111,7 +111,7 @@ multiple instances can run without coordination.
 
 <a id="dp-3"></a>**DP-3.** Mnemonic must verify schema compatibility at startup (e.g., by checking that the database
 schema version is compatible with the running version). Mnemonic does not manage schema versioning or
-run migrations. Migrations are pre-applied at Docker image build time via entrypoint scripts,
+run migrations. The schema ships inside the database images and is applied by their entrypoints,
 independent of the application lifecycle. **Not implemented:** the services do not check the schema version at startup;
 only the "no migrations in the services" half holds.
 
@@ -142,4 +142,4 @@ what the system is responsible for:
 
 ---
 
-Copyright (c) 2025-2026 Jeremy K. Johnson. All rights reserved.
+Copyright (c) 2025-2026 Jeremy K. Johnson. Licensed under FSL-1.1-ALv2; see [LICENSE](../../LICENSE).

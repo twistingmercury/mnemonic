@@ -1,7 +1,7 @@
 ---
-version: 1
+version: 2
 date: 2026-10-21
-notes: "Imported from librarian-docs; service names and source paths updated for the monorepo."
+notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
 ---
 
 # POST /v1/api/patterns — Activity Diagram
@@ -112,4 +112,4 @@ flowchart TD
 
 ---
 
-Copyright (c) 2025-2026 Jeremy K. Johnson. All rights reserved.
+Copyright (c) 2025-2026 Jeremy K. Johnson. Licensed under FSL-1.1-ALv2; see [LICENSE](../../../LICENSE).

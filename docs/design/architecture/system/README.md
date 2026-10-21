@@ -1,7 +1,7 @@
 ---
-version: 1
+version: 2
 date: 2026-10-21
-notes: "Imported from librarian-docs; design-docs location and back-link updated for the monorepo."
+notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
 ---
 
 # Architecture
@@ -36,4 +36,4 @@ Architecture docs describe **what** and **why**. Design docs describe **how** an
 
 ---
 
-Copyright (c) 2025-2026 Jeremy K. Johnson. All rights reserved.
+Copyright (c) 2025-2026 Jeremy K. Johnson. Licensed under FSL-1.1-ALv2; see [LICENSE](../../../../LICENSE).

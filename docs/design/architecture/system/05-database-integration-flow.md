@@ -1,7 +1,7 @@
 ---
-version: 1
+version: 2
 date: 2026-10-21
-notes: "Imported from librarian-docs; db/ references updated; admin UI noted as not part of this repository for now."
+notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
 ---
 
 # Database Integration Flow
@@ -39,7 +39,7 @@ Each database serves a distinct purpose in the Mnemonic architecture:
 - Pattern chunks (section title, chunk text, per-chunk embedding and enrichment status)
 - Enrichment jobs (durable job state; RabbitMQ only carries the job ID)
 
-These are the only tables. `agents`, `skills`, `skill_files` (JSONB definitions with `crc64` change detection) and `pattern_agent_associations` are planned for agent/skill features but have no schema in `db/` yet.
+These are the tables the services use. The schema in `db/` also defines `agents`, `skills`, `skill_files` (JSONB definitions with `crc64` change detection) and `pattern_agent_associations`; no service reads or writes them.
 
 **Why PostgreSQL:** Mature ecosystem, excellent Go driver support, JSONB for flexible storage, and transactional consistency across entities.
 
@@ -668,4 +668,4 @@ See also:
 
 ---
 
-Copyright (c) 2025-2026 Jeremy K. Johnson. All rights reserved.
+Copyright (c) 2025-2026 Jeremy K. Johnson. Licensed under FSL-1.1-ALv2; see [LICENSE](../../../../LICENSE).

@@ -1,7 +1,7 @@
 ---
-version: 1
+version: 2
 date: 2026-10-21
-notes: "Imported from librarian-docs; repository column replaced with source paths; service names and admin UI label updated."
+notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
 ---
 
 # System Architecture
@@ -34,11 +34,11 @@ notes: "Imported from librarian-docs; repository column replaced with source pat
 
 Mnemonic uses a decomposed service architecture with three independent services communicating through a message queue and shared data stores.
 
-| Service    | Location           | Image                                        | Ports                                                           | Role                                           |
-| ---------- | ------------------ | -------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------- |
-| MCP Server | `src/cmd/mcp`      | `ghcr.io/twistingmercury/librarian-mcp`      | 8081 `/mcp`, 8080 `/health` `/version`, 9090 `/metrics`         | Sole read-only MCP interface for Claude Code   |
-| Admin API  | `src/cmd/api`      | `ghcr.io/twistingmercury/librarian-api`      | 8080 `/v1/api` `/swagger` `/health` `/version`, 9090 `/metrics` | REST API for pattern CRUD and search           |
-| Enricher   | `src/cmd/enricher` | `ghcr.io/twistingmercury/librarian-enricher` | 8080 `/health` `/version`, 9090 `/metrics`                      | Standalone worker for async pattern enrichment |
+| Service    | Location           | Image                                       | Ports                                                           | Role                                           |
+| ---------- | ------------------ | ------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------- |
+| MCP Server | `src/cmd/mcp`      | `ghcr.io/twistingmercury/mnemonic-mcp`      | 8081 `/mcp`, 8080 `/health` `/version`, 9090 `/metrics`         | Sole read-only MCP interface for Claude Code   |
+| Admin API  | `src/cmd/api`      | `ghcr.io/twistingmercury/mnemonic-api`      | 8080 `/v1/api` `/swagger` `/health` `/version`, 9090 `/metrics` | REST API for pattern CRUD and search           |
+| Enricher   | `src/cmd/enricher` | `ghcr.io/twistingmercury/mnemonic-enricher` | 8080 `/health` `/version`, 9090 `/metrics`                      | Standalone worker for async pattern enrichment |
 
 All three services serve `/health` and `/version` on `server.port` (default 8080) and Prometheus metrics on `observability.metrics.port` (default 9090, path `/metrics`). Only the mcp service listens on 8081 (`mcp.port`).
 
@@ -304,7 +304,7 @@ graph TB
 ### Cross-Cutting Concerns
 
 - **Observability**: All three services emit structured logs, expose `/health` and `/version` on port 8080, publish OpenTelemetry metrics for Prometheus on port 9090 (`/metrics`), and export traces over OTLP gRPC when `observability.tracing.enabled` is true (off by default). One trace spans API to RabbitMQ to Enricher. See [Observability Architecture](07-observability-architecture.md).
-- **Schema migration**: Migrations are pre-applied at Docker image build time via entrypoint scripts. The services neither run migrations nor check the schema version at startup; they assume the schema shipped in the database images. See [Data Architecture - Migration Strategy](04-data-architecture.md#migration-strategy).
+- **Schema migration**: The schema ships inside the database images: Postgres applies it from `docker-entrypoint-initdb.d` on first start, and the Neo4j image applies it at every container start. The services neither run migrations nor check the schema version at startup; they assume the schema shipped in the database images. See [Data Architecture - Migration Strategy](04-data-architecture.md#migration-strategy).
 
 ## Post-MVP
 
@@ -348,4 +348,4 @@ See [05-concept-cloud-iteration](../../diagrams/05-concept-cloud-iteration.md).
 
 ---
 
-Copyright (c) 2025-2026 Jeremy K. Johnson. All rights reserved.
+Copyright (c) 2025-2026 Jeremy K. Johnson. Licensed under FSL-1.1-ALv2; see [LICENSE](../../../../LICENSE).

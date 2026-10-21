@@ -1,7 +1,7 @@
 ---
-version: 1
+version: 2
 date: 2026-10-21
-notes: "Imported from librarian-docs; repo wording updated for the monorepo; history entries otherwise unchanged."
+notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
 ---
 
 # Mnemonic Design Change Log
@@ -77,7 +77,7 @@ Each entry includes:
 - **Removed:** Routing engine, routing rules, ACE CLI
 - **Added:** MCP server for Claude Code integration, skills storage, Admin REST API
 - **Changed:** Mnemonic's focus from agent routing to team knowledge graph + tooling synchronization
-- **See:** Pivot Proposal (2026-02-14-mnemonic-pivot-knowledge-sync.md, in source repository), [ADR-008](architecture/system/00-architectural-decisions.md)
+- **See:** Pivot Proposal (2026-02-14-mnemonic-pivot-knowledge-sync.md, not part of this repository), [ADR-008](architecture/system/00-architectural-decisions.md)
 
 ### 2026-01-28: Phase 3 Observability Implementation
 
@@ -192,4 +192,4 @@ Each entry includes:
 
 ---
 
-Copyright (c) 2025-2026 Jeremy K. Johnson. All rights reserved.
+Copyright (c) 2025-2026 Jeremy K. Johnson. Licensed under FSL-1.1-ALv2; see [LICENSE](../../LICENSE).

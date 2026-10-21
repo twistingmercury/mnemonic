@@ -1,7 +1,7 @@
 ---
-version: 1
+version: 2
 date: 2026-10-21
-notes: "Imported from librarian-docs; service names and back-link updated for the monorepo."
+notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
 ---
 
 # MCP Tools
@@ -23,7 +23,7 @@ Mnemonic exposes 3 read-only MCP tools for pattern search: `search_patterns`, `f
 
 ## Tool Discovery
 
-The MCP server speaks MCP protocol version **2026-07-28** over Streamable HTTP at `http://localhost:18081/mcp` (port from `mcp.port`). There is **no authentication** in the current local, single-user phase, so the port should not be exposed beyond localhost.
+The MCP server speaks MCP protocol version **2026-07-28** over Streamable HTTP at `http://localhost:8081/mcp` (port from `mcp.port`). There is **no authentication** in the current local, single-user phase, so the port should not be exposed beyond localhost.
 
 The 2026-07-28 protocol has no `initialize` handshake and no sessions. Every request is one HTTP POST that stands on its own:
 
@@ -82,7 +82,7 @@ sequenceDiagram
 Client configuration (Claude Code CLI):
 
 ```bash
-claude mcp add --transport http --scope user mnemonic http://localhost:18081/mcp
+claude mcp add --transport http --scope user mnemonic http://localhost:8081/mcp
 ```
 
 Or in `.mcp.json`:
@@ -92,7 +92,7 @@ Or in `.mcp.json`:
   "mcpServers": {
     "mnemonic": {
       "type": "http",
-      "url": "http://localhost:18081/mcp"
+      "url": "http://localhost:8081/mcp"
     }
   }
 }
@@ -201,4 +201,4 @@ Arguments that do not match a tool's input schema (for example a number where `i
 
 ---
 
-Copyright (c) 2025-2026 Jeremy K. Johnson. All rights reserved.
+Copyright (c) 2025-2026 Jeremy K. Johnson. Licensed under FSL-1.1-ALv2; see [LICENSE](../../../../LICENSE).

@@ -1,7 +1,7 @@
 ---
-version: 1
+version: 2
 date: 2026-10-21
-notes: "Imported from librarian-docs; service names, test paths and links updated for the monorepo."
+notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
 ---
 
 # Requirements Traceability Matrix
@@ -67,7 +67,7 @@ flowchart LR
 | SE-3 | Implemented     | By design: no user, credential, or session tables or fields in any service                                                                                                                                              | —                                                                                                                                                                                                                                                                              |
 | SE-4 | Implemented     | mcp `internal/mcpserver/tools.go` (only `search_patterns`, `find_related_patterns`, `get_pattern`); mcp has no write code                                                                                               | mcp e2e `TestMCPToolsList_ReturnsThreeTools`                                                                                                                                                                                                                                   |
 | SE-5 | Post-MVP        | —                                                                                                                                                                                                                       | —                                                                                                                                                                                                                                                                              |
-| SE-6 | Implemented     | `internal/config/config.go` in each service (`LIBRARIAN_*` env vars, config file)                                                                                                                                        | `internal/config/config_test.go` in each service                                                                                                                                                                                                                               |
+| SE-6 | Implemented     | `internal/config/config.go` in each service (`MNEMONIC_*` env vars, config file)                                                                                                                                        | `internal/config/config_test.go` in each service                                                                                                                                                                                                                               |
 | DP-1 | Partial         | Local: Docker images and docker-compose.yaml; production deployment is Post-MVP                                                                                                                                         | Service E2E and cross-service suites run the images under Docker Compose                                                                                                                                                                                                       |
 | DP-2 | Implemented     | All state in PostgreSQL/Neo4j/RabbitMQ; mcp uses stateless Streamable HTTP (`internal/mcpserver/server.go`); enricher claims jobs with `FOR UPDATE SKIP LOCKED`                                                         | enricher `internal/enricher/enrichment_test.go` (`TestMultipleWorkersConcurrency`)                                                                                                                                                                                             |
 | DP-3 | Not implemented | No startup schema-version check; services run no migrations                                                                                                                                                             | —                                                                                                                                                                                                                                                                              |
@@ -137,4 +137,4 @@ flowchart LR
 
 ---
 
-Copyright (c) 2025-2026 Jeremy K. Johnson. All rights reserved.
+Copyright (c) 2025-2026 Jeremy K. Johnson. Licensed under FSL-1.1-ALv2; see [LICENSE](../../LICENSE).

@@ -1,7 +1,7 @@
 ---
-version: 1
+version: 2
 date: 2026-10-21
-notes: "Imported from librarian-docs; design index rewritten for the monorepo, admin pages removed from the list, navigation limited to pages that exist."
+notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
 ---
 
 # Design Documents
@@ -40,8 +40,8 @@ If you are new to the codebase, read the design docs in this order — each buil
 - [Architecture](architecture/system/README.md): system, communication, data, security, deployment and observability; database images under [architecture/dbs](architecture/dbs/README.md); MCP tools under [architecture/mnemonic](architecture/mnemonic/README.md)
 - [Diagrams](diagrams/01-concept-local-iteration.md): concept diagrams for each iteration, plus the POST activity diagram
 - [Glossary](reference/glossary.md) and [Pattern File Schema](reference/pattern-schema.md)
-- [From Coding Patterns to Any Knowledge](librarian_from_coding_patterns_to_any_knowledge.md): design direction for generalizing beyond coding patterns
+- [From Coding Patterns to Any Knowledge](mnemonic_from_coding_patterns_to_any_knowledge.md): design direction for generalizing beyond coding patterns
 
 ---
 
-Copyright (c) 2025-2026 Jeremy K. Johnson. All rights reserved.
+Copyright (c) 2025-2026 Jeremy K. Johnson. Licensed under FSL-1.1-ALv2; see [LICENSE](../../LICENSE).

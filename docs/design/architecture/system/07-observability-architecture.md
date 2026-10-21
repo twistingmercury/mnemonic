@@ -1,7 +1,7 @@
 ---
-version: 1
+version: 2
 date: 2026-10-21
-notes: "Imported from librarian-docs; service names in sequence labels updated; service.name values unchanged."
+notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
 ---
 
 # Observability Architecture
@@ -100,7 +100,7 @@ Each service writes structured JSON logs (zerolog via otelx) to stdout. Logs are
 **Standard fields:**
 
 - Timestamp, log level, message
-- `service`, `version` and `environment` (from `LIBRARIAN_ENV`) added by otelx; the caller location is added at `debug` level
+- `service`, `version` and `environment` (from `MNEMONIC_ENV`) added by otelx; the caller location is added at `debug` level
 - `trace_id` and `span_id` when the event happens inside a recording span
 
 **Context fields:**
@@ -502,4 +502,4 @@ For sampling configuration, see operations documentation (TBD).
 
 ---
 
-Copyright (c) 2025-2026 Jeremy K. Johnson. All rights reserved.
+Copyright (c) 2025-2026 Jeremy K. Johnson. Licensed under FSL-1.1-ALv2; see [LICENSE](../../../../LICENSE).

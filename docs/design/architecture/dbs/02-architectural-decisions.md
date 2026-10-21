@@ -1,7 +1,7 @@
 ---
-version: 1
+version: 2
 date: 2026-10-21
-notes: "Imported from librarian-docs; ADR-002 marked superseded by the monorepo, history kept; repo references updated."
+notes: "ADR-003 corrected: Neo4j schema is applied by a startup entrypoint, not docker commit; ADR-004 updated. License footer corrected."
 ---
 
 # Database Images — Architectural Decisions
@@ -26,12 +26,12 @@ Each architectural decision is recorded as an ADR with the following structure:
 
 ## Decision Summary
 
-| ADR #   | Title                                                            | Status     | Date       |
-| ------- | ---------------------------------------------------------------- | ---------- | ---------- |
-| ADR-001 | Pre-seeded images over runtime migration tooling                 | Accepted   | 2026-03-19 |
-| ADR-002 | Separate repo from application code                              | Superseded | 2026-03-19 |
-| ADR-003 | docker-entrypoint-initdb.d for Postgres; docker commit for Neo4j | Accepted   | 2026-03-19 |
-| ADR-004 | Neo4j Community Edition only                                     | Accepted   | 2026-03-19 |
+| ADR #   | Title                                                                 | Status     | Date       |
+| ------- | --------------------------------------------------------------------- | ---------- | ---------- |
+| ADR-001 | Pre-seeded images over runtime migration tooling                      | Accepted   | 2026-03-19 |
+| ADR-002 | Separate repo from application code                                   | Superseded | 2026-03-19 |
+| ADR-003 | docker-entrypoint-initdb.d for Postgres; startup entrypoint for Neo4j | Accepted   | 2026-03-19 |
+| ADR-004 | Neo4j Community Edition only                                          | Accepted   | 2026-03-19 |
 
 ## Decisions
 
@@ -45,7 +45,7 @@ Application services previously depended on a `migrate/migrate` sidecar containe
 
 **Decision:**
 
-Build database images with the schema already applied. The Postgres image uses `docker-entrypoint-initdb.d` to run SQL files on first container start. The Neo4j image is committed after Cypher migrations are applied in a temporary container. Application services simply reference these images — no migration step at runtime.
+Build database images with the schema already applied. The Postgres image uses `docker-entrypoint-initdb.d` to run SQL files on first container start. The Neo4j image ships its Cypher files and a wrapper entrypoint that applies them at every container start (see ADR-003). Application services simply reference these images — no migration step at runtime.
 
 **Consequences:**
 
@@ -64,7 +64,7 @@ _Negative:_
 
 ### ADR-002: Separate repo from application code
 
-**Status:** Superseded (monorepo, 2026-10-21): the component now lives in `db/` in the Librarian monorepo. The text below is the original decision, kept as history.
+**Status:** Superseded (monorepo, 2026-10-21): the component now lives in `db/` in the Mnemonic monorepo. The text below is the original decision, kept as history.
 
 **Context:**
 
@@ -72,7 +72,7 @@ The database schema was originally embedded inside the `mnemonic` application re
 
 **Decision:**
 
-Extract schema into its own repo (`db/`). All three application repos (the mcp service, the api service, the enricher service) pull the pre-built images from GHCR. Schema changes have their own PR, review, and CI pipeline.
+Extract schema into its own repo (`db/`). All three application repos (the mcp service, the api service, the enricher service) pull the pre-built images from GHCR. Schema changes have their own PR and review, and are tested by the BATS suites in `db/tests/`.
 
 **Consequences:**
 
@@ -89,18 +89,18 @@ _Negative:_
 
 ---
 
-### ADR-003: docker-entrypoint-initdb.d for Postgres; docker commit for Neo4j
+### ADR-003: docker-entrypoint-initdb.d for Postgres; startup entrypoint for Neo4j
 
 **Status:** Accepted
 
 **Context:**
 
-Both databases need their schema applied at image build time, but each supports different initialization mechanisms.
+Both databases need their schema in place before the services use them, but each supports different initialization mechanisms.
 
 **Decision:**
 
-- **Postgres**: Copy all `*.up.sql` files into `/docker-entrypoint-initdb.d/`. The `pgvector/pgvector:pg16` base image runs these scripts automatically on first container start. File naming (`000001_…` through `000006_…`) ensures correct execution order.
-- **Neo4j**: No equivalent init-directory mechanism exists in the Community Edition image. The build script starts a temporary container, applies Cypher files via `cypher-shell`, stops the container, and commits it as the final image using `docker commit`.
+- **Postgres**: Copy all `*.up.sql` files into `/docker-entrypoint-initdb.d/`. The `pgvector/pgvector:pg16` base image runs these scripts automatically on first container start. File naming (`000001_…` through `000010_…`) ensures correct execution order.
+- **Neo4j**: No equivalent init-directory mechanism exists in the Community Edition image, and the schema cannot be baked in at build time: `/data` is a `VOLUME` in the base image and `docker commit` drops volume contents, so the original plan (seed a temporary container, then `docker commit`) does not work. Instead the image copies the Cypher files to `/startup/schema/` and replaces the entrypoint with `schema-entrypoint.sh`. That script starts Neo4j in the foreground and, in the background, waits for it to accept connections, applies the idempotent Cypher files with `cypher-shell` and writes `/tmp/schema_ready`, which the image's `HEALTHCHECK` tests.
 
 **Consequences:**
 
@@ -111,8 +111,9 @@ _Positive:_
 
 _Negative:_
 
-- Neo4j build is slower and more complex — it requires a running container and network connectivity during the build
-- `docker commit` captures the full container filesystem, including any neo4j runtime state, which increases image size slightly
+- The Neo4j schema is applied on every container start, so a Neo4j container is not ready until `/tmp/schema_ready` exists
+- A failed schema job stops Neo4j, so a container never runs without its schema
+- Every Cypher file must stay idempotent
 
 ---
 
@@ -126,7 +127,7 @@ Neo4j offers property existence constraints (`IS NOT NULL`) only in Enterprise E
 
 **Decision:**
 
-Target Community Edition only. Skip `002_create_existence_constraints.cypher` in both the build script and CI. Existence constraints are enforced at the application layer instead. The file is kept in the repo for reference and future Enterprise Edition support.
+Target Community Edition only. Skip `002_create_existence_constraints.cypher` at container start unless the edition is Enterprise (`schema-entrypoint.sh` checks `NEO4J_EDITION`). Existence constraints are enforced at the application layer instead. The file is kept in the repo for reference and future Enterprise Edition support.
 
 **Consequences:**
 
@@ -138,10 +139,10 @@ _Positive:_
 _Negative:_
 
 - Property existence is not enforced at the database level for Neo4j nodes
-- Switching to Enterprise Edition later requires re-running the build with migration 002 included
+- Enterprise Edition support needs no build change: the same entrypoint applies migration 002 when it runs on an Enterprise base image
 
 **Next:** [Deployment Architecture](05-deployment-architecture.md)
 
 ---
 
-Copyright (c) 2025-2026 Jeremy K. Johnson. All rights reserved.
+Copyright (c) 2025-2026 Jeremy K. Johnson. Licensed under FSL-1.1-ALv2; see [LICENSE](../../../../LICENSE).

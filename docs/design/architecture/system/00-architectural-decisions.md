@@ -1,7 +1,7 @@
 ---
-version: 1
+version: 2
 date: 2026-10-21
-notes: "Imported from librarian-docs; service references updated for the monorepo, ADR history kept; back-link repointed."
+notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
 ---
 
 # Architectural Decisions
@@ -134,7 +134,7 @@ Agents, skills, and skill files are first-class entities in Mnemonic (see [ADR-0
 
 ### Decision
 
-> **Amendment (2026-10-15):** Not implemented in the current services. As of v0.4.0, the api, mcp and enricher services have no agent, skill or skill-file entities or endpoints; patterns are the only resource, and the database schema in `db/` has no `agents`, `skills` or `skill_files` tables. This record is kept for history and as the design to follow if entity storage returns.
+> **Amendment (2026-10-15):** Not implemented in the current services. As of v0.4.0, the api, mcp and enricher services have no agent, skill or skill-file entities or endpoints; patterns are the only resource, and no service uses the `agents`, `skills` and `skill_files` tables that the schema in `db/` defines (migrations 000002, 000007, 000008). This record is kept for history and as the design to follow if entity storage returns.
 
 **Use a JSONB document model for entity definitions.** Each entity table follows a common pattern:
 
@@ -185,7 +185,7 @@ Patterns are the core knowledge artifacts in Mnemonic. Unlike entities (agents, 
 
 > **Amended by ADR-008 and ADR-009:** Enrichment dispatch now uses RabbitMQ as the primary queue. The Postgres-backed `enrichment_jobs` table with `FOR UPDATE SKIP LOCKED` remains as a recovery mechanism for jobs that fail to publish to RabbitMQ. The pattern storage design (relational columns, two-phase enrichment) remains in effect.
 >
-> **Amendment (2026-10-15), chunked enrichment:** Embeddings are now stored per chunk in `pattern_chunks`, not in a single pattern-level `embedding` column. The api service splits content into chunks (one per `[//]: pattern` section) and creates one enrichment job per chunk in the same transaction as the pattern. The enricher embeds each chunk; only when the pattern's last chunk is embedded does it extract concepts and sync Neo4j, then mark the pattern `enriched`. Retries use a fixed delay (`enrichment.retry_delay`, default 30s) up to the job's `max_attempts` (default 3), not exponential backoff, and are run by the enricher's 15-second retry sweep. The API handler accepts content up to 100000 bytes; the database has no content-length CHECK (`db/` migration 000005 dropped the 10KB one).
+> **Amendment (2026-10-15), chunked enrichment:** Embeddings are now stored per chunk in `pattern_chunks`, not in a single pattern-level `embedding` column. The api service splits content into chunks (one per `[//]: pattern` section) and creates one enrichment job per chunk in the same transaction as the pattern. The enricher embeds each chunk; only when the pattern's last chunk is embedded does it extract concepts and sync Neo4j, then mark the pattern `enriched`. Retries use a fixed delay (`enrichment.retry_delay`, default 30s) up to the job's `max_attempts` (default 3), not exponential backoff, and are run by the enricher's 15-second retry sweep. The API handler accepts content up to 100000 bytes; the database has no content-length CHECK (`db/` migration 000009 dropped the 10KB one).
 
 **Patterns use relational columns (not JSONB) with async enrichment via a Postgres-backed job queue.**
 
@@ -207,7 +207,7 @@ Patterns are the core knowledge artifacts in Mnemonic. Unlike entities (agents, 
 
 - Vector similarity search requires a dedicated `embedding` column for PGVector indexing
 - Enrichment status must be queryable for job processing (`WHERE enrichment_status = 'pending'`)
-- ~~Content size constraint (10KB max) enforced at database level via CHECK~~ (dropped by migration 000005 in `db/postgres/`; the API handler caps content at 100000 bytes)
+- ~~Content size constraint (10KB max) enforced at database level via CHECK~~ (dropped by migration 000009 in `db/postgres/`; the API handler caps content at 100000 bytes)
 
 ### Consequences
 
@@ -340,7 +340,7 @@ Additionally, operators want to constrain deployments to their team's supported 
 
 **Enforce vocabulary allow-lists at the handler layer, loaded from `VocabularyConfig` in the server config.**
 
-- `VocabularyConfig{Languages []string, Domains []string}` is defined in the `config` package, loaded by Viper from `config.yaml` or environment variables (`LIBRARIAN_VOCABULARY_LANGUAGES`, `LIBRARIAN_VOCABULARY_DOMAINS`).
+- `VocabularyConfig{Languages []string, Domains []string}` is defined in the `config` package, loaded by Viper from `config.yaml` or environment variables (`MNEMONIC_VOCABULARY_LANGUAGES`, `MNEMONIC_VOCABULARY_DOMAINS`).
 - At startup, `VocabularyConfig.validate()` rejects empty lists. The server will not start without a non-empty vocabulary.
 - `Handler` receives the vocabulary at construction time via `New(patternSvc, searchSvc, vocab)`. No global state.
 - `validatePatternFields` checks `language` and `domain` against `allowedLanguages` and `allowedDomains` after format validation. A non-matching value returns `INVALID_VALUE` (400).
@@ -451,4 +451,4 @@ Recovery relies on the `pending` status in the `enrichment_jobs` table. A future
 
 ---
 
-Copyright (c) 2025-2026 Jeremy K. Johnson. All rights reserved.
+Copyright (c) 2025-2026 Jeremy K. Johnson. Licensed under FSL-1.1-ALv2; see [LICENSE](../../../../LICENSE).

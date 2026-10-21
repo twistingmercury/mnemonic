@@ -1,7 +1,7 @@
 ---
-version: 1
+version: 2
 date: 2026-10-21
-notes: "Imported from librarian-docs; service names, code paths and E2E wording updated for the monorepo; metric names unchanged."
+notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
 ---
 
 # Observability Implementation Design
@@ -121,7 +121,7 @@ The observability keys (`logging.level`, `observability.metrics.*`, `observabili
 otelCfg := otelx.Config{
     ServiceName:    version.Service,       // "mnemonic-api", "mnemonic-enricher" or "mnemonic-mcp"
     ServiceVersion: version.Version(),
-    Environment:    getEnvironment(),      // $LIBRARIAN_ENV, default "development"
+    Environment:    getEnvironment(),      // $MNEMONIC_ENV, default "development"
     LogLevel:       cfg.Logging.Level,
 }
 
@@ -737,4 +737,4 @@ Status at api v0.5.0, enricher v0.5.0, mcp v0.6.0.
 
 ---
 
-Copyright (c) 2025-2026 Jeremy K. Johnson. All rights reserved.
+Copyright (c) 2025-2026 Jeremy K. Johnson. Licensed under FSL-1.1-ALv2; see [LICENSE](../../LICENSE).

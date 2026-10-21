@@ -1,7 +1,7 @@
 ---
-version: 1
+version: 2
 date: 2026-10-21
-notes: "Imported from librarian-docs; service, db/ and image names updated for the monorepo."
+notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
 ---
 
 # Data Architecture
@@ -116,7 +116,7 @@ flowchart LR
 - Pattern chunks: sections of each pattern, split at `[//]: pattern` markers (used for embedding and semantic search)
 - Enrichment jobs: durable queue state for chunk embedding and graph sync
 
-**Planned, no schema yet:** `agents`, `skills`, `skill_files`, `pattern_agent_associations`. The `db/` component has no migrations for them, and no service has code for them.
+**Schema only, unused:** `agents`, `skills`, `skill_files`, `pattern_agent_associations`. The `db/` component has migrations for them (000002, 000004, 000007, 000008), but no service has code for them.
 
 **Constraint Level:** ACID transactions, foreign keys with CASCADE deletes, NOT NULL constraints on required columns.
 
@@ -144,7 +144,7 @@ flowchart LR
 - Concepts: entities extracted during enrichment (technologies, practices, domains)
 - Relationships: concept mentions (`MENTIONED_IN`) and pattern-pattern similarity (`RELATED_TO`)
 
-The planned `Agent` node and `RELEVANT_FOR` relationship have no schema (the Cypher files cover `Pattern` and `Concept` only), and no service creates them.
+The `Agent` node and `RELEVANT_FOR` relationship have schema in the Cypher files (an `Agent` uniqueness constraint and an index on `RELEVANT_FOR.relevance`), but no service creates them.
 
 **Consistency Model:** Eventual consistency. Postgres is always written first. The enricher writes the graph only after every chunk of a pattern is embedded; a failed graph write fails the job, which is retried. The Admin API's graph delete on pattern delete is best-effort (logged on failure).
 
@@ -156,7 +156,7 @@ The planned `Agent` node and `RELEVANT_FOR` relationship have no schema (the Cyp
 
 #### Entity Relationship Diagram
 
-The three tables in the schema, which are all the services use. See also the [database ER diagram](../dbs/08-data-architecture.md#entity-relationship-diagram).
+The three tables the services use (the schema defines four more, which no service uses). See also the [database ER diagram](../dbs/08-data-architecture.md#entity-relationship-diagram).
 
 ```mermaid
 erDiagram
@@ -214,7 +214,7 @@ erDiagram
 
 #### Agents
 
-**Status:** Planned, not implemented. There is no `agents` table in `db/`, and no service has an agent repository, endpoint, or query. The planned design is in [Data Storage Implementation](../../data-storage.md#jsonb-document-model).
+**Status:** Planned, not implemented. The `agents` table exists in `db/` (migration 000002), but no service has an agent repository, endpoint, or query. The planned design is in [Data Storage Implementation](../../data-storage.md#jsonb-document-model).
 
 #### Patterns
 
@@ -246,7 +246,7 @@ erDiagram
 
 #### Skills
 
-**Status:** Planned, not implemented. There are no `skills` or `skill_files` tables in `db/`. See [Data Storage Implementation](../../data-storage.md#jsonb-document-model) for the planned design.
+**Status:** Planned, not implemented. The `skills` and `skill_files` tables exist in `db/` (migrations 000007 and 000008), but no service uses them. See [Data Storage Implementation](../../data-storage.md#jsonb-document-model) for the planned design.
 
 #### Pattern Chunks
 
@@ -320,7 +320,7 @@ stateDiagram-v2
 
 #### PostgreSQL Schema
 
-The schema is owned by `db/` and baked into the `librarian-postgres` image; see [Database Images Data Architecture](../dbs/08-data-architecture.md) and [Data Storage Implementation](../../data-storage.md#postgresql-migrations) for the DDL.
+The schema is owned by `db/` and baked into the `mnemonic-postgres` image; see [Database Images Data Architecture](../dbs/08-data-architecture.md) and [Data Storage Implementation](../../data-storage.md#postgresql-migrations) for the DDL.
 
 **Note:** Application manages `updated_at` timestamps on write. No database triggers.
 
@@ -595,13 +595,13 @@ If the graph query fails, the pattern is returned without `graph` and a warning 
 
 #### Schema Versioning
 
-**Migration Tool:** Docker entrypoint scripts. PostgreSQL migrations are `.up.sql` files applied via `docker-entrypoint-initdb.d` when the `librarian-postgres` container first starts. Neo4j migrations are `.cypher` files applied via `cypher-shell` during image build. Mnemonic services never manage DDL or run migrations. See [dbs ADR-001](../dbs/02-architectural-decisions.md) for the rationale behind this approach.
+**Migration Tool:** Docker entrypoint scripts. PostgreSQL migrations are `.up.sql` files applied via `docker-entrypoint-initdb.d` when the `mnemonic-postgres` container first starts. Neo4j migrations are `.cypher` files applied via `cypher-shell` by the image's wrapper entrypoint at every container start (the files are idempotent). Mnemonic services never manage DDL or run migrations. See [dbs ADR-001](../dbs/02-architectural-decisions.md) for the rationale behind this approach.
 
-**Location:** The migration files live in `db/` (`db/postgres/000001_*.up.sql` to `000006_*.up.sql`, `db/neo4j/001_*.cypher` to `003_*.cypher`). There are no `.down.sql` files. See [Database Images Deployment Architecture](../dbs/05-deployment-architecture.md).
+**Location:** The migration files live in `db/` (`db/postgres/000001_*.up.sql` to `000010_*.up.sql`, `db/neo4j/001_*.cypher` to `003_*.cypher`). There are no `.down.sql` files. See [Database Images Deployment Architecture](../dbs/05-deployment-architecture.md).
 
 **Version Tracking:**
 
-Migration state is implicit in the Docker image tag — each image version contains a known set of migrations. The services currently pin `librarian-postgres:v1.0.0-dev` and `librarian-neo4j:v1.0.0-dev`. Rollback is accomplished by pulling a prior image tag.
+Migration state is implicit in the Docker image tag — each image version contains a known set of migrations. The services currently pin `mnemonic-postgres:v1.0.0-dev` and `mnemonic-neo4j:v1.0.0-dev`. Rollback is accomplished by pulling a prior image tag.
 
 #### Forward-Compatible Migrations
 
@@ -638,11 +638,11 @@ Migration state is implicit in the Docker image tag — each image version conta
 
 #### Rollback Procedures
 
-No down migrations are maintained. To roll back, point the services at a prior `librarian-postgres` / `librarian-neo4j` image tag:
+No down migrations are maintained. To roll back, point the services at a prior `mnemonic-postgres` / `mnemonic-neo4j` image tag:
 
 ```bash
-docker pull ghcr.io/twistingmercury/librarian-postgres:<previous-tag>
-docker pull ghcr.io/twistingmercury/librarian-neo4j:<previous-tag>
+docker pull ghcr.io/twistingmercury/mnemonic-postgres:<previous-tag>
+docker pull ghcr.io/twistingmercury/mnemonic-neo4j:<previous-tag>
 ```
 
 **Rollback Safety:**
@@ -941,4 +941,4 @@ See also:
 
 ---
 
-Copyright (c) 2025-2026 Jeremy K. Johnson. All rights reserved.
+Copyright (c) 2025-2026 Jeremy K. Johnson. Licensed under FSL-1.1-ALv2; see [LICENSE](../../../../LICENSE).

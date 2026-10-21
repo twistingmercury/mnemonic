@@ -1,7 +1,7 @@
 ---
-version: 1
+version: 2
 date: 2026-10-21
-notes: "Imported from librarian-docs; service names, headings and code paths updated for the monorepo; config keys and env names unchanged."
+notes: "Variable names verified against the config keys; neo4j default URI corrected to port 7687; OpenAI key handling in the full stack noted. License footer corrected."
 ---
 
 # Mnemonic Server Configuration
@@ -48,13 +48,13 @@ The configuration system is built on [`github.com/spf13/viper`](https://github.c
 
 - **Sensible defaults**: Work out of the box with minimal configuration (via `viper.SetDefault()`)
 - **File-based configuration**: Persistent settings in YAML format (via `viper.ReadInConfig()`)
-- **Environment overrides**: Container and CI/CD friendly (via `viper.AutomaticEnv()` with the `LIBRARIAN_` prefix)
+- **Environment overrides**: Container and CI/CD friendly (via `viper.AutomaticEnv()` with the `MNEMONIC_` prefix)
 
 | Service          | Config Prefix | Config File                 | Service-specific sections             |
 | ---------------- | ------------- | --------------------------- | ------------------------------------- |
-| mcp service      | `LIBRARIAN_`  | `/etc/mnemonic/config.yaml` | `mcp.*` (MCP endpoint on port 8081)   |
-| api service      | `LIBRARIAN_`  | `/etc/mnemonic/config.yaml` | `queue.*` (publisher), `vocabulary.*` |
-| enricher service | `LIBRARIAN_`  | `/etc/mnemonic/config.yaml` | `queue.*` (consumer), `enrichment.*`  |
+| mcp service      | `MNEMONIC_`   | `/etc/mnemonic/config.yaml` | `mcp.*` (MCP endpoint on port 8081)   |
+| api service      | `MNEMONIC_`   | `/etc/mnemonic/config.yaml` | `queue.*` (publisher), `vocabulary.*` |
+| enricher service | `MNEMONIC_`   | `/etc/mnemonic/config.yaml` | `queue.*` (consumer), `enrichment.*`  |
 
 All three share `server.*` (health/version HTTP server), `database.*`, `openai.*`, `logging.*` and `observability.*`.
 
@@ -82,7 +82,7 @@ flowchart LR
 
 ### Loading Behavior
 
-Viper's `MergeInConfig()` is NOT used. Configuration is loaded with `ReadInConfig()`, which replaces the entire file layer. Environment variables are bound via `AutomaticEnv()` with key replacement (`.` becomes `_`), so `LIBRARIAN_QUEUE_RABBITMQ_HOST` maps to the Viper key `queue.rabbitmq.host`.
+Viper's `MergeInConfig()` is NOT used. Configuration is loaded with `ReadInConfig()`, which replaces the entire file layer. Environment variables are bound via `AutomaticEnv()` with key replacement (`.` becomes `_`), so `MNEMONIC_QUEUE_RABBITMQ_HOST` maps to the Viper key `queue.rabbitmq.host`.
 
 **Merge vs Replace**:
 
@@ -92,11 +92,11 @@ Viper's `MergeInConfig()` is NOT used. Configuration is loaded with `ReadInConfi
 
 **Missing or broken files** (differs slightly per service):
 
-| Service          | No file found  | Selected file cannot be read or parsed                                                                 |
-| ---------------- | -------------- | ------------------------------------------------------------------------------------------------------ |
-| api service      | Defaults + env | Always fatal, whether the file came from `--config`, `LIBRARIAN_CONFIG_FILE` or discovery              |
-| enricher service | Defaults + env | Fatal only when set explicitly via `--config` or `LIBRARIAN_CONFIG_FILE`; a discovered file is ignored |
-| mcp service      | Defaults + env | Fatal only when set explicitly via `LIBRARIAN_CONFIG_FILE`; a discovered file is ignored               |
+| Service          | No file found  | Selected file cannot be read or parsed                                                                |
+| ---------------- | -------------- | ----------------------------------------------------------------------------------------------------- |
+| api service      | Defaults + env | Always fatal, whether the file came from `--config`, `MNEMONIC_CONFIG_FILE` or discovery              |
+| enricher service | Defaults + env | Fatal only when set explicitly via `--config` or `MNEMONIC_CONFIG_FILE`; a discovered file is ignored |
+| mcp service      | Defaults + env | Fatal only when set explicitly via `MNEMONIC_CONFIG_FILE`; a discovered file is ignored               |
 
 After loading, every service validates the result and refuses to start if validation fails (see [Configuration Validation](#configuration-validation)).
 
@@ -142,7 +142,7 @@ database:
     min_conns: 5
     conn_max_lifetime: "5m"
   neo4j:
-    uri: "bolt://localhost:17687"
+    uri: "bolt://localhost:7687"
     username: "neo4j"
     password: ""
     database: "neo4j"
@@ -270,43 +270,43 @@ observability:
 
 [Table of Contents](#table-of-contents)
 
-All Mnemonic configuration options can be set via environment variables using the `LIBRARIAN_` prefix. Two further variables are read directly rather than through Viper keys:
+All Mnemonic configuration options can be set via environment variables using the `MNEMONIC_` prefix. Two further variables are read directly rather than through Viper keys:
 
 | Variable               | Services | Purpose                                                                                |
 | ---------------------- | -------- | -------------------------------------------------------------------------------------- |
-| `LIBRARIAN_CONFIG_FILE` | all      | Explicit config file path (see [File Discovery Order](#file-discovery-order))          |
-| `LIBRARIAN_ENV`         | all      | Value of the `deployment.environment.name` telemetry attribute (default `development`) |
+| `MNEMONIC_CONFIG_FILE` | all      | Explicit config file path (see [File Discovery Order](#file-discovery-order))          |
+| `MNEMONIC_ENV`         | all      | Value of the `deployment.environment.name` telemetry attribute (default `development`) |
 
 ```bash
 # Server and MCP endpoint
-export LIBRARIAN_SERVER_PORT="8080"
-export LIBRARIAN_MCP_PORT="8081"                 # the mcp service only
+export MNEMONIC_SERVER_PORT="8080"
+export MNEMONIC_MCP_PORT="8081"                 # the mcp service only
 
 # Database credentials (recommended for secrets)
-export LIBRARIAN_DATABASE_POSTGRES_PASSWORD="secret"
-export LIBRARIAN_DATABASE_NEO4J_PASSWORD="secret"
+export MNEMONIC_DATABASE_POSTGRES_PASSWORD="secret"
+export MNEMONIC_DATABASE_NEO4J_PASSWORD="secret"
 
 # RabbitMQ (Admin API and Enricher)
-export LIBRARIAN_QUEUE_RABBITMQ_HOST="rabbitmq"
-export LIBRARIAN_QUEUE_RABBITMQ_USER="mnemonic"
-export LIBRARIAN_QUEUE_RABBITMQ_PASSWORD="secret"
-export LIBRARIAN_QUEUE_RABBITMQ_QUEUE="enrichment-jobs"
+export MNEMONIC_QUEUE_RABBITMQ_HOST="rabbitmq"
+export MNEMONIC_QUEUE_RABBITMQ_USER="mnemonic"
+export MNEMONIC_QUEUE_RABBITMQ_PASSWORD="secret"
+export MNEMONIC_QUEUE_RABBITMQ_QUEUE="enrichment-jobs"
 
 # OpenAI (all three services embed text; the enricher also extracts concepts)
-export LIBRARIAN_OPENAI_API_KEY="sk-..."
-export LIBRARIAN_OPENAI_BASE_URL="http://openai-stub:8080/v1"   # e.g. the integration-test stub
+export MNEMONIC_OPENAI_API_KEY="sk-..."
+export MNEMONIC_OPENAI_BASE_URL="http://openai-stub:8080/v1"   # e.g. the integration-test stub
 
 # Logging and tracing
-export LIBRARIAN_LOGGING_LEVEL="debug"
-export LIBRARIAN_OBSERVABILITY_TRACING_ENABLED="true"
-export LIBRARIAN_OBSERVABILITY_TRACING_ENDPOINT="otel-collector:4317"
+export MNEMONIC_LOGGING_LEVEL="debug"
+export MNEMONIC_OBSERVABILITY_TRACING_ENABLED="true"
+export MNEMONIC_OBSERVABILITY_TRACING_ENDPOINT="otel-collector:4317"
 ```
 
 ## OpenTelemetry Standard Variables
 
 [Table of Contents](#table-of-contents)
 
-In addition to `LIBRARIAN_` prefixed variables, the otelx library reads the standard OpenTelemetry environment variables. How they interact with Mnemonic's own keys:
+In addition to `MNEMONIC_` prefixed variables, the otelx library reads the standard OpenTelemetry environment variables. How they interact with Mnemonic's own keys:
 
 | Variable                                                                                 | Effect in Mnemonic                                                                                                                                   |
 | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -317,7 +317,7 @@ In addition to `LIBRARIAN_` prefixed variables, the otelx library reads the stan
 | `OTEL_EXPORTER_OTLP_INSECURE`                                                            | Overridden when `observability.tracing.otlp_insecure` is `true` (the default); set the key to `false` to let TLS settings from the environment apply |
 | `OTEL_TRACES_SAMPLER`, `OTEL_TRACES_SAMPLER_ARG`                                         | Ignored: the services always set `ParentBased(TraceIDRatioBased(observability.tracing.sample_rate))`                                                 |
 
-otelx v2 no longer has endpoint or insecure settings in its own config. Each service therefore builds the OTLP gRPC trace exporter itself from `observability.tracing.endpoint` and `otlp_insecure` and hands it to otelx, so the `LIBRARIAN_` keys keep working (see `src/internal/telemetry/telemetry.go` in each service).
+otelx v2 no longer has endpoint or insecure settings in its own config. Each service therefore builds the OTLP gRPC trace exporter itself from `observability.tracing.endpoint` and `otlp_insecure` and hands it to otelx, so the `MNEMONIC_` keys keep working (see `src/internal/telemetry/telemetry.go` in each service).
 
 ## otelx Dependency
 
@@ -341,17 +341,17 @@ RabbitMQ is used for asynchronous communication between the Admin API (publisher
 
 The keys live under `queue.rabbitmq` in both services. Credentials are sent via SASL PLAIN and are never embedded in a URL.
 
-| Key                              | Type     | Default           | Env Var                                   | Services      | Description                                                             |
-| -------------------------------- | -------- | ----------------- | ----------------------------------------- | ------------- | ----------------------------------------------------------------------- |
-| `queue.provider`                 | string   | `rabbitmq`        | `LIBRARIAN_QUEUE_PROVIDER`                 | enricher      | Queue backend; the enricher rejects any other value                     |
-| `queue.rabbitmq.host`            | string   | `localhost`       | `LIBRARIAN_QUEUE_RABBITMQ_HOST`            | api, enricher | Broker host                                                             |
-| `queue.rabbitmq.port`            | int      | `5672`            | `LIBRARIAN_QUEUE_RABBITMQ_PORT`            | api, enricher | Broker AMQP port                                                        |
-| `queue.rabbitmq.user`            | string   | `guest`           | `LIBRARIAN_QUEUE_RABBITMQ_USER`            | api, enricher | Broker user                                                             |
-| `queue.rabbitmq.password`        | string   | `""`              | `LIBRARIAN_QUEUE_RABBITMQ_PASSWORD`        | api, enricher | Broker password                                                         |
-| `queue.rabbitmq.vhost`           | string   | `/`               | `LIBRARIAN_QUEUE_RABBITMQ_VHOST`           | api, enricher | Virtual host                                                            |
-| `queue.rabbitmq.queue`           | string   | `enrichment-jobs` | `LIBRARIAN_QUEUE_RABBITMQ_QUEUE`           | api, enricher | Queue name (declared durable by both sides)                             |
-| `queue.rabbitmq.prefetch_count`  | int      | `5`               | `LIBRARIAN_QUEUE_RABBITMQ_PREFETCH_COUNT`  | enricher      | Consumer QoS prefetch                                                   |
-| `queue.rabbitmq.reconnect_delay` | duration | `5s`              | `LIBRARIAN_QUEUE_RABBITMQ_RECONNECT_DELAY` | api, enricher | Wait before reconnecting after a broker failure                         |
+| Key                              | Type     | Default           | Env Var                                   | Services      | Description                                         |
+| -------------------------------- | -------- | ----------------- | ----------------------------------------- | ------------- | --------------------------------------------------- |
+| `queue.provider`                 | string   | `rabbitmq`        | `MNEMONIC_QUEUE_PROVIDER`                 | enricher      | Queue backend; the enricher rejects any other value |
+| `queue.rabbitmq.host`            | string   | `localhost`       | `MNEMONIC_QUEUE_RABBITMQ_HOST`            | api, enricher | Broker host                                         |
+| `queue.rabbitmq.port`            | int      | `5672`            | `MNEMONIC_QUEUE_RABBITMQ_PORT`            | api, enricher | Broker AMQP port                                    |
+| `queue.rabbitmq.user`            | string   | `guest`           | `MNEMONIC_QUEUE_RABBITMQ_USER`            | api, enricher | Broker user                                         |
+| `queue.rabbitmq.password`        | string   | `""`              | `MNEMONIC_QUEUE_RABBITMQ_PASSWORD`        | api, enricher | Broker password                                     |
+| `queue.rabbitmq.vhost`           | string   | `/`               | `MNEMONIC_QUEUE_RABBITMQ_VHOST`           | api, enricher | Virtual host                                        |
+| `queue.rabbitmq.queue`           | string   | `enrichment-jobs` | `MNEMONIC_QUEUE_RABBITMQ_QUEUE`           | api, enricher | Queue name (declared durable by both sides)         |
+| `queue.rabbitmq.prefetch_count`  | int      | `5`               | `MNEMONIC_QUEUE_RABBITMQ_PREFETCH_COUNT`  | enricher      | Consumer QoS prefetch                               |
+| `queue.rabbitmq.reconnect_delay` | duration | `5s`              | `MNEMONIC_QUEUE_RABBITMQ_RECONNECT_DELAY` | api, enricher | Wait before reconnecting after a broker failure     |
 
 ## Configuration Reference
 
@@ -361,59 +361,59 @@ The Services column shows which services define each key: **A** = the api servic
 
 | Setting                                         | Type     | Default                     | Environment Variable                                     | Services | Description                                                                                 |
 | ----------------------------------------------- | -------- | --------------------------- | -------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------- |
-| `server.host`                                   | string   | `0.0.0.0`                   | `LIBRARIAN_SERVER_HOST`                                   | A, E, M  | HTTP listen address (also used by the MCP endpoint)                                         |
-| `server.port`                                   | int      | `8080`                      | `LIBRARIAN_SERVER_PORT`                                   | A, E, M  | HTTP port: REST API (A) and `/health`, `/version` (all)                                     |
-| `server.read_timeout`                           | duration | `30s`                       | `LIBRARIAN_SERVER_READ_TIMEOUT`                           | A, E, M  | Read timeout                                                                                |
-| `server.write_timeout`                          | duration | `30s`                       | `LIBRARIAN_SERVER_WRITE_TIMEOUT`                          | A, E, M  | Write timeout                                                                               |
-| `server.idle_timeout`                           | duration | `120s`                      | `LIBRARIAN_SERVER_IDLE_TIMEOUT`                           | A, E, M  | Idle timeout                                                                                |
-| `server.shutdown_timeout`                       | duration | `5s`                        | `LIBRARIAN_SERVER_SHUTDOWN_TIMEOUT`                       | A, E, M  | Graceful shutdown timeout                                                                   |
-| `server.tls.enabled`                            | bool     | `false`                     | `LIBRARIAN_SERVER_TLS_ENABLED`                            | E, M     | Serve the health/version server over TLS (not the MCP endpoint)                             |
-| `server.tls.cert_file`                          | string   | `""`                        | `LIBRARIAN_SERVER_TLS_CERT_FILE`                          | E, M     | TLS certificate path; must exist when TLS is enabled                                        |
-| `server.tls.key_file`                           | string   | `""`                        | `LIBRARIAN_SERVER_TLS_KEY_FILE`                           | E, M     | TLS key path; must exist when TLS is enabled                                                |
-| `mcp.port`                                      | int      | `8081`                      | `LIBRARIAN_MCP_PORT`                                      | M        | MCP endpoint port (`/mcp`); must differ from `server.port`                                  |
-| `mcp.read_timeout`                              | duration | `30s`                       | `LIBRARIAN_MCP_READ_TIMEOUT`                              | M        | MCP endpoint read timeout                                                                   |
-| `mcp.write_timeout`                             | duration | `30s`                       | `LIBRARIAN_MCP_WRITE_TIMEOUT`                             | M        | MCP endpoint write timeout                                                                  |
-| `mcp.idle_timeout`                              | duration | `120s`                      | `LIBRARIAN_MCP_IDLE_TIMEOUT`                              | M        | MCP endpoint idle timeout                                                                   |
-| `mcp.default_search_threshold`                  | float    | `0.5`                       | `LIBRARIAN_MCP_DEFAULT_SEARCH_THRESHOLD`                  | M        | Similarity threshold (0.0-1.0) for `search_patterns` when the caller gives none             |
-| `database.postgres.host`                        | string   | `localhost`                 | `LIBRARIAN_DATABASE_POSTGRES_HOST`                        | A, E, M  | PostgreSQL host                                                                             |
-| `database.postgres.port`                        | int      | `5432`                      | `LIBRARIAN_DATABASE_POSTGRES_PORT`                        | A, E, M  | PostgreSQL port                                                                             |
-| `database.postgres.database`                    | string   | `mnemonic`                  | `LIBRARIAN_DATABASE_POSTGRES_DATABASE`                    | A, E, M  | Database name                                                                               |
-| `database.postgres.username`                    | string   | `mnemonic`                  | `LIBRARIAN_DATABASE_POSTGRES_USERNAME`                    | A, E, M  | Database username                                                                           |
-| `database.postgres.password`                    | string   | `""`                        | `LIBRARIAN_DATABASE_POSTGRES_PASSWORD`                    | A, E, M  | Database password                                                                           |
-| `database.postgres.ssl_mode`                    | string   | `prefer`                    | `LIBRARIAN_DATABASE_POSTGRES_SSL_MODE`                    | A, E, M  | SSL mode                                                                                    |
-| `database.postgres.max_open_conns`              | int32    | `25`                        | `LIBRARIAN_DATABASE_POSTGRES_MAX_OPEN_CONNS`              | A, E, M  | Pool maximum (pgxpool `MaxConns`)                                                           |
-| `database.postgres.min_conns`                   | int32    | `5`                         | `LIBRARIAN_DATABASE_POSTGRES_MIN_CONNS`                   | A, E, M  | Pool minimum kept open (pgxpool `MinConns`); must not exceed `max_open_conns`               |
-| `database.postgres.conn_max_lifetime`           | duration | `5m`                        | `LIBRARIAN_DATABASE_POSTGRES_CONN_MAX_LIFETIME`           | A, E, M  | Connection max lifetime                                                                     |
-| `database.neo4j.uri`                            | string   | `bolt://localhost:17687`     | `LIBRARIAN_DATABASE_NEO4J_URI`                            | A, E, M  | Neo4j URI (`bolt`, `neo4j` or their `+s`/`+ssc` variants)                                   |
-| `database.neo4j.username`                       | string   | `neo4j`                     | `LIBRARIAN_DATABASE_NEO4J_USERNAME`                       | A, E, M  | Neo4j username                                                                              |
-| `database.neo4j.password`                       | string   | `""`                        | `LIBRARIAN_DATABASE_NEO4J_PASSWORD`                       | A, E, M  | Neo4j password                                                                              |
-| `database.neo4j.database`                       | string   | `neo4j`                     | `LIBRARIAN_DATABASE_NEO4J_DATABASE`                       | A, E, M  | Neo4j database                                                                              |
-| `database.neo4j.max_connection_pool_size`       | int      | `50`                        | `LIBRARIAN_DATABASE_NEO4J_MAX_CONNECTION_POOL_SIZE`       | A, E, M  | Neo4j max connection pool size                                                              |
-| `database.neo4j.connection_acquisition_timeout` | duration | `60s`                       | `LIBRARIAN_DATABASE_NEO4J_CONNECTION_ACQUISITION_TIMEOUT` | A, E, M  | Neo4j connection acquisition timeout                                                        |
-| `openai.api_key`                                | string   | `""`                        | `LIBRARIAN_OPENAI_API_KEY`                                | A, E, M  | OpenAI API key (not checked at startup; a bad key shows as a Warning on `/health`)          |
-| `openai.base_url`                               | string   | `https://api.openai.com/v1` | `LIBRARIAN_OPENAI_BASE_URL`                               | A, E, M  | OpenAI-compatible API root; must be an absolute URL. Integration tests point it at a stub   |
-| `openai.embedding_model`                        | string   | `text-embedding-3-large`    | `LIBRARIAN_OPENAI_EMBEDDING_MODEL`                        | A, E, M  | Embedding model                                                                             |
-| `openai.embedding_dimensions`                   | int      | `2000`                      | `LIBRARIAN_OPENAI_EMBEDDING_DIMENSIONS`                   | A, E, M  | Requested embedding dimensions                                                              |
-| `openai.extraction_model`                       | string   | `gpt-4o-mini`               | `LIBRARIAN_OPENAI_EXTRACTION_MODEL`                       | E        | Concept extraction model                                                                    |
-| `openai.retry_attempts`                         | int      | `3`                         | `LIBRARIAN_OPENAI_RETRY_ATTEMPTS`                         | A, E, M  | Retries per OpenAI call                                                                     |
-| `openai.retry_delay`                            | duration | `1s`                        | `LIBRARIAN_OPENAI_RETRY_DELAY`                            | A, E, M  | Delay between OpenAI retries                                                                |
-| `vocabulary.languages`                          | []string | 42 built-in values          | `LIBRARIAN_VOCABULARY_LANGUAGES` (comma-separated)        | A        | Allowed pattern `language` values; must not be empty                                        |
-| `vocabulary.domains`                            | []string | 14 built-in values          | `LIBRARIAN_VOCABULARY_DOMAINS` (comma-separated)          | A        | Allowed pattern `domain` values; must not be empty                                          |
-| `enrichment.worker_count`                       | int      | `2`                         | `LIBRARIAN_ENRICHMENT_WORKER_COUNT`                       | E        | Concurrent workers                                                                          |
-| `enrichment.retry_delay`                        | duration | `30s`                       | `LIBRARIAN_ENRICHMENT_RETRY_DELAY`                        | E        | Delay before a failed job is due for retry                                                  |
-| `enrichment.job_timeout`                        | duration | `5m`                        | `LIBRARIAN_ENRICHMENT_JOB_TIMEOUT`                        | E        | Maximum time for a single enrichment job; stuck jobs are reclaimed after this duration      |
-| `enrichment.drain_timeout`                      | duration | `30s`                       | `LIBRARIAN_ENRICHMENT_DRAIN_TIMEOUT`                      | E        | How long shutdown waits for in-flight jobs before cancelling them                           |
-| `enrichment.completed_retention`                | duration | `168h`                      | `LIBRARIAN_ENRICHMENT_COMPLETED_RETENTION`                | E        | Retention period for completed enrichment jobs (default 7 days); older jobs are deleted     |
-| `enrichment.failed_retention`                   | duration | `720h`                      | `LIBRARIAN_ENRICHMENT_FAILED_RETENTION`                   | E        | Retention period for failed enrichment jobs (default 30 days); older jobs are deleted       |
-| `enrichment.related_to_min_similarity`          | float    | `0.3`                       | `LIBRARIAN_ENRICHMENT_RELATED_TO_MIN_SIMILARITY`          | E        | Minimum concept-overlap similarity (0.0-1.0) for creating RELATED_TO edges between patterns |
-| `logging.level`                                 | string   | `info`                      | `LIBRARIAN_LOGGING_LEVEL`                                 | A, E, M  | Log level (`debug`, `info`, `warn`, `error`)                                                |
-| `observability.metrics.enabled`                 | bool     | `true`                      | `LIBRARIAN_OBSERVABILITY_METRICS_ENABLED`                 | A, E, M  | Serve Prometheus metrics                                                                    |
-| `observability.metrics.path`                    | string   | `/metrics`                  | `LIBRARIAN_OBSERVABILITY_METRICS_PATH`                    | A, E, M  | Metrics endpoint path                                                                       |
-| `observability.metrics.port`                    | int      | `9090`                      | `LIBRARIAN_OBSERVABILITY_METRICS_PORT`                    | A, E, M  | Metrics server port; must differ from `server.port`                                         |
-| `observability.tracing.enabled`                 | bool     | `false`                     | `LIBRARIAN_OBSERVABILITY_TRACING_ENABLED`                 | A, E, M  | Enable distributed tracing                                                                  |
-| `observability.tracing.endpoint`                | string   | `""`                        | `LIBRARIAN_OBSERVABILITY_TRACING_ENDPOINT`                | A, E, M  | OTLP gRPC collector `host:port`; required when tracing is enabled                           |
-| `observability.tracing.sample_rate`             | float    | `0.1`                       | `LIBRARIAN_OBSERVABILITY_TRACING_SAMPLE_RATE`             | A, E, M  | Ratio (0.0-1.0) of new traces sampled; incoming sampled parents are always honored          |
-| `observability.tracing.otlp_insecure`           | bool     | `true`                      | `LIBRARIAN_OBSERVABILITY_TRACING_OTLP_INSECURE`           | A, E, M  | Use insecure OTLP connection (local development only; production should use TLS)            |
+| `server.host`                                   | string   | `0.0.0.0`                   | `MNEMONIC_SERVER_HOST`                                   | A, E, M  | HTTP listen address (also used by the MCP endpoint)                                         |
+| `server.port`                                   | int      | `8080`                      | `MNEMONIC_SERVER_PORT`                                   | A, E, M  | HTTP port: REST API (A) and `/health`, `/version` (all)                                     |
+| `server.read_timeout`                           | duration | `30s`                       | `MNEMONIC_SERVER_READ_TIMEOUT`                           | A, E, M  | Read timeout                                                                                |
+| `server.write_timeout`                          | duration | `30s`                       | `MNEMONIC_SERVER_WRITE_TIMEOUT`                          | A, E, M  | Write timeout                                                                               |
+| `server.idle_timeout`                           | duration | `120s`                      | `MNEMONIC_SERVER_IDLE_TIMEOUT`                           | A, E, M  | Idle timeout                                                                                |
+| `server.shutdown_timeout`                       | duration | `5s`                        | `MNEMONIC_SERVER_SHUTDOWN_TIMEOUT`                       | A, E, M  | Graceful shutdown timeout                                                                   |
+| `server.tls.enabled`                            | bool     | `false`                     | `MNEMONIC_SERVER_TLS_ENABLED`                            | E, M     | Serve the health/version server over TLS (not the MCP endpoint)                             |
+| `server.tls.cert_file`                          | string   | `""`                        | `MNEMONIC_SERVER_TLS_CERT_FILE`                          | E, M     | TLS certificate path; must exist when TLS is enabled                                        |
+| `server.tls.key_file`                           | string   | `""`                        | `MNEMONIC_SERVER_TLS_KEY_FILE`                           | E, M     | TLS key path; must exist when TLS is enabled                                                |
+| `mcp.port`                                      | int      | `8081`                      | `MNEMONIC_MCP_PORT`                                      | M        | MCP endpoint port (`/mcp`); must differ from `server.port`                                  |
+| `mcp.read_timeout`                              | duration | `30s`                       | `MNEMONIC_MCP_READ_TIMEOUT`                              | M        | MCP endpoint read timeout                                                                   |
+| `mcp.write_timeout`                             | duration | `30s`                       | `MNEMONIC_MCP_WRITE_TIMEOUT`                             | M        | MCP endpoint write timeout                                                                  |
+| `mcp.idle_timeout`                              | duration | `120s`                      | `MNEMONIC_MCP_IDLE_TIMEOUT`                              | M        | MCP endpoint idle timeout                                                                   |
+| `mcp.default_search_threshold`                  | float    | `0.5`                       | `MNEMONIC_MCP_DEFAULT_SEARCH_THRESHOLD`                  | M        | Similarity threshold (0.0-1.0) for `search_patterns` when the caller gives none             |
+| `database.postgres.host`                        | string   | `localhost`                 | `MNEMONIC_DATABASE_POSTGRES_HOST`                        | A, E, M  | PostgreSQL host                                                                             |
+| `database.postgres.port`                        | int      | `5432`                      | `MNEMONIC_DATABASE_POSTGRES_PORT`                        | A, E, M  | PostgreSQL port                                                                             |
+| `database.postgres.database`                    | string   | `mnemonic`                  | `MNEMONIC_DATABASE_POSTGRES_DATABASE`                    | A, E, M  | Database name                                                                               |
+| `database.postgres.username`                    | string   | `mnemonic`                  | `MNEMONIC_DATABASE_POSTGRES_USERNAME`                    | A, E, M  | Database username                                                                           |
+| `database.postgres.password`                    | string   | `""`                        | `MNEMONIC_DATABASE_POSTGRES_PASSWORD`                    | A, E, M  | Database password                                                                           |
+| `database.postgres.ssl_mode`                    | string   | `prefer`                    | `MNEMONIC_DATABASE_POSTGRES_SSL_MODE`                    | A, E, M  | SSL mode                                                                                    |
+| `database.postgres.max_open_conns`              | int32    | `25`                        | `MNEMONIC_DATABASE_POSTGRES_MAX_OPEN_CONNS`              | A, E, M  | Pool maximum (pgxpool `MaxConns`)                                                           |
+| `database.postgres.min_conns`                   | int32    | `5`                         | `MNEMONIC_DATABASE_POSTGRES_MIN_CONNS`                   | A, E, M  | Pool minimum kept open (pgxpool `MinConns`); must not exceed `max_open_conns`               |
+| `database.postgres.conn_max_lifetime`           | duration | `5m`                        | `MNEMONIC_DATABASE_POSTGRES_CONN_MAX_LIFETIME`           | A, E, M  | Connection max lifetime                                                                     |
+| `database.neo4j.uri`                            | string   | `bolt://localhost:7687`     | `MNEMONIC_DATABASE_NEO4J_URI`                            | A, E, M  | Neo4j URI (`bolt`, `neo4j` or their `+s`/`+ssc` variants)                                   |
+| `database.neo4j.username`                       | string   | `neo4j`                     | `MNEMONIC_DATABASE_NEO4J_USERNAME`                       | A, E, M  | Neo4j username                                                                              |
+| `database.neo4j.password`                       | string   | `""`                        | `MNEMONIC_DATABASE_NEO4J_PASSWORD`                       | A, E, M  | Neo4j password                                                                              |
+| `database.neo4j.database`                       | string   | `neo4j`                     | `MNEMONIC_DATABASE_NEO4J_DATABASE`                       | A, E, M  | Neo4j database                                                                              |
+| `database.neo4j.max_connection_pool_size`       | int      | `50`                        | `MNEMONIC_DATABASE_NEO4J_MAX_CONNECTION_POOL_SIZE`       | A, E, M  | Neo4j max connection pool size                                                              |
+| `database.neo4j.connection_acquisition_timeout` | duration | `60s`                       | `MNEMONIC_DATABASE_NEO4J_CONNECTION_ACQUISITION_TIMEOUT` | A, E, M  | Neo4j connection acquisition timeout                                                        |
+| `openai.api_key`                                | string   | `""`                        | `MNEMONIC_OPENAI_API_KEY`                                | A, E, M  | OpenAI API key (not checked at startup; a bad key shows as a Warning on `/health`)          |
+| `openai.base_url`                               | string   | `https://api.openai.com/v1` | `MNEMONIC_OPENAI_BASE_URL`                               | A, E, M  | OpenAI-compatible API root; must be an absolute URL. Integration tests point it at a stub   |
+| `openai.embedding_model`                        | string   | `text-embedding-3-large`    | `MNEMONIC_OPENAI_EMBEDDING_MODEL`                        | A, E, M  | Embedding model                                                                             |
+| `openai.embedding_dimensions`                   | int      | `2000`                      | `MNEMONIC_OPENAI_EMBEDDING_DIMENSIONS`                   | A, E, M  | Requested embedding dimensions                                                              |
+| `openai.extraction_model`                       | string   | `gpt-4o-mini`               | `MNEMONIC_OPENAI_EXTRACTION_MODEL`                       | E        | Concept extraction model                                                                    |
+| `openai.retry_attempts`                         | int      | `3`                         | `MNEMONIC_OPENAI_RETRY_ATTEMPTS`                         | A, E, M  | Retries per OpenAI call                                                                     |
+| `openai.retry_delay`                            | duration | `1s`                        | `MNEMONIC_OPENAI_RETRY_DELAY`                            | A, E, M  | Delay between OpenAI retries                                                                |
+| `vocabulary.languages`                          | []string | 42 built-in values          | `MNEMONIC_VOCABULARY_LANGUAGES` (comma-separated)        | A        | Allowed pattern `language` values; must not be empty                                        |
+| `vocabulary.domains`                            | []string | 14 built-in values          | `MNEMONIC_VOCABULARY_DOMAINS` (comma-separated)          | A        | Allowed pattern `domain` values; must not be empty                                          |
+| `enrichment.worker_count`                       | int      | `2`                         | `MNEMONIC_ENRICHMENT_WORKER_COUNT`                       | E        | Concurrent workers                                                                          |
+| `enrichment.retry_delay`                        | duration | `30s`                       | `MNEMONIC_ENRICHMENT_RETRY_DELAY`                        | E        | Delay before a failed job is due for retry                                                  |
+| `enrichment.job_timeout`                        | duration | `5m`                        | `MNEMONIC_ENRICHMENT_JOB_TIMEOUT`                        | E        | Maximum time for a single enrichment job; stuck jobs are reclaimed after this duration      |
+| `enrichment.drain_timeout`                      | duration | `30s`                       | `MNEMONIC_ENRICHMENT_DRAIN_TIMEOUT`                      | E        | How long shutdown waits for in-flight jobs before cancelling them                           |
+| `enrichment.completed_retention`                | duration | `168h`                      | `MNEMONIC_ENRICHMENT_COMPLETED_RETENTION`                | E        | Retention period for completed enrichment jobs (default 7 days); older jobs are deleted     |
+| `enrichment.failed_retention`                   | duration | `720h`                      | `MNEMONIC_ENRICHMENT_FAILED_RETENTION`                   | E        | Retention period for failed enrichment jobs (default 30 days); older jobs are deleted       |
+| `enrichment.related_to_min_similarity`          | float    | `0.3`                       | `MNEMONIC_ENRICHMENT_RELATED_TO_MIN_SIMILARITY`          | E        | Minimum concept-overlap similarity (0.0-1.0) for creating RELATED_TO edges between patterns |
+| `logging.level`                                 | string   | `info`                      | `MNEMONIC_LOGGING_LEVEL`                                 | A, E, M  | Log level (`debug`, `info`, `warn`, `error`)                                                |
+| `observability.metrics.enabled`                 | bool     | `true`                      | `MNEMONIC_OBSERVABILITY_METRICS_ENABLED`                 | A, E, M  | Serve Prometheus metrics                                                                    |
+| `observability.metrics.path`                    | string   | `/metrics`                  | `MNEMONIC_OBSERVABILITY_METRICS_PATH`                    | A, E, M  | Metrics endpoint path                                                                       |
+| `observability.metrics.port`                    | int      | `9090`                      | `MNEMONIC_OBSERVABILITY_METRICS_PORT`                    | A, E, M  | Metrics server port; must differ from `server.port`                                         |
+| `observability.tracing.enabled`                 | bool     | `false`                     | `MNEMONIC_OBSERVABILITY_TRACING_ENABLED`                 | A, E, M  | Enable distributed tracing                                                                  |
+| `observability.tracing.endpoint`                | string   | `""`                        | `MNEMONIC_OBSERVABILITY_TRACING_ENDPOINT`                | A, E, M  | OTLP gRPC collector `host:port`; required when tracing is enabled                           |
+| `observability.tracing.sample_rate`             | float    | `0.1`                       | `MNEMONIC_OBSERVABILITY_TRACING_SAMPLE_RATE`             | A, E, M  | Ratio (0.0-1.0) of new traces sampled; incoming sampled parents are always honored          |
+| `observability.tracing.otlp_insecure`           | bool     | `true`                      | `MNEMONIC_OBSERVABILITY_TRACING_OTLP_INSECURE`           | A, E, M  | Use insecure OTLP connection (local development only; production should use TLS)            |
 
 > **Not implemented:** Rate limiting (`rate_limit.*`), a statement-logging switch (`observability.log_db_statements`), MCP session timeouts and enricher polling settings (`poll_interval`, `max_attempts`) appeared in earlier drafts of this document. None of them exist in code.
 >
@@ -423,11 +423,11 @@ The Services column shows which services define each key: **A** = the api servic
 
 [Table of Contents](#table-of-contents)
 
-All Mnemonic environment variables use the `LIBRARIAN_` prefix with the following conventions:
+All Mnemonic environment variables use the `MNEMONIC_` prefix with the following conventions:
 
 | Convention   | Example                    |
 | ------------ | -------------------------- |
-| Prefix       | `LIBRARIAN_`                |
+| Prefix       | `MNEMONIC_`                |
 | Separator    | `_` (underscore)           |
 | Case         | SCREAMING_SNAKE_CASE       |
 | Nested paths | Flattened with underscores |
@@ -436,11 +436,11 @@ All Mnemonic environment variables use the `LIBRARIAN_` prefix with the followin
 
 | YAML Path                    | Environment Variable                  |
 | ---------------------------- | ------------------------------------- |
-| `server.port`                | `LIBRARIAN_SERVER_PORT`                |
-| `mcp.port`                   | `LIBRARIAN_MCP_PORT`                   |
-| `database.postgres.password` | `LIBRARIAN_DATABASE_POSTGRES_PASSWORD` |
-| `queue.rabbitmq.host`        | `LIBRARIAN_QUEUE_RABBITMQ_HOST`        |
-| `openai.base_url`            | `LIBRARIAN_OPENAI_BASE_URL`            |
+| `server.port`                | `MNEMONIC_SERVER_PORT`                |
+| `mcp.port`                   | `MNEMONIC_MCP_PORT`                   |
+| `database.postgres.password` | `MNEMONIC_DATABASE_POSTGRES_PASSWORD` |
+| `queue.rabbitmq.host`        | `MNEMONIC_QUEUE_RABBITMQ_HOST`        |
+| `openai.base_url`            | `MNEMONIC_OPENAI_BASE_URL`            |
 
 **Special Cases**:
 
@@ -456,12 +456,12 @@ Configuration files are searched in the following order; the first match wins:
 
 ```text
 1. --config flag (the api service and the enricher service)
-2. $LIBRARIAN_CONFIG_FILE (if set)
+2. $MNEMONIC_CONFIG_FILE (if set)
 3. /etc/mnemonic/config.yaml (production)
 4. ./config.yaml (development)
 ```
 
-The enricher service takes `--config <path>`, which takes precedence over `LIBRARIAN_CONFIG_FILE`, along with `--version` and `--health`. The mcp service has no `--config` flag; its only command-line flags are `--version` and `--health`. `--version` prints to stdout. All three binaries support `--health`, which calls `http://localhost:<server.port>/health` and exits 0 only on HTTP 200 (overall status OK or Warning); it is used as the container `HEALTHCHECK`. Each service resolves `server.port` for `--health` from the same sources as the server, including the config file (the MCP server honours `LIBRARIAN_CONFIG_FILE` and the discovered files). The API and MCP server fail the probe if the port is outside 1-65535.
+The enricher service takes `--config <path>`, which takes precedence over `MNEMONIC_CONFIG_FILE`, along with `--version` and `--health`. The mcp service has no `--config` flag; its only command-line flags are `--version` and `--health`. `--version` prints to stdout. All three binaries support `--health`, which calls `http://localhost:<server.port>/health` and exits 0 only on HTTP 200 (overall status OK or Warning); it is used as the container `HEALTHCHECK`. Each service resolves `server.port` for `--health` from the same sources as the server, including the config file (the MCP server honours `MNEMONIC_CONFIG_FILE` and the discovered files). The API and MCP server fail the probe if the port is outside 1-65535.
 
 ## Viper Initialization
 
@@ -474,7 +474,7 @@ func Resolve(flags *pflag.FlagSet) (*viper.Viper, error) {
     v := viper.New()
     SetDefaults(v) // 1. compiled defaults from defaults.go
 
-    // 2. configuration file: --config, $LIBRARIAN_CONFIG_FILE, /etc/mnemonic, ./
+    // 2. configuration file: --config, $MNEMONIC_CONFIG_FILE, /etc/mnemonic, ./
     if configPath := findConfigFile(flags); configPath != "" {
         v.SetConfigFile(configPath)
         if err := v.ReadInConfig(); err != nil {
@@ -483,7 +483,7 @@ func Resolve(flags *pflag.FlagSet) (*viper.Viper, error) {
     }
 
     // 3. environment variables (highest priority)
-    v.SetEnvPrefix(EnvPrefix) // "LIBRARIAN"
+    v.SetEnvPrefix(EnvPrefix) // "MNEMONIC"
     v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
     v.AutomaticEnv()
     return v, nil
@@ -509,8 +509,8 @@ func LoadWithFlags(flags *pflag.FlagSet) (*MnemonicConfig, error) {
 
 **Key Viper details:**
 
-- `SetEnvPrefix("LIBRARIAN")` causes all env var lookups to be prefixed with `LIBRARIAN_`
-- `SetEnvKeyReplacer(strings.NewReplacer(".", "_"))` maps nested keys (e.g., `queue.rabbitmq.host`) to env vars (e.g., `LIBRARIAN_QUEUE_RABBITMQ_HOST`)
+- `SetEnvPrefix("MNEMONIC")` causes all env var lookups to be prefixed with `MNEMONIC_`
+- `SetEnvKeyReplacer(strings.NewReplacer(".", "_"))` maps nested keys (e.g., `queue.rabbitmq.host`) to env vars (e.g., `MNEMONIC_QUEUE_RABBITMQ_HOST`)
 - `AutomaticEnv()` enables automatic binding of all Viper keys to their corresponding env vars
 - `Unmarshal(&cfg)` uses the `mapstructure` library under the hood, so config structs MUST use `mapstructure:"..."` tags (not `yaml` or `json` tags)
 
@@ -544,14 +544,16 @@ database:
 # Good: Reference environment variable
 database:
   postgres:
-    password: ""  # Set via LIBRARIAN_DATABASE_POSTGRES_PASSWORD
+    password: ""  # Set via MNEMONIC_DATABASE_POSTGRES_PASSWORD
 ```
 
 ```bash
 # Set secrets via environment
-export LIBRARIAN_DATABASE_POSTGRES_PASSWORD="secure-password"
-export LIBRARIAN_OPENAI_API_KEY="sk-openai-key"
+export MNEMONIC_DATABASE_POSTGRES_PASSWORD="secure-password"
+export MNEMONIC_OPENAI_API_KEY="sk-openai-key"
 ```
+
+In the full stack (`deploy/docker-compose.yaml`) the services do not hold the real OpenAI key. They get the placeholder `MNEMONIC_OPENAI_API_KEY=proxy-managed` and a `MNEMONIC_OPENAI_BASE_URL` that points at the egress proxy; only the egress service reads the real key, from the host variable `MNEMONIC_OPENAI_API_EMBEDDINGS_KEY`.
 
 **Secret management integrations** (Post-MVP; see [Deployment Architecture](architecture/system/06-deployment-architecture.md)):
 
@@ -580,7 +582,7 @@ export LIBRARIAN_OPENAI_API_KEY="sk-openai-key"
    ```yaml
    # Pod environment from secret
    env:
-     - name: LIBRARIAN_DATABASE_POSTGRES_PASSWORD
+     - name: MNEMONIC_DATABASE_POSTGRES_PASSWORD
        valueFrom:
          secretKeyRef:
            name: mnemonic-secrets
@@ -902,4 +904,4 @@ classDiagram
 
 ---
 
-Copyright (c) 2025-2026 Jeremy K. Johnson. All rights reserved.
+Copyright (c) 2025-2026 Jeremy K. Johnson. Licensed under FSL-1.1-ALv2; see [LICENSE](../../LICENSE).

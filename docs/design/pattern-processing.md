@@ -1,7 +1,7 @@
 ---
-version: 1
+version: 2
 date: 2026-10-21
-notes: "Imported from librarian-docs; service names and code paths updated for the monorepo."
+notes: "Migration number corrected to 000010; Agent graph schema noted; spec path corrected. License footer corrected."
 ---
 
 # Pattern Enrichment
@@ -40,7 +40,7 @@ The work is split across two services:
 
 This design is inspired by Cognee's cognify pipeline (chunk, classify, extract, integrate, summarize) but adapted for Mnemonic's simpler use case: patterns are already curated documents, not raw data requiring extensive preprocessing.
 
-**Note:** Following the architectural pivot (see 2026-02-14-mnemonic-pivot-knowledge-sync.md (in source repository)), enriched patterns are consumed by the MCP server's search tools and the Admin API search endpoint, not by a routing engine.
+**Note:** Following the architectural pivot (see 2026-02-14-mnemonic-pivot-knowledge-sync.md (not part of this repository)), enriched patterns are consumed by the MCP server's search tools and the Admin API search endpoint, not by a routing engine.
 
 ## Enrichment Model
 
@@ -493,7 +493,7 @@ RETURNING id, pattern_id, chunk_id;
 
 The 2-minute grace keeps the sweep from racing a message that is merely in flight. A delivered message starts its job with a conditional update instead (`WHERE id = $1 AND status = 'pending' AND scheduled_for <= now()`), so a redelivered message, a job the sweep already took, and a job waiting out its retry delay are all no-ops.
 
-Job columns used by the pipeline: `id`, `chunk_id` (set for chunk jobs, which the API creates), `pattern_id` (set only for legacy pattern-level jobs, which the enricher still processes with steps 3–5 only), `status`, `attempts`, `max_attempts` (3, set by the API at insert), `last_error`, `scheduled_for`, `started_at`, `completed_at`, `created_at`, `updated_at`. See [Data Storage - Migration 000003](data-storage.md#migration-000003-enrichment-jobs-table) (and 000005, which adds `chunk_id`) for the table definition.
+Job columns used by the pipeline: `id`, `chunk_id` (set for chunk jobs, which the API creates), `pattern_id` (set only for legacy pattern-level jobs, which the enricher still processes with steps 3–5 only), `status`, `attempts`, `max_attempts` (3, set by the API at insert), `last_error`, `scheduled_for`, `started_at`, `completed_at`, `created_at`, `updated_at`. See [Data Storage - Migration 000005](data-storage.md#migration-000005-enrichment-jobs-table) (and 000009, which adds `chunk_id`) for the table definition.
 
 ### Job Lifecycle
 
@@ -557,7 +557,7 @@ Embedding generation (enricher for chunks; API and MCP for search queries):
 | **Endpoint**       | `{openai.base_url}/embeddings` (default `https://api.openai.com/v1/embeddings`)         |
 | **Model**          | `text-embedding-3-large` (`openai.embedding_model`)                                     |
 | **Dimensions**     | 2000 (`openai.embedding_dimensions`, must match the PGVector column)                    |
-| **Authentication** | API key required (`LIBRARIAN_OPENAI_API_KEY`)                                            |
+| **Authentication** | API key required (`MNEMONIC_OPENAI_API_KEY`)                                            |
 | **Client**         | 30 s HTTP timeout; `openai.retry_attempts` (3) retries `openai.retry_delay` (1 s) apart |
 | **Cost**           | ~$0.0001 per pattern (~$0.00002 per 1K tokens)                                          |
 | **Rate limits**    | 3,000 RPM / 1,000,000 TPM (tier 1), higher for paid tiers                               |
@@ -595,7 +595,7 @@ Additional LLM providers (Anthropic, Azure OpenAI) can be added post-MVP if need
 
 ```bash
 # Required for embedding generation and entity extraction
-LIBRARIAN_OPENAI_API_KEY=sk-...
+MNEMONIC_OPENAI_API_KEY=sk-...
 ```
 
 ### Application Configuration
@@ -604,7 +604,7 @@ Configuration follows the patterns established in [configuration.md](configurati
 
 ```yaml
 openai:
-  # API key should be set via LIBRARIAN_OPENAI_API_KEY
+  # API key should be set via MNEMONIC_OPENAI_API_KEY
   api_key: ""
   base_url: https://api.openai.com/v1
   embedding_model: text-embedding-3-large
@@ -628,7 +628,7 @@ queue:
     host: localhost
     port: 5672
     user: guest
-    # password via LIBRARIAN_QUEUE_RABBITMQ_PASSWORD
+    # password via MNEMONIC_QUEUE_RABBITMQ_PASSWORD
     vhost: /
     queue: enrichment-jobs
     prefetch_count: 5
@@ -636,9 +636,9 @@ queue:
 
 database:
   neo4j:
-    uri: bolt://localhost:17687
+    uri: bolt://localhost:7687
     username: neo4j
-    # password via LIBRARIAN_DATABASE_NEO4J_PASSWORD
+    # password via MNEMONIC_DATABASE_NEO4J_PASSWORD
     database: neo4j
 ```
 
@@ -729,7 +729,7 @@ Before deploying pattern enrichment, verify:
 Vector embeddings are stored in `pattern_chunks.embedding`, not `patterns.embedding`. The `patterns` table no longer has an `embedding` column.
 
 ```sql
--- db/ 000006_update_embedding_dimensions.up.sql (000005 created the
+-- db/ 000010_update_embedding_dimensions.up.sql (000009 created the
 -- column as vector(1536) with the same HNSW index)
 drop index if exists idx_pattern_chunks_embedding;
 
@@ -768,7 +768,7 @@ CREATE INDEX concept_type_index IF NOT EXISTS
 FOR (c:Concept) ON (c.type);
 ```
 
-There is no `Agent` constraint or index: the planned agent feature has no graph schema yet. The Enterprise-only `002_create_existence_constraints.cypher` (not applied by the Community image) adds `pattern_name_exists` and `concept_name_exists`.
+`001_create_constraints.cypher` also defines an `Agent` uniqueness constraint and `003_create_indexes.cypher` an index on `RELEVANT_FOR.relevance`; no service creates `Agent` nodes or `RELEVANT_FOR` edges. The Enterprise-only `002_create_existence_constraints.cypher` (not applied by the Community image) adds `pattern_name_exists`, `concept_name_exists` and `agent_name_exists`.
 
 ### Entity Extraction Prompt
 
@@ -796,8 +796,8 @@ Pattern content:
 - [Architecture Overview](architecture/system/README.md)
 - [System Architecture](architecture/system/02-system-architecture.md) - Storage stack details
 - [Service Layer](service-layer.md) - Service and repository interfaces behind this pipeline
-- Mnemonic OpenAPI Spec (mnemonic-v1.yaml, in source repository) - Full API definition
+- Generated API spec (`src/docs/api/swagger/swagger.yaml` and `swagger.json`) - Full API definition
 
 ---
 
-Copyright (c) 2025-2026 Jeremy K. Johnson. All rights reserved.
+Copyright (c) 2025-2026 Jeremy K. Johnson. Licensed under FSL-1.1-ALv2; see [LICENSE](../../LICENSE).

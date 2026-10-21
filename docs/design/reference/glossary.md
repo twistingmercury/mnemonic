@@ -1,7 +1,7 @@
 ---
-version: 1
+version: 2
 date: 2026-10-21
-notes: "Imported from librarian-docs; service names updated for the monorepo."
+notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
 ---
 
 # Glossary
@@ -13,7 +13,7 @@ Definitions of key terms used throughout the Mnemonic documentation. Terms are l
 ---
 
 <a id="agent"></a>**Agent**
-A Claude Code agent role (e.g., `go-engineer`, `devops-engineer`). Associating patterns with agents by relevance score is **planned, not implemented**: the design documents describe agent tables, but the `db/` component has no agent schema, no Mnemonic service has agent code, the pattern API has no agent field, and search has no agent filter.
+A Claude Code agent role (e.g., `go-engineer`, `devops-engineer`). Associating patterns with agents by relevance score is **planned, not implemented**: the `db/` component defines agent tables (`agents`, `pattern_agent_associations`) and an `Agent` graph constraint, but no Mnemonic service has agent code, the pattern API has no agent field, and search has no agent filter.
 See also: [Pattern](#pattern), [Knowledge Graph](#knowledge-graph)
 
 <a id="chunk"></a>**Chunk**
@@ -77,9 +77,9 @@ A PostgreSQL extension that adds vector data types and similarity search operato
 See also: [Embedding](#embedding), [HNSW](#hnsw), [Cosine Similarity](#cosine-similarity)
 
 <a id="streamable-http"></a>**Streamable HTTP**
-The MCP transport protocol used by Mnemonic. Claude Code connects to `http://localhost:18081/mcp` (`claude mcp add --transport http mnemonic http://localhost:18081/mcp`) and sends JSON-RPC 2.0 messages over HTTP POST. Mnemonic runs in stateless mode (no session persistence), and the HTTP handler continues any incoming W3C trace context.
+The MCP transport protocol used by Mnemonic. Claude Code connects to `http://localhost:8081/mcp` (`claude mcp add --transport http mnemonic http://localhost:8081/mcp`) and sends JSON-RPC 2.0 messages over HTTP POST. Mnemonic runs in stateless mode (no session persistence), and the HTTP handler continues any incoming W3C trace context.
 See also: [MCP (Model Context Protocol)](#mcp-model-context-protocol)
 
 ---
 
-Copyright (c) 2025-2026 Jeremy K. Johnson. All rights reserved.
+Copyright (c) 2025-2026 Jeremy K. Johnson. Licensed under FSL-1.1-ALv2; see [LICENSE](../../../LICENSE).

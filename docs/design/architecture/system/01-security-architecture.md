@@ -1,7 +1,7 @@
 ---
-version: 1
+version: 2
 date: 2026-10-21
-notes: "Imported from librarian-docs; service names updated; admin UI noted as not part of this repository for now."
+notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
 ---
 
 # Security Architecture
@@ -42,7 +42,7 @@ This is what the code does today (the api service v0.5.0, the enricher service v
 | REST `/v1/api` and `/swagger` on :8080 (api service)                  | No authentication or authorization; any caller can create, update and delete patterns                                                                                                   |
 | `/health`, `/version` on :8080 and `/metrics` on :9090 (all services) | Unauthenticated                                                                                                                                                                         |
 | TLS                                                                   | None in process; the API removed `server.tls.*`, so TLS, if needed, terminates at a reverse proxy                                                                                       |
-| Secrets                                                               | `openai.api_key`, PostgreSQL, Neo4j and RabbitMQ passwords come from config or `LIBRARIAN_*` environment variables (for example `LIBRARIAN_OPENAI_API_KEY`); none are hard-coded        |
+| Secrets                                                               | `openai.api_key`, PostgreSQL, Neo4j and RabbitMQ passwords come from config or `MNEMONIC_*` environment variables (for example `MNEMONIC_OPENAI_API_KEY`); none are hard-coded          |
 | PostgreSQL                                                            | `database.postgres.ssl_mode`, default `prefer`                                                                                                                                          |
 | RabbitMQ                                                              | SASL PLAIN credentials passed separately from the connection URL                                                                                                                        |
 | Error responses                                                       | Public 500 and 503 bodies use fixed messages; private logs redact upstream bodies, URLs and credential fields                                                                           |
@@ -630,4 +630,4 @@ See also:
 
 ---
 
-Copyright (c) 2025-2026 Jeremy K. Johnson. All rights reserved.
+Copyright (c) 2025-2026 Jeremy K. Johnson. Licensed under FSL-1.1-ALv2; see [LICENSE](../../../../LICENSE).

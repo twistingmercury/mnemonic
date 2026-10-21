@@ -1,7 +1,7 @@
 ---
-version: 1
+version: 2
 date: 2026-10-21
-notes: "Imported from librarian-docs; compose, pipeline and service references rewritten for the monorepo; admin UI noted as not part of this repository for now."
+notes: "Image tags, RabbitMQ image, host ports and the pipeline table corrected; pipelines marked as not yet existing. License footer corrected."
 ---
 
 # Deployment Architecture
@@ -34,7 +34,7 @@ The full six-container local stack is defined in `deploy/docker-compose.yaml`. C
 | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `deploy/docker-compose.yaml`                                      | Local stack: Envoy edges, OPA, Keycloak, the OpenAI egress proxy, postgres, neo4j, rabbitmq, and the api, mcp and enricher services (see the gateway docs) |
 | `tests/legacy/<service>/docker-compose.yaml` (api, mcp, enricher) | Former per-service E2E suites, kept under `tests/legacy/`, with an OpenAI stub in place of api.openai.com                                                  |
-| `tests/integration/docker-compose.yaml`                           | Cross-service black-box tests: all three published `latest-dev` images, postgres, neo4j, rabbitmq and an OpenAI stub (`LIBRARIAN_OPENAI_BASE_URL`)         |
+| `tests/integration/docker-compose.yaml`                           | Cross-service black-box tests: all three published `latest-dev` images, postgres, neo4j, rabbitmq and an OpenAI stub (`MNEMONIC_OPENAI_BASE_URL`)          |
 
 The enricher service has no compose file of its own; it runs from `deploy/docker-compose.yaml`.
 
@@ -76,16 +76,16 @@ graph TB
     MCP & API & ENRICHER --> OAI
 ```
 
-| Container        | Image                                                                                                  | Container ports                                                        | Role                   |
-| ---------------- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- | ---------------------- |
-| mcp service      | ghcr.io/twistingmercury/librarian-mcp                                                                  | 8081 (`/mcp`), 8080 (`/health`, `/version`), 9090 (`/metrics`)         | MCP server (read-only) |
-| api service      | ghcr.io/twistingmercury/librarian-api                                                                  | 8080 (`/v1/api`, `/swagger`, `/health`, `/version`), 9090 (`/metrics`) | Admin REST API         |
-| enricher service | ghcr.io/twistingmercury/librarian-enricher                                                             | 8080 (`/health`, `/version`), 9090 (`/metrics`)                        | Enrichment worker      |
-| rabbitmq         | rabbitmq:3-management-alpine (api and integration-tests compose; mcp compose uses 4-management-alpine) | 5672/15672                                                             | Message queue          |
-| postgres         | ghcr.io/twistingmercury/librarian-postgres:v1.0.0-dev                                                  | 5432                                                                   | PostgreSQL + PGVector  |
-| neo4j            | ghcr.io/twistingmercury/librarian-neo4j:v1.0.0-dev                                                     | 7687                                                                   | Neo4j                  |
+| Container        | Image                                                                                      | Container ports                                                        | Role                   |
+| ---------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- | ---------------------- |
+| mcp service      | ghcr.io/twistingmercury/mnemonic-mcp                                                       | 8081 (`/mcp`), 8080 (`/health`, `/version`), 9090 (`/metrics`)         | MCP server (read-only) |
+| api service      | ghcr.io/twistingmercury/mnemonic-api                                                       | 8080 (`/v1/api`, `/swagger`, `/health`, `/version`), 9090 (`/metrics`) | Admin REST API         |
+| enricher service | ghcr.io/twistingmercury/mnemonic-enricher                                                  | 8080 (`/health`, `/version`), 9090 (`/metrics`)                        | Enrichment worker      |
+| rabbitmq         | rabbitmq:4-management-alpine (`deploy/`; the integration compose uses 3-management-alpine) | 5672/15672                                                             | Message queue          |
+| postgres         | ghcr.io/twistingmercury/mnemonic-postgres:v1.0.0-dev                                       | 5432                                                                   | PostgreSQL + PGVector  |
+| neo4j            | ghcr.io/twistingmercury/mnemonic-neo4j:v1.0.0-dev                                          | 7687                                                                   | Neo4j                  |
 
-The application images are built `FROM scratch` and tagged from `develop`: `latest-dev` and `vX.Y.Z-dev`. The version comes from the component's own tag (for example `api/v0.4.0` gives `v0.4.0-dev`). Health checks run the binary with `--health`, which calls its own `/health`: the api image declares this as a Docker `HEALTHCHECK`, and the compose files declare it for all three services. Host port mappings differ per compose file (see the table above).
+The application images are built `FROM scratch`. The build scripts tag each image `vX.Y.Z` and `latest`, taking the version from the component's own tag (for example `api/v0.4.0` gives `v0.4.0`; `0.0.0-dev` when the component has no tag yet). The compose files reference `latest-dev` and the database images `v1.0.0-dev`; those `-dev` tags are meant to be applied when CI pushes from `develop`, and no CI workflow exists yet to do that. Health checks run the binary with `--health`, which calls its own `/health`: the api image declares this as a Docker `HEALTHCHECK`, and the compose files declare it for all three services. The table lists container ports. In `deploy/docker-compose.yaml` only the gateway publishes host ports: 8080 (api edge), 8081 (mcp edge) and 8180 (Keycloak); the services themselves are reached through the gateway.
 
 ### Deployment Topology
 
@@ -232,7 +232,7 @@ graph TB
 
 - Message queue for async enrichment dispatch between Admin API and Enricher
 - Management UI available on port 15672
-- Uses the stock `rabbitmq` management image (no custom build); the api compose file uses `rabbitmq:3-management-alpine`
+- Uses the stock `rabbitmq` management image (no custom build); `deploy/docker-compose.yaml` uses `rabbitmq:4-management-alpine`
 - The API declares the `enrichment-jobs` queue as durable and publishes persistent messages
 
 **Resource Requirements:**
@@ -334,11 +334,11 @@ graph TB
     end
 
     subgraph "Container Registry (GHCR)"
-        MCP_IMG[ghcr.io/twistingmercury/librarian-mcp]
-        API_IMG[ghcr.io/twistingmercury/librarian-api]
-        ENR_IMG[ghcr.io/twistingmercury/librarian-enricher]
-        PG_IMG[ghcr.io/twistingmercury/librarian-postgres]
-        NEO_IMG[ghcr.io/twistingmercury/librarian-neo4j]
+        MCP_IMG[ghcr.io/twistingmercury/mnemonic-mcp]
+        API_IMG[ghcr.io/twistingmercury/mnemonic-api]
+        ENR_IMG[ghcr.io/twistingmercury/mnemonic-enricher]
+        PG_IMG[ghcr.io/twistingmercury/mnemonic-postgres]
+        NEO_IMG[ghcr.io/twistingmercury/mnemonic-neo4j]
     end
 
     MCP_SRC --> MCP_CI --> MCP_IMG
@@ -350,15 +350,15 @@ graph TB
 
 Each component has its own build script (`build/<component>/<component>.build.sh` for the Go services, `db/postgres/build.sh` and `db/neo4j/build.sh` for the database images). Release tags are per component (`api/vX.Y.Z`, `mcp/vX.Y.Z`, `enricher/vX.Y.Z`, `db/vX.Y.Z`, `helm/vX.Y.Z`), so tagging one component does not build or publish another. CI workflows for the monorepo are not in the repository yet; the intended model is that a push to `develop` builds only the components whose inputs changed, and that pull request builds run the same build and tests without pushing. Dependabot configuration is also still to come.
 
-**Pipeline Summary:**
+**Pipeline Summary** (intended; none of these pipelines exists yet):
 
-| Pipeline          | Location                                    | Triggers On                                                                     | Produces                                     |
-| ----------------- | ------------------------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------- |
-| mcp build         | `src/cmd/mcp`, `src/internal/mcp`           | changes to its Go dependencies, `build/mcp/`, `src/go.mod` or `src/go.sum`      | `ghcr.io/twistingmercury/librarian-mcp`      |
-| api build         | `src/cmd/api`, `src/internal/api`           | changes to its Go dependencies, `build/api/`, `src/go.mod` or `src/go.sum`      | `ghcr.io/twistingmercury/librarian-api`      |
-| enricher build    | `src/cmd/enricher`, `src/internal/enricher` | changes to its Go dependencies, `build/enricher/`, `src/go.mod` or `src/go.sum` | `ghcr.io/twistingmercury/librarian-enricher` |
-| Integration Tests | `tests/integration`                         | push/PR to `develop`, nightly                                                   | Pass/fail only (no image)                    |
-| db build          | `db/`                                       | changes under `db/postgres/` or `db/neo4j/`                                     | Database images                              |
+| Pipeline          | Location                                    | Triggers On                                                                     | Produces                                    |
+| ----------------- | ------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------- |
+| mcp build         | `src/cmd/mcp`, `src/internal/mcp`           | changes to its Go dependencies, `build/mcp/`, `src/go.mod` or `src/go.sum`      | `ghcr.io/twistingmercury/mnemonic-mcp`      |
+| api build         | `src/cmd/api`, `src/internal/api`           | changes to its Go dependencies, `build/api/`, `src/go.mod` or `src/go.sum`      | `ghcr.io/twistingmercury/mnemonic-api`      |
+| enricher build    | `src/cmd/enricher`, `src/internal/enricher` | changes to its Go dependencies, `build/enricher/`, `src/go.mod` or `src/go.sum` | `ghcr.io/twistingmercury/mnemonic-enricher` |
+| Integration Tests | `tests/integration`                         | pull requests that touch `db/` or a Go service                                  | Pass/fail only (no image)                   |
+| db build          | `db/`                                       | changes under `db/postgres/` or `db/neo4j/`                                     | Database images                             |
 
 **Why Independent Pipelines?**
 
@@ -424,4 +424,4 @@ See [MVP 5 concept diagram](../../diagrams/05-concept-cloud-iteration.md).
 
 ---
 
-Copyright (c) 2025-2026 Jeremy K. Johnson. All rights reserved.
+Copyright (c) 2025-2026 Jeremy K. Johnson. Licensed under FSL-1.1-ALv2; see [LICENSE](../../../../LICENSE).

@@ -1,7 +1,7 @@
 ---
-version: 1
+version: 2
 date: 2026-10-21
-notes: "Imported from librarian-docs; service names and code paths updated for the monorepo."
+notes: "Go module path corrected to the single module. License footer corrected."
 ---
 
 # MCP Server Implementation Design
@@ -49,7 +49,7 @@ The server speaks MCP protocol version 2026-07-28 (sessionless, no `initialize`,
 
 **Authentication:** none. The MCP endpoint is unauthenticated in the current local, single-user phase. Do not expose port 8081 beyond localhost.
 
-**SDK:** `github.com/modelcontextprotocol/go-sdk/mcp` v1.8.0 (see `src/go.mod`). The Go module path of the service is `github.com/twistingmercury/librarian-mcp`.
+**SDK:** `github.com/modelcontextprotocol/go-sdk/mcp` v1.8.0 (see `src/go.mod`). The Go module for all three services is `github.com/twistingmercury/mnemonic` (rooted at `src/`); the mcp service lives under `internal/mcp`.
 
 **Scope:** There are only 3 MCP tools, all for pattern search. The MCP service has no write paths: patterns are created, updated and deleted through the REST API (the api service) and enriched by the enricher service.
 
@@ -584,4 +584,4 @@ The SDK infers the input schema from Go struct tags, and the inferred schema car
 
 ---
 
-Copyright (c) 2025-2026 Jeremy K. Johnson. All rights reserved.
+Copyright (c) 2025-2026 Jeremy K. Johnson. Licensed under FSL-1.1-ALv2; see [LICENSE](../../LICENSE).

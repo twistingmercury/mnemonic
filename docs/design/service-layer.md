@@ -1,7 +1,7 @@
 ---
-version: 1
+version: 2
 date: 2026-10-21
-notes: "Imported from librarian-docs; service names, code paths and repository wording updated for the monorepo."
+notes: "Single Go module and spec path corrected. License footer corrected."
 ---
 
 # Service Layer Design
@@ -64,7 +64,7 @@ notes: "Imported from librarian-docs; service names, code paths and repository w
 
 > **Architecture Reference:** [System Architecture - Component Breakdown](architecture/system/02-system-architecture.md#component-breakdown) | [Data Architecture - Data Flow Patterns](architecture/system/04-data-architecture.md#data-flow-patterns)
 
-The service layer pattern is shared across all three Mnemonic services (the mcp service, the api service, the enricher service), but each service contains only the services and repositories its job needs. There is no shared Go module; each repository carries its own copy of the packages it uses.
+The service layer pattern is shared across all three Mnemonic services (the mcp service, the api service, the enricher service), but each service contains only the services and repositories its job needs. The three services share one Go module (rooted at `src/`) but no packages: each service carries its own copy of the packages it uses under `src/internal/<service>/`.
 
 | Service          | Services                                                                                                             | Repositories                                                                                   |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
@@ -175,7 +175,7 @@ src/internal/enricher/
     server/              # wiring, HTTP server
 ```
 
-All three also have `config`, `database` (api: `database/graphdb`, `database/vectordb`), `health`, `metrics`, `telemetry` and `version`; the API also has `middleware`. The Go module paths are `github.com/twistingmercury/librarian-api`, `github.com/twistingmercury/librarian-mcp` (the MCP service) and `github.com/twistingmercury/librarian-enricher`.
+All three also have `config`, `database` (api: `database/graphdb`, `database/vectordb`), `health`, `metrics`, `telemetry` and `version`; the API also has `middleware`. All three services share one Go module, `github.com/twistingmercury/mnemonic`, rooted at `src/`; their packages are under `internal/api`, `internal/mcp` and `internal/enricher`.
 
 `mcpserver.Services` (in the mcp service's `src/internal/mcp/mcpserver/server.go`) is a struct of function fields that `src/internal/mcp/server` fills with the MCP service methods.
 
@@ -472,7 +472,7 @@ Both have RabbitMQ implementations under `queue/rabbitmq`. The publisher sends `
 
 ### Planned: Agent and Skill Services
 
-> **Status: planned, not implemented.** No service has agent, skill or skill-file code, tables are not read or written by any service, and there are no REST routes for them.
+> **Status: planned, not implemented.** No service has agent, skill or skill-file code, no service reads or writes the corresponding tables (which the schema in `db/` does define), and there are no REST routes for them.
 
 Earlier versions of this document specified `AgentService` (agent CRUD with CRC64 change detection and best-effort Neo4j `Agent` node sync), `SkillService` and `SkillFileService` (Postgres-only skill definitions and child files, addressed by name), pattern-agent associations (`PUT /v1/api/patterns/{id}/agents`, `RELEVANT_FOR` edges), and an `agent` filter on `search_patterns`. If these are built, they should follow the same conventions as `pattern.Service`: sentinel-error translation, one Postgres transaction per write, best-effort Neo4j sync after commit.
 
@@ -487,7 +487,7 @@ The MCP server's `Services` struct is a narrow facade over the MCP read services
 ### Struct Definition
 
 ```go
-// Package: internal/mcpserver (module github.com/twistingmercury/librarian-mcp)
+// Package: internal/mcpserver (package path github.com/twistingmercury/mnemonic/internal/mcp/mcpserver)
 type Services struct {
     SearchPatterns      func(ctx context.Context, opts searchsvc.SearchOptions) (*searchsvc.SearchResult, error)
     FindRelatedPatterns func(ctx context.Context, patternID uuid.UUID, limit int) (string, []patternsvc.RelatedPatternResult, error)
@@ -1008,9 +1008,9 @@ for {
 
 [Table of Contents](#table-of-contents)
 
-> **Architecture Reference:** OpenAPI Spec - Pagination (in source repository: `mnemonic-api/api/openapi/mnemonic-v1.yaml`)
+> **Architecture Reference:** Generated API spec - Pagination (`src/docs/api/swagger/swagger.yaml`)
 
-The OpenAPI spec defines cursor-based pagination with opaque base64 cursors. The repository layer uses `ListOptions{Offset, Limit}`. The translation between wire cursors and repository offsets lives in the **handler layer**, not the service layer. Only `GET /v1/api/patterns` is paginated.
+The generated spec describes cursor-based pagination with opaque base64 cursors. The repository layer uses `ListOptions{Offset, Limit}`. The translation between wire cursors and repository offsets lives in the **handler layer**, not the service layer. Only `GET /v1/api/patterns` is paginated.
 
 ### Cursor Encoding
 
@@ -1142,7 +1142,7 @@ In the enricher, `queue.provider` must be `rabbitmq`; any other value fails star
 
 [Table of Contents](#table-of-contents)
 
-- [data-storage.md](data-storage.md) documents the `pattern_chunks` table (migration 000005), the chunk repository and the RELATED_TO / `FindRelatedPatterns` queries used here. Its agent, skill and association sections describe planned features (see [Planned: Agent and Skill Services](#planned-agent-and-skill-services)).
+- [data-storage.md](data-storage.md) documents the `pattern_chunks` table (migration 000009), the chunk repository and the RELATED_TO / `FindRelatedPatterns` queries used here. Its agent, skill and association sections describe planned features (see [Planned: Agent and Skill Services](#planned-agent-and-skill-services)).
 - [configuration.md](configuration.md) documents the RabbitMQ settings for the API (publisher) and enricher (consumer) and the `enrichment.*` settings, including `completed_retention` (168h) and `failed_retention` (720h).
 
 ## Key Takeaways
@@ -1174,8 +1174,8 @@ In the enricher, `queue.provider` must be `rabbitmq`; any other value fails star
 - [MCP Server](mcp-server.md) - MCP tool handlers, formats and observability
 - [Pattern Processing](pattern-processing.md) - Chunking, enrichment pipeline, job lifecycle and OpenAI integration
 - [Configuration](configuration.md) - Server configuration including OpenAI and enrichment settings
-- API Specification (mnemonic-v1.yaml, in source repository) - REST API contract
+- Generated API spec (`src/docs/api/swagger/swagger.yaml` and `swagger.json`) - REST API contract
 
 ---
 
-Copyright (c) 2025-2026 Jeremy K. Johnson. All rights reserved.
+Copyright (c) 2025-2026 Jeremy K. Johnson. Licensed under FSL-1.1-ALv2; see [LICENSE](../../LICENSE).
