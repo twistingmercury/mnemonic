@@ -7,8 +7,13 @@
 //   - POST /v1/chat/completions (concept extraction) returns the concepts
 //     listed on a "Concepts: a, b" line of the pattern content.
 //   - GET /v1/models/{model} answers the services' health checks.
-//   - POST /control/fail?match=X&n=N makes the next N embedding requests
-//     whose input contains X fail with 500; GET returns how many remain.
+//   - GET /healthz answers liveness probes without credentials.
+//   - POST or GET /control/fail?match=X&n=N makes the next N embedding
+//     requests whose input contains X fail with 500. GET
+//     /control/fail?match=X, without n, returns how many remain.
+//   - POST /control/reset clears every injected failure.
+//
+// Every /v1/* route requires an Authorization header, like the real API.
 package main
 
 import (
@@ -20,32 +25,51 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 	"unicode"
 )
 
 const defaultDimensions = 2000
 
-// failures maps an input substring to how many more embedding requests
-// containing it must fail.
-var (
+// stub holds the injected failures: an input substring mapped to how many
+// more embedding requests containing it must fail.
+type stub struct {
 	mu       sync.Mutex
-	failures = map[string]int{}
-)
-
-func main() {
-	mux := http.NewServeMux()
-	mux.HandleFunc("POST /v1/embeddings", handleEmbeddings)
-	mux.HandleFunc("POST /v1/chat/completions", handleChatCompletions)
-	mux.HandleFunc("GET /v1/models/{model}", handleModel)
-	mux.HandleFunc("POST /control/fail", handleSetFailures)
-	mux.HandleFunc("GET /control/fail", handleGetFailures)
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
-
-	log.Println("OpenAI stub listening on :8090")
-	log.Fatal(http.ListenAndServe(":8090", mux)) // #nosec G114 -- test-only stub
+	failures map[string]int
 }
 
-func handleEmbeddings(w http.ResponseWriter, r *http.Request) {
+func newStub() *stub {
+	return &stub{failures: map[string]int{}}
+}
+
+func (s *stub) routes() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /v1/embeddings", s.handleEmbeddings)
+	mux.HandleFunc("POST /v1/chat/completions", s.handleChatCompletions)
+	mux.HandleFunc("GET /v1/models/{model}", s.handleModel)
+	mux.HandleFunc("POST /control/fail", s.handleSetFailures)
+	mux.HandleFunc("GET /control/fail", s.handleFailures)
+	mux.HandleFunc("POST /control/reset", s.handleReset)
+	mux.HandleFunc("GET /healthz", handleHealthz)
+	return mux
+}
+
+func main() {
+	server := &http.Server{
+		Addr:              ":8090",
+		Handler:           newStub().routes(),
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	log.Println("OpenAI stub listening on :8090")
+	log.Fatal(server.ListenAndServe())
+}
+
+func handleHealthz(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *stub) handleEmbeddings(w http.ResponseWriter, r *http.Request) {
 	if !authorized(w, r) {
 		return
 	}
@@ -58,7 +82,7 @@ func handleEmbeddings(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
 		return
 	}
-	if shouldFail(req.Input) {
+	if s.shouldFail(req.Input) {
 		http.Error(w, `{"error":"forced failure"}`, http.StatusInternalServerError)
 		return
 	}
@@ -85,7 +109,7 @@ func embed(text string, dims int) []float32 {
 		seen[word] = true
 		h := fnv.New32a()
 		_, _ = h.Write([]byte(word))
-		v[h.Sum32()%uint32(dims)]++
+		v[int(h.Sum32())%dims]++
 	}
 	var norm float64
 	for _, x := range v {
@@ -110,19 +134,19 @@ func words(text string) []string {
 	})
 }
 
-func shouldFail(input string) bool {
-	mu.Lock()
-	defer mu.Unlock()
-	for match, n := range failures {
+func (s *stub) shouldFail(input string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for match, n := range s.failures {
 		if n > 0 && strings.Contains(input, match) {
-			failures[match] = n - 1
+			s.failures[match] = n - 1
 			return true
 		}
 	}
 	return false
 }
 
-func handleChatCompletions(w http.ResponseWriter, r *http.Request) {
+func (s *stub) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 	if !authorized(w, r) {
 		return
 	}
@@ -159,31 +183,46 @@ func handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func handleModel(w http.ResponseWriter, r *http.Request) {
+func (s *stub) handleModel(w http.ResponseWriter, r *http.Request) {
 	if !authorized(w, r) {
 		return
 	}
 	writeJSON(w, map[string]string{"id": r.PathValue("model"), "object": "model"})
 }
 
-func handleSetFailures(w http.ResponseWriter, r *http.Request) {
+func (s *stub) handleSetFailures(w http.ResponseWriter, r *http.Request) {
 	match := r.URL.Query().Get("match")
 	n, err := strconv.Atoi(r.URL.Query().Get("n"))
 	if match == "" || err != nil || n < 0 {
 		http.Error(w, "match and a non-negative n are required", http.StatusBadRequest)
 		return
 	}
-	mu.Lock()
-	failures[match] = n
-	mu.Unlock()
+
+	s.mu.Lock()
+	s.failures[match] = n
+	s.mu.Unlock()
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func handleGetFailures(w http.ResponseWriter, r *http.Request) {
-	mu.Lock()
-	remaining := failures[r.URL.Query().Get("match")]
-	mu.Unlock()
+// handleFailures sets a failure when n is present (so a browser or curl GET
+// works) and otherwise reports how many failures remain for match.
+func (s *stub) handleFailures(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Query().Has("n") {
+		s.handleSetFailures(w, r)
+		return
+	}
+
+	s.mu.Lock()
+	remaining := s.failures[r.URL.Query().Get("match")]
+	s.mu.Unlock()
 	writeJSON(w, map[string]int{"remaining": remaining})
+}
+
+func (s *stub) handleReset(w http.ResponseWriter, _ *http.Request) {
+	s.mu.Lock()
+	clear(s.failures)
+	s.mu.Unlock()
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func authorized(w http.ResponseWriter, r *http.Request) bool {
