@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -275,4 +276,119 @@ func TestIntegration_CreateBatchesChunksAndJobs(t *testing.T) {
 	for _, c := range summaries {
 		assert.Empty(t, c.Content, "summaries never load content")
 	}
+}
+
+// storedPattern is the pattern row and its chunks as the database holds them,
+// compared whole so no column can change unnoticed.
+type storedPattern struct {
+	Name        string
+	Description *string
+	Content     string
+	Tags        string
+	Status      string
+	EnrichedAt  *time.Time
+	UpdatedAt   time.Time
+	Chunks      []storedChunk
+}
+
+type storedChunk struct {
+	ID      uuid.UUID
+	Index   int
+	Title   string
+	Content string
+	Status  string
+}
+
+// snapshot reads the pattern row and its chunks straight from the tables,
+// bypassing the service, so it reports what a rollback actually left behind.
+func snapshot(t *testing.T, pool *pgxpool.Pool, id uuid.UUID) storedPattern {
+	t.Helper()
+	ctx := context.Background()
+
+	var got storedPattern
+	require.NoError(t, pool.QueryRow(ctx, `
+		select name, description, content, tags::text, enrichment_status, enriched_at, updated_at
+		  from patterns where id = $1`, id).Scan(
+		&got.Name, &got.Description, &got.Content, &got.Tags, &got.Status, &got.EnrichedAt, &got.UpdatedAt))
+
+	rows, err := pool.Query(ctx, `
+		select id, chunk_index, section_title, content, enrichment_status
+		  from pattern_chunks where pattern_id = $1 order by chunk_index`, id)
+	require.NoError(t, err)
+	defer rows.Close()
+
+	for rows.Next() {
+		var c storedChunk
+		require.NoError(t, rows.Scan(&c.ID, &c.Index, &c.Title, &c.Content, &c.Status))
+		got.Chunks = append(got.Chunks, c)
+	}
+	require.NoError(t, rows.Err())
+
+	return got
+}
+
+// TestIntegration_UpdateIsAtomic is the Update counterpart of
+// TestIntegration_CreateIsAtomic. Update writes the pattern row, deletes the old
+// chunks, then inserts the new ones, so an over-long section title fails the
+// last step after the first two have already run inside the transaction. The
+// prior row, updated_at and chunks must all survive; the mock tests can only
+// show that Rollback was called.
+func TestIntegration_UpdateIsAtomic(t *testing.T) {
+	pool := integrationPool(t)
+	svc, pub := newIntegrationService(t, pool)
+	ctx := context.Background()
+	name := uniqueName(t)
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, `delete from patterns where name = $1 or name = $1 || '-renamed'`, name)
+	})
+
+	description := "original description"
+	created, err := svc.Create(ctx, patternsvc.Input{
+		Name:        name,
+		Description: &description,
+		Content:     integrationContent,
+		Tags:        []string{"original"},
+	})
+	require.NoError(t, err)
+
+	// Put the pattern and its chunks in the terminal state the enricher would
+	// leave, backdated: a successful update would visibly reset all of it, so a
+	// rollback that missed any part would show.
+	staleTime := time.Now().Add(-72 * time.Hour).UTC()
+	_, err = pool.Exec(ctx, `
+		update patterns set enrichment_status = 'enriched', enriched_at = $2, updated_at = $2 where id = $1`,
+		created.ID, staleTime)
+	require.NoError(t, err)
+	_, err = pool.Exec(ctx, `
+		update pattern_chunks set enrichment_status = 'enriched', enriched_at = $2 where pattern_id = $1`,
+		created.ID, staleTime)
+	require.NoError(t, err)
+
+	before := snapshot(t, pool, created.ID)
+	require.Len(t, before.Chunks, 2, "precondition: the original two chunks exist")
+	pub.published = nil
+
+	overlong := "[//]: pattern\n## " + strings.Repeat("T", 300) + "\nBody."
+	newDescription := "replacement description"
+	_, err = svc.Update(ctx, created.ID, patternsvc.Input{
+		Name:        name + "-renamed",
+		Description: &newDescription,
+		Content:     overlong,
+		Tags:        []string{"replacement"},
+	})
+	require.Error(t, err, "an over-long section title must fail the update")
+
+	// Prove the failure came from the column limit and not from earlier
+	// validation: it is Postgres' string_data_right_truncation.
+	var pgErr *pgconn.PgError
+	require.ErrorAs(t, err, &pgErr)
+	assert.Equal(t, "22001", pgErr.Code)
+
+	after := snapshot(t, pool, created.ID)
+	assert.Equal(t, before, after, "a failed update must leave the row, updated_at and chunks as they were")
+	assert.Empty(t, pub.published, "nothing may be published for a rolled-back update")
+
+	// The rolled-back rename must not have taken the name either.
+	patterns, _, _ := countsFor(t, pool, name+"-renamed")
+	assert.Zero(t, patterns)
 }
