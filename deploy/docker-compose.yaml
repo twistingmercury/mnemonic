@@ -4,9 +4,10 @@
 # egress proxy is the one exception: it alone reaches api.openai.com, and it
 # alone holds the API key (set MNEMONIC_OPENAI_API_EMBEDDINGS_KEY when starting the stack).
 #
-# The Mnemonic images are pulled from ghcr.io when missing. To run local
-# builds instead, set MNEMONIC_API_IMAGE and MNEMONIC_MCP_IMAGE (make build in
-# those repos tags them ghcr.io/twistingmercury/<name>:latest).
+# The Mnemonic images default to ghcr.io/twistingmercury/<name>:latest-dev and
+# are pulled when missing. To run local builds instead, set MNEMONIC_API_IMAGE,
+# MNEMONIC_MCP_IMAGE and MNEMONIC_ENRICHER_IMAGE (make build tags each image
+# ghcr.io/twistingmercury/<name>:latest).
 
 name: mnemonic
 

@@ -1,9 +1,9 @@
 # Values for the local minikube deployment. deploy/docker-compose.yaml
 # is the reference stack; settings here mirror it unless noted.
 
-# The mnemonic-* images exist only in the host's Docker cache and are loaded
-# into the node with `minikube image load` (make k8s-images), so they must
-# never be pulled.
+# `make k8s-images` loads a mnemonic-* image built on the host into the node
+# with `minikube image load` and replaces a stale copy. An image the host does
+# not have is not loaded, and with IfNotPresent the node pulls it from ghcr.io.
 imagePullPolicy: IfNotPresent
 
 # ConfigMaps created by `make k8s-config` straight from gateway/envoy/, gateway/opa/ and
