@@ -6,14 +6,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJ_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 COMPONENT="api"
-IMAGE_NAME="${IMAGE_NAME:-ghcr.io/twistingmercury/mnemonic-api}"
-BUILD_VER="${BUILD_VER:-$("${PROJ_ROOT}/build/version.sh" "${COMPONENT}")}"
-BUILD_DATE="${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
-BUILD_COMMIT="${BUILD_COMMIT:-$(git -C "${PROJ_ROOT}" rev-parse --short HEAD 2>/dev/null || echo 'unknown')}"
-IMAGE_TAG="${IMAGE_TAG:-v${BUILD_VER}}"
+MNEMONIC_IMAGE_NAME="${MNEMONIC_IMAGE_NAME:-ghcr.io/twistingmercury/mnemonic-api}"
+MNEMONIC_BUILD_VER="${MNEMONIC_BUILD_VER:-$("${PROJ_ROOT}/build/version.sh" "${COMPONENT}")}"
+MNEMONIC_BUILD_DATE="${MNEMONIC_BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+MNEMONIC_BUILD_COMMIT="${MNEMONIC_BUILD_COMMIT:-$(git -C "${PROJ_ROOT}" rev-parse --short HEAD 2>/dev/null || echo 'unknown')}"
+MNEMONIC_IMAGE_TAG="${MNEMONIC_IMAGE_TAG:-v${MNEMONIC_BUILD_VER}}"
 
 # The e2e suite is still parked under tests/legacy until it is re-homed.
-E2E_COMPOSE_FILE="${E2E_COMPOSE_FILE:-${PROJ_ROOT}/tests/legacy/api/docker-compose.yaml}"
+MNEMONIC_E2E_COMPOSE_FILE="${MNEMONIC_E2E_COMPOSE_FILE:-${PROJ_ROOT}/tests/legacy/api/docker-compose.yaml}"
 # The librarian_* service names must change together with the compose files
 # under tests/legacy (the rename tasks for those files).
 E2E_INFRA_SERVICES=(postgres neo4j rabbitmq)

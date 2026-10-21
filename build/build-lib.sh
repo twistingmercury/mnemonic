@@ -2,10 +2,11 @@
 # Description: Image build and e2e steps shared by api.build.sh, mcp.build.sh
 #              and enricher.build.sh, which differ only in names and services.
 # Usage: source it from build/<name>/<name>.build.sh after setting PROJ_ROOT,
-#        COMPONENT, IMAGE_NAME, IMAGE_TAG, BUILD_VER, BUILD_DATE, BUILD_COMMIT,
-#        E2E_COMPOSE_FILE, E2E_INFRA_SERVICES, E2E_UP_SERVICES and
-#        E2E_EXIT_CODE_FROM (arrays for the *_SERVICES). Optional:
-#        E2E_PULL_SERVICES (array; pulled first with PULL_POLICY).
+#        COMPONENT, MNEMONIC_IMAGE_NAME, MNEMONIC_IMAGE_TAG, MNEMONIC_BUILD_VER,
+#        MNEMONIC_BUILD_DATE, MNEMONIC_BUILD_COMMIT, MNEMONIC_E2E_COMPOSE_FILE,
+#        E2E_INFRA_SERVICES, E2E_UP_SERVICES and E2E_EXIT_CODE_FROM (arrays for
+#        the *_SERVICES). Optional: E2E_PULL_SERVICES (array; pulled first with
+#        MNEMONIC_PULL_POLICY, default always).
 #
 # Both steps print one progress line and show docker output only on failure.
 # The image build always runs with --no-cache and --pull so the quality gates
@@ -37,12 +38,12 @@ build_lib::build_image() {
     printf "building %s..." "${COMPONENT}"
     build_lib::run_quiet docker build --rm --no-cache --pull --progress=plain \
         --file "${PROJ_ROOT}/build/${COMPONENT}/${COMPONENT}.Dockerfile" \
-        --build-arg BUILD_VER="${BUILD_VER}" \
-        --build-arg BUILD_DATE="${BUILD_DATE}" \
-        --build-arg BUILD_COMMIT="${BUILD_COMMIT}" \
+        --build-arg BUILD_VER="${MNEMONIC_BUILD_VER}" \
+        --build-arg BUILD_DATE="${MNEMONIC_BUILD_DATE}" \
+        --build-arg BUILD_COMMIT="${MNEMONIC_BUILD_COMMIT}" \
         --target final \
-        --tag "${IMAGE_NAME}:${IMAGE_TAG}" \
-        --tag "${IMAGE_NAME}:latest" \
+        --tag "${MNEMONIC_IMAGE_NAME}:${MNEMONIC_IMAGE_TAG}" \
+        --tag "${MNEMONIC_IMAGE_NAME}:latest" \
         "${PROJ_ROOT}" || rc=$?
     if [ "${rc}" -ne 0 ]; then
         printf "failed\n"
@@ -58,7 +59,7 @@ build_lib::build_image() {
 # Every compose call of a run goes through here so they all share one project
 # name; that scoping is what lets teardown remove only what this run created.
 build_lib::compose() {
-    docker compose -p "${E2E_PROJECT}" -f "${E2E_COMPOSE_FILE}" "$@"
+    docker compose -p "${E2E_PROJECT}" -f "${MNEMONIC_E2E_COMPOSE_FILE}" "$@"
 }
 
 build_lib::e2e_pull() {
@@ -67,7 +68,7 @@ build_lib::e2e_pull() {
     fi
 
     build_lib::run_quiet build_lib::compose pull \
-        --policy "${PULL_POLICY:-always}" "${E2E_PULL_SERVICES[@]}"
+        --policy "${MNEMONIC_PULL_POLICY:-always}" "${E2E_PULL_SERVICES[@]}"
 }
 
 build_lib::e2e_run() {

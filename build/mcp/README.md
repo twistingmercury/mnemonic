@@ -55,27 +55,27 @@ quality gates and tests and starts from a fresh base image.
 
 `build.sh` accepts these environment variables:
 
-| Variable       | Default                                      | Purpose                              |
-| -------------- | -------------------------------------------- | ------------------------------------ |
-| `BUILD_VER`    | Latest Git tag, or `dev`                     | Binary and image version             |
-| `BUILD_DATE`   | Current UTC time in RFC 3339 format          | Image and binary build timestamp     |
-| `BUILD_COMMIT` | Current short Git commit, or `unknown`       | Image and binary source revision     |
-| `IMAGE_NAME`   | `ghcr.io/twistingmercury/mnemonic-mcp`       | Image repository                     |
-| `IMAGE_TAG`    | Value of `BUILD_VER`                         | Primary local image tag              |
+| Variable                | Default                                | Purpose                          |
+| ----------------------- | -------------------------------------- | -------------------------------- |
+| `MNEMONIC_BUILD_VER`    | Latest Git tag, or `dev`               | Binary and image version         |
+| `MNEMONIC_BUILD_DATE`   | Current UTC time in RFC 3339 format    | Image and binary build timestamp |
+| `MNEMONIC_BUILD_COMMIT` | Current short Git commit, or `unknown` | Image and binary source revision |
+| `MNEMONIC_IMAGE_NAME`   | `ghcr.io/twistingmercury/mnemonic-mcp` | Image repository                 |
+| `MNEMONIC_IMAGE_TAG`    | Value of `MNEMONIC_BUILD_VER`          | Primary local image tag          |
 
 For example, to build with explicit metadata while retaining the canonical
 Make target:
 
 ```bash
-BUILD_VER=v0.3.1 BUILD_COMMIT=abc12345 make build
+MNEMONIC_BUILD_VER=v0.3.1 MNEMONIC_BUILD_COMMIT=abc12345 make build
 ```
 
 ## Output and publishing
 
 Each successful script run produces both:
 
-- `${IMAGE_NAME}:${IMAGE_TAG}`
-- `${IMAGE_NAME}:latest`
+- `${MNEMONIC_IMAGE_NAME}:${MNEMONIC_IMAGE_TAG}`
+- `${MNEMONIC_IMAGE_NAME}:latest`
 
 The script never pushes images. Local builds stop after image creation and E2E
 validation. CI invokes `build/mcp/mcp.build.sh` directly, authenticates to GHCR after validation, and pushes tags in the

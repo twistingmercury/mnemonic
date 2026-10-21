@@ -13,7 +13,7 @@ setup() {
     install_stubs
     export STUB_GIT_DESCRIBE="${COMPONENT}/v0.5.1"
     export STUB_GIT_COMMIT="abc1234"
-    export BUILD_DATE="2026-01-02T03:04:05Z"
+    export MNEMONIC_BUILD_DATE="2026-01-02T03:04:05Z"
 }
 
 teardown() {
@@ -25,7 +25,7 @@ teardown() {
 
     assert_success
     assert_equal "$(build_invocation)" \
-        "$(expected_build "${COMPONENT}" 0.5.1 "${BUILD_DATE}" abc1234 v0.5.1)"
+        "$(expected_build "${COMPONENT}" 0.5.1 "${MNEMONIC_BUILD_DATE}" abc1234 v0.5.1)"
 }
 
 @test "${COMPONENT} build - always passes --no-cache" {
@@ -93,30 +93,30 @@ teardown() {
     assert [ -n "$(log_line_of 'down -v --remove-orphans')" ]
 }
 
-@test "${COMPONENT} build - uses the legacy compose file unless E2E_COMPOSE_FILE is set" {
+@test "${COMPONENT} build - uses the legacy compose file unless MNEMONIC_E2E_COMPOSE_FILE is set" {
     run "${SCRIPT_PATH}"
 
     assert_success
     assert [ -n "$(log_line_of "-f ${REPO_ROOT}/tests/legacy/${COMPONENT}/docker-compose.yaml up")" ]
 }
 
-@test "${COMPONENT} build with E2E_COMPOSE_FILE set - runs e2e from that file" {
-    export E2E_COMPOSE_FILE="${TEST_DIR}/other-compose.yaml"
+@test "${COMPONENT} build with MNEMONIC_E2E_COMPOSE_FILE set - runs e2e from that file" {
+    export MNEMONIC_E2E_COMPOSE_FILE="${TEST_DIR}/other-compose.yaml"
 
     run "${SCRIPT_PATH}"
 
     assert_success
-    assert [ -n "$(log_line_of "-f ${E2E_COMPOSE_FILE} up")" ]
+    assert [ -n "$(log_line_of "-f ${MNEMONIC_E2E_COMPOSE_FILE} up")" ]
 }
 
-@test "${COMPONENT} build - takes BUILD_VER from build/version.sh with the prefix stripped" {
+@test "${COMPONENT} build - takes MNEMONIC_BUILD_VER from build/version.sh with the prefix stripped" {
     export STUB_GIT_DESCRIBE="${COMPONENT}/v1.2.3"
 
     run "${SCRIPT_PATH}"
 
     assert_success
     assert_equal "$(build_invocation)" \
-        "$(expected_build "${COMPONENT}" 1.2.3 "${BUILD_DATE}" abc1234 v1.2.3)"
+        "$(expected_build "${COMPONENT}" 1.2.3 "${MNEMONIC_BUILD_DATE}" abc1234 v1.2.3)"
 }
 
 @test "${COMPONENT} build with no component tag - versions the image 0.0.0-dev" {
@@ -126,23 +126,23 @@ teardown() {
 
     assert_success
     assert_equal "$(build_invocation)" \
-        "$(expected_build "${COMPONENT}" 0.0.0-dev "${BUILD_DATE}" abc1234 v0.0.0-dev)"
+        "$(expected_build "${COMPONENT}" 0.0.0-dev "${MNEMONIC_BUILD_DATE}" abc1234 v0.0.0-dev)"
 }
 
-@test "${COMPONENT} build with BUILD_VER and BUILD_COMMIT set - uses them" {
-    export BUILD_VER="9.9.9"
-    export BUILD_COMMIT="feedbee"
+@test "${COMPONENT} build with MNEMONIC_BUILD_VER and MNEMONIC_BUILD_COMMIT set - uses them" {
+    export MNEMONIC_BUILD_VER="9.9.9"
+    export MNEMONIC_BUILD_COMMIT="feedbee"
 
     run "${SCRIPT_PATH}"
 
     assert_success
     assert_equal "$(build_invocation)" \
-        "$(expected_build "${COMPONENT}" 9.9.9 "${BUILD_DATE}" feedbee v9.9.9)"
+        "$(expected_build "${COMPONENT}" 9.9.9 "${MNEMONIC_BUILD_DATE}" feedbee v9.9.9)"
 }
 
-@test "${COMPONENT} build with IMAGE_NAME and IMAGE_TAG set - tags with them" {
-    export IMAGE_NAME="registry.example.com/team/${COMPONENT}"
-    export IMAGE_TAG="latest-dev"
+@test "${COMPONENT} build with MNEMONIC_IMAGE_NAME and MNEMONIC_IMAGE_TAG set - tags with them" {
+    export MNEMONIC_IMAGE_NAME="registry.example.com/team/${COMPONENT}"
+    export MNEMONIC_IMAGE_TAG="latest-dev"
 
     run "${SCRIPT_PATH}"
 
@@ -150,19 +150,52 @@ teardown() {
     assert [ -n "$(log_line_of "--tag registry.example.com/team/${COMPONENT}:latest-dev --tag registry.example.com/team/${COMPONENT}:latest ")" ]
 }
 
-@test "${COMPONENT} build with git unable to name a commit - passes unknown" {
-    unset STUB_GIT_COMMIT
-    unset BUILD_COMMIT
+@test "${COMPONENT} build with the unprefixed BUILD_VER, BUILD_COMMIT, IMAGE_NAME and IMAGE_TAG set - ignores them" {
+    export BUILD_VER="8.8.8"
+    export BUILD_COMMIT="deadbee"
+    export IMAGE_NAME="ignored.example.com/${COMPONENT}"
+    export IMAGE_TAG="ignored-tag"
 
     run "${SCRIPT_PATH}"
 
     assert_success
     assert_equal "$(build_invocation)" \
-        "$(expected_build "${COMPONENT}" 0.5.1 "${BUILD_DATE}" unknown v0.5.1)"
+        "$(expected_build "${COMPONENT}" 0.5.1 "${MNEMONIC_BUILD_DATE}" abc1234 v0.5.1)"
 }
 
-@test "${COMPONENT} build without BUILD_DATE - passes a UTC timestamp" {
-    unset BUILD_DATE
+@test "${COMPONENT} build with the unprefixed BUILD_DATE set - ignores it" {
+    unset MNEMONIC_BUILD_DATE
+    export BUILD_DATE="1999-01-01T00:00:00Z"
+
+    run "${SCRIPT_PATH}"
+
+    assert_success
+    run grep -c -e 'BUILD_DATE=1999-01-01T00:00:00Z' "${DOCKER_LOG}"
+    assert_output "0"
+}
+
+@test "${COMPONENT} build with the unprefixed E2E_COMPOSE_FILE set - ignores it" {
+    export E2E_COMPOSE_FILE="${TEST_DIR}/ignored-compose.yaml"
+
+    run "${SCRIPT_PATH}"
+
+    assert_success
+    assert [ -z "$(log_line_of "-f ${E2E_COMPOSE_FILE} up")" ]
+}
+
+@test "${COMPONENT} build with git unable to name a commit - passes unknown" {
+    unset STUB_GIT_COMMIT
+    unset MNEMONIC_BUILD_COMMIT
+
+    run "${SCRIPT_PATH}"
+
+    assert_success
+    assert_equal "$(build_invocation)" \
+        "$(expected_build "${COMPONENT}" 0.5.1 "${MNEMONIC_BUILD_DATE}" unknown v0.5.1)"
+}
+
+@test "${COMPONENT} build without MNEMONIC_BUILD_DATE - passes a UTC timestamp" {
+    unset MNEMONIC_BUILD_DATE
 
     run "${SCRIPT_PATH}"
 
@@ -178,7 +211,7 @@ teardown() {
 
     assert_success
     assert_equal "$(build_invocation)" \
-        "$(expected_build "${COMPONENT}" 0.5.1 "${BUILD_DATE}" abc1234 v0.5.1)"
+        "$(expected_build "${COMPONENT}" 0.5.1 "${MNEMONIC_BUILD_DATE}" abc1234 v0.5.1)"
 }
 
 @test "${COMPONENT} build when docker build fails - exits non-zero and skips e2e" {
