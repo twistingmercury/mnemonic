@@ -3,7 +3,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJ_ROOT="${PROJ_ROOT:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
+MNEMONIC_PROJ_ROOT="${MNEMONIC_PROJ_ROOT:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
 
 # Printed when a component has no release tag yet.
 readonly FALLBACK_VERSION="0.0.0-dev"
@@ -38,7 +38,7 @@ component_version() {
     local component="${1}"
     local tag
 
-    if ! tag=$(git -C "${PROJ_ROOT}" describe --tags --abbrev=0 --match "${component}/v*" 2>/dev/null); then
+    if ! tag=$(git -C "${MNEMONIC_PROJ_ROOT}" describe --tags --abbrev=0 --match "${component}/v*" 2>/dev/null); then
         printf "%s" "${FALLBACK_VERSION}"
         return 0
     fi

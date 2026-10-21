@@ -152,3 +152,31 @@ commit_change() {
     assert_failure
     assert_output --partial "ERROR"
 }
+
+@test "version api with MNEMONIC_PROJ_ROOT set - reads the tags of that repo" {
+    local other_repo="${OUTSIDE_DIR}/other"
+    git init --quiet "${other_repo}"
+    git -C "${other_repo}" commit --quiet --allow-empty -m "other"
+    git -C "${other_repo}" tag api/v7.7.7
+    git -C "${REPO_DIR}" tag api/v0.5.1
+    export MNEMONIC_PROJ_ROOT="${other_repo}"
+
+    run "${SCRIPT_PATH}" api
+
+    assert_success
+    assert_output "7.7.7"
+}
+
+@test "version api with the unprefixed PROJ_ROOT set - ignores it" {
+    local other_repo="${OUTSIDE_DIR}/other"
+    git init --quiet "${other_repo}"
+    git -C "${other_repo}" commit --quiet --allow-empty -m "other"
+    git -C "${other_repo}" tag api/v7.7.7
+    git -C "${REPO_DIR}" tag api/v0.5.1
+    export PROJ_ROOT="${other_repo}"
+
+    run "${SCRIPT_PATH}" api
+
+    assert_success
+    assert_output "0.5.1"
+}
