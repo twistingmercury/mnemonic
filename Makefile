@@ -8,10 +8,15 @@ STUB_COMPOSE  := docker compose -f gateway/test/compose.stub.yaml
 help: ## Show targets
 	@grep -E '^[a-z0-9-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-16s %s\n", $$1, $$2}'
 
-test-policy: ## Format-check, type-check and unit-test the OPA policies
-	opa fmt --list --fail gateway/opa/policy
-	opa check --strict gateway/opa/policy
-	opa test -v gateway/opa/policy
+# Runs OPA from the pinned image, like validate-envoy, so a local run and a CI
+# run use the same OPA version and need no host install.
+OPA_IMAGE     ?= openpolicyagent/opa:$(OPA_VERSION)-envoy-static
+OPA_RUN       := docker run --rm -v $(CURDIR)/gateway/opa/policy:/policy:ro $(OPA_IMAGE)
+
+test-policy: ## Format-check, type-check and unit-test the OPA policies (pinned OPA image)
+	$(OPA_RUN) fmt --list --fail /policy
+	$(OPA_RUN) check --strict /policy
+	$(OPA_RUN) test -v /policy
 
 validate-envoy: ## Validate both Envoy configs (edge and egress)
 	docker run --rm -v $(CURDIR)/gateway/envoy:/cfg:ro $(ENVOY_IMAGE) envoy --mode validate -c /cfg/envoy.yaml
