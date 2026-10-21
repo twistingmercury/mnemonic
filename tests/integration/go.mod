@@ -1,3 +1,3 @@
-module github.com/twistingmercury/librarian-integration-tests
+module github.com/twistingmercury/mnemonic/tests/integration
 
-go 1.27.2
+go 1.27.3

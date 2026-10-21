@@ -19,11 +19,11 @@ import (
 )
 
 var (
-	apiURL      = env("API_URL", "http://localhost:8080")
-	mcpURL      = env("MCP_URL", "http://localhost:8081")
-	mcpOpsURL   = env("MCP_OPS_URL", "http://localhost:8080")
-	enricherURL = env("ENRICHER_URL", "http://localhost:8082")
-	stubURL     = env("OPENAI_STUB_URL", "http://localhost:8090")
+	apiURL      = env("MNEMONIC_API_URL", "http://localhost:8080")
+	mcpURL      = env("MNEMONIC_MCP_URL", "http://localhost:8081")
+	mcpOpsURL   = env("MNEMONIC_MCP_OPS_URL", "http://localhost:8080")
+	enricherURL = env("MNEMONIC_ENRICHER_URL", "http://localhost:8082")
+	stubURL     = env("MNEMONIC_OPENAI_STUB_URL", "http://localhost:8090")
 
 	httpClient = &http.Client{Timeout: 10 * time.Second}
 )

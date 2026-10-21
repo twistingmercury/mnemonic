@@ -1,6 +1,11 @@
+# The service images come from MNEMONIC_API_IMAGE, MNEMONIC_MCP_IMAGE and
+# MNEMONIC_ENRICHER_IMAGE. pull_policy stays "missing" (not "always") so a
+# locally built image is used as is; this suite runs against local builds.
+name: mnemonic-it
+
 services:
   postgres:
-    image: ghcr.io/twistingmercury/librarian-postgres:v1.0.0-dev
+    image: ghcr.io/twistingmercury/mnemonic-postgres:v1.0.0-dev
     environment:
       POSTGRES_DB: mnemonic
       POSTGRES_USER: mnemonic
@@ -13,10 +18,10 @@ services:
       timeout: 5s
       retries: 30
     networks:
-      - librarian-network
+      - mnemonic-network
 
   neo4j:
-    image: ghcr.io/twistingmercury/librarian-neo4j:v1.0.0-dev
+    image: ghcr.io/twistingmercury/mnemonic-neo4j:v1.0.0-dev
     environment:
       NEO4J_AUTH: neo4j/mnemonic_dev
       NEO4J_PLUGINS: '["apoc"]'
@@ -31,7 +36,7 @@ services:
       start_period: 60s
       retries: 40
     networks:
-      - librarian-network
+      - mnemonic-network
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
@@ -44,29 +49,30 @@ services:
       timeout: 5s
       retries: 40
     networks:
-      - librarian-network
+      - mnemonic-network
 
   # Stands in for OpenAI so runs are deterministic and need no key.
   openai_stub:
     build:
-      context: ./openai-stub
+      context: ../openai-stub
     networks:
-      - librarian-network
+      - mnemonic-network
 
-  librarian_api:
-    image: ghcr.io/twistingmercury/librarian-api:latest-dev
+  mnemonic-api:
+    image: ${MNEMONIC_API_IMAGE:-ghcr.io/twistingmercury/mnemonic-api:latest-dev}
+    pull_policy: missing
     environment:
-      LIBRARIAN_DATABASE_POSTGRES_HOST: postgres
-      LIBRARIAN_DATABASE_POSTGRES_PASSWORD: mnemonic_dev
-      LIBRARIAN_DATABASE_POSTGRES_SSL_MODE: disable
-      LIBRARIAN_DATABASE_NEO4J_URI: bolt://neo4j:7687
-      LIBRARIAN_DATABASE_NEO4J_PASSWORD: mnemonic_dev
-      LIBRARIAN_OPENAI_API_KEY: sk-test
-      LIBRARIAN_OPENAI_BASE_URL: http://openai_stub:8090/v1
-      LIBRARIAN_LOGGING_LEVEL: error
-      LIBRARIAN_QUEUE_RABBITMQ_HOST: rabbitmq
-      LIBRARIAN_QUEUE_RABBITMQ_USER: mnemonic
-      LIBRARIAN_QUEUE_RABBITMQ_PASSWORD: mnemonic_dev
+      MNEMONIC_DATABASE_POSTGRES_HOST: postgres
+      MNEMONIC_DATABASE_POSTGRES_PASSWORD: mnemonic_dev
+      MNEMONIC_DATABASE_POSTGRES_SSL_MODE: disable
+      MNEMONIC_DATABASE_NEO4J_URI: bolt://neo4j:7687
+      MNEMONIC_DATABASE_NEO4J_PASSWORD: mnemonic_dev
+      MNEMONIC_OPENAI_API_KEY: sk-test
+      MNEMONIC_OPENAI_BASE_URL: http://openai_stub:8090/v1
+      MNEMONIC_LOGGING_LEVEL: error
+      MNEMONIC_QUEUE_RABBITMQ_HOST: rabbitmq
+      MNEMONIC_QUEUE_RABBITMQ_USER: mnemonic
+      MNEMONIC_QUEUE_RABBITMQ_PASSWORD: mnemonic_dev
     depends_on:
       openai_stub:
         condition: service_healthy
@@ -82,20 +88,21 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - librarian-network
+      - mnemonic-network
 
-  librarian_mcp:
-    image: ghcr.io/twistingmercury/librarian-mcp:latest-dev
+  mnemonic-mcp:
+    image: ${MNEMONIC_MCP_IMAGE:-ghcr.io/twistingmercury/mnemonic-mcp:latest-dev}
+    pull_policy: missing
     environment:
-      LIBRARIAN_DATABASE_POSTGRES_HOST: postgres
-      LIBRARIAN_DATABASE_POSTGRES_PASSWORD: mnemonic_dev
-      LIBRARIAN_DATABASE_POSTGRES_SSL_MODE: disable
-      LIBRARIAN_DATABASE_NEO4J_URI: bolt://neo4j:7687
-      LIBRARIAN_DATABASE_NEO4J_PASSWORD: mnemonic_dev
-      LIBRARIAN_OPENAI_API_KEY: sk-test
-      LIBRARIAN_OPENAI_BASE_URL: http://openai_stub:8090/v1
-      LIBRARIAN_MCP_PORT: 8081
-      LIBRARIAN_LOGGING_LEVEL: error
+      MNEMONIC_DATABASE_POSTGRES_HOST: postgres
+      MNEMONIC_DATABASE_POSTGRES_PASSWORD: mnemonic_dev
+      MNEMONIC_DATABASE_POSTGRES_SSL_MODE: disable
+      MNEMONIC_DATABASE_NEO4J_URI: bolt://neo4j:7687
+      MNEMONIC_DATABASE_NEO4J_PASSWORD: mnemonic_dev
+      MNEMONIC_OPENAI_API_KEY: sk-test
+      MNEMONIC_OPENAI_BASE_URL: http://openai_stub:8090/v1
+      MNEMONIC_MCP_PORT: 8081
+      MNEMONIC_LOGGING_LEVEL: error
     depends_on:
       openai_stub:
         condition: service_healthy
@@ -109,28 +116,29 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - librarian-network
+      - mnemonic-network
 
-  librarian_enricher:
-    image: ghcr.io/twistingmercury/librarian-enricher:latest-dev
+  mnemonic-enricher:
+    image: ${MNEMONIC_ENRICHER_IMAGE:-ghcr.io/twistingmercury/mnemonic-enricher:latest-dev}
+    pull_policy: missing
     environment:
-      LIBRARIAN_DATABASE_POSTGRES_HOST: postgres
-      LIBRARIAN_DATABASE_POSTGRES_PASSWORD: mnemonic_dev
-      LIBRARIAN_DATABASE_POSTGRES_SSL_MODE: disable
-      LIBRARIAN_DATABASE_NEO4J_URI: bolt://neo4j:7687
-      LIBRARIAN_DATABASE_NEO4J_PASSWORD: mnemonic_dev
-      LIBRARIAN_QUEUE_PROVIDER: rabbitmq
-      LIBRARIAN_QUEUE_RABBITMQ_HOST: rabbitmq
-      LIBRARIAN_QUEUE_RABBITMQ_USER: mnemonic
-      LIBRARIAN_QUEUE_RABBITMQ_PASSWORD: mnemonic_dev
-      LIBRARIAN_QUEUE_RABBITMQ_QUEUE: enrichment-jobs
+      MNEMONIC_DATABASE_POSTGRES_HOST: postgres
+      MNEMONIC_DATABASE_POSTGRES_PASSWORD: mnemonic_dev
+      MNEMONIC_DATABASE_POSTGRES_SSL_MODE: disable
+      MNEMONIC_DATABASE_NEO4J_URI: bolt://neo4j:7687
+      MNEMONIC_DATABASE_NEO4J_PASSWORD: mnemonic_dev
+      MNEMONIC_QUEUE_PROVIDER: rabbitmq
+      MNEMONIC_QUEUE_RABBITMQ_HOST: rabbitmq
+      MNEMONIC_QUEUE_RABBITMQ_USER: mnemonic
+      MNEMONIC_QUEUE_RABBITMQ_PASSWORD: mnemonic_dev
+      MNEMONIC_QUEUE_RABBITMQ_QUEUE: enrichment-jobs
       # A failed OpenAI call fails the job at once and is retried 1s later by
       # the sweep, which TestEnricherRetriesFailedJob relies on.
-      LIBRARIAN_OPENAI_RETRY_ATTEMPTS: 0
-      LIBRARIAN_ENRICHMENT_RETRY_DELAY: 1s
-      LIBRARIAN_OPENAI_API_KEY: sk-test
-      LIBRARIAN_OPENAI_BASE_URL: http://openai_stub:8090/v1
-      LIBRARIAN_LOGGING_LEVEL: error
+      MNEMONIC_OPENAI_RETRY_ATTEMPTS: 0
+      MNEMONIC_ENRICHMENT_RETRY_DELAY: 1s
+      MNEMONIC_OPENAI_API_KEY: sk-test
+      MNEMONIC_OPENAI_BASE_URL: http://openai_stub:8090/v1
+      MNEMONIC_LOGGING_LEVEL: error
     depends_on:
       openai_stub:
         condition: service_healthy
@@ -146,36 +154,36 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - librarian-network
+      - mnemonic-network
 
-  librarian_tests:
-    image: golang:1.27.2-alpine
+  mnemonic-tests:
+    image: golang:1.27.3-alpine
     working_dir: /src
     volumes:
-      - ./src:/src:ro
+      - .:/src:ro
     environment:
       CGO_ENABLED: "0"
       GOTOOLCHAIN: local
-      API_URL: http://librarian_api:8080
-      MCP_URL: http://librarian_mcp:8081
-      MCP_OPS_URL: http://librarian_mcp:8080
-      ENRICHER_URL: http://librarian_enricher:8080
-      OPENAI_STUB_URL: http://openai_stub:8090
+      MNEMONIC_API_URL: http://mnemonic-api:8080
+      MNEMONIC_MCP_URL: http://mnemonic-mcp:8081
+      MNEMONIC_MCP_OPS_URL: http://mnemonic-mcp:8080
+      MNEMONIC_ENRICHER_URL: http://mnemonic-enricher:8080
+      MNEMONIC_OPENAI_STUB_URL: http://openai_stub:8090
     command: ["go", "test", "-count=1", "-v", "./..."]
     depends_on:
-      librarian_api:
+      mnemonic-api:
         condition: service_healthy
-      librarian_mcp:
+      mnemonic-mcp:
         condition: service_healthy
-      librarian_enricher:
+      mnemonic-enricher:
         condition: service_healthy
     networks:
-      - librarian-network
+      - mnemonic-network
 
 volumes:
   postgres-data:
   neo4j-data:
 
 networks:
-  librarian-network:
+  mnemonic-network:
     driver: bridge

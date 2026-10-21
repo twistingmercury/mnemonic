@@ -1,3 +1,3 @@
-module github.com/twistingmercury/librarian-integration-tests/openai-stub
+module github.com/twistingmercury/mnemonic/tests/openai-stub
 
-go 1.27.2
+go 1.27.3
