@@ -64,20 +64,34 @@ def test_text_of_joins_text_blocks_and_carries_the_error_flag() -> None:
     assert text_of(result) == ToolResult(text="a\nb", is_error=True)
 
 
+def task_group_error(exc: Exception) -> ExceptionGroup[Exception]:
+    """Wrap exc the way the SDK's nested anyio task groups do (mcp 2.3.0: two levels)."""
+    return ExceptionGroup("unhandled errors in a TaskGroup", [ExceptionGroup("unhandled errors in a TaskGroup", [exc])])
+
+
 class FakeSdkClient:
-    """Stands in for mcp.Client: records its constructor call, returns or raises on call_tool."""
+    """Stands in for mcp.Client: records its constructor call, returns or raises on call_tool.
+
+    Like the real client, it fails to connect with an exception group from
+    __aenter__, and wraps whatever leaves the async with block in one.
+    """
 
     created: list[tuple[str, dict[str, object]]] = []
     outcome: types.CallToolResult | Exception
+    connect_error: Exception | None = None
 
     def __init__(self, url: str, **kwargs: object) -> None:
         FakeSdkClient.created.append((url, kwargs))
 
     async def __aenter__(self) -> "FakeSdkClient":
+        if self.connect_error is not None:
+            raise task_group_error(self.connect_error)
+
         return self
 
-    async def __aexit__(self, *exc: object) -> None:
-        return None
+    async def __aexit__(self, exc_type: object, exc: BaseException | None, tb: object) -> None:
+        if isinstance(exc, Exception):
+            raise task_group_error(exc) from None
 
     async def call_tool(self, name: str, args: dict[str, object]) -> types.CallToolResult:
         if isinstance(self.outcome, Exception):
@@ -88,6 +102,7 @@ class FakeSdkClient:
 @pytest.fixture
 def fake_sdk(monkeypatch: pytest.MonkeyPatch) -> type[FakeSdkClient]:
     FakeSdkClient.created = []
+    FakeSdkClient.connect_error = None
     monkeypatch.setattr("mnemonic_e2e.mcp.Client", FakeSdkClient)
     return FakeSdkClient
 
@@ -120,3 +135,12 @@ def test_call_tool_gives_the_sdk_client_the_project_timeout(fake_sdk: type[FakeS
     url, kwargs = fake_sdk.created[0]
     assert url == "http://mcp.test:8081/mcp"
     assert kwargs["read_timeout_seconds"] == TIMEOUT_S
+
+
+def test_call_tool_unreachable_error_names_the_url_and_the_cause(fake_sdk: type[FakeSdkClient]) -> None:
+    fake_sdk.connect_error = OSError("Name or service not known")
+
+    with pytest.raises(ConnectionError, match="http://mcp.test:8081/mcp") as info:
+        McpClient("http://mcp.test:8081").call_tool("t", {})
+
+    assert "Name or service not known" in str(info.value)

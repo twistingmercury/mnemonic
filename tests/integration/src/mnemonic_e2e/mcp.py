@@ -52,6 +52,13 @@ def tool_call_request(name: str, args: dict[str, Any]) -> tuple[dict[str, str], 
     return headers, body
 
 
+def _root_cause(exc: BaseException) -> BaseException:
+    """The first exception at the bottom of nested exception groups."""
+    while isinstance(exc, BaseExceptionGroup):
+        exc = exc.exceptions[0]
+    return exc
+
+
 class McpClient:
     def __init__(self, base_url: str, transport: httpx.BaseTransport | None = None) -> None:
         self._url = base_url.rstrip("/") + "/mcp"
@@ -62,14 +69,18 @@ class McpClient:
         return asyncio.run(self._call_tool(name, args))
 
     async def _call_tool(self, name: str, args: dict[str, Any]) -> ToolResult:
+        # The SDK's anyio task groups wrap anything that leaves `async with Client` in an
+        # ExceptionGroup, so a JSON-RPC error is caught inside the block, and a group that
+        # escapes it is a failure to reach or talk to the server.
         try:
             async with Client(self._url, read_timeout_seconds=TIMEOUT_S) as client:
-                return text_of(await client.call_tool(name, args))
-        except MCPError as exc:
-            # A JSON-RPC error (unknown tool, bad arguments) is a result, as a tool-level error is.
-            return ToolResult(text=exc.message, is_error=True)
-        except httpx.TransportError as exc:
-            raise ConnectionError(f"MCP tools/call {name} at {self._url}: {exc}") from exc
+                try:
+                    return text_of(await client.call_tool(name, args))
+                except MCPError as exc:
+                    # A JSON-RPC error (unknown tool, bad arguments) is a result, as a tool-level error is.
+                    return ToolResult(text=exc.message, is_error=True)
+        except ExceptionGroup as group:
+            raise ConnectionError(f"MCP tools/call {name} at {self._url}: {_root_cause(group)!r}") from group
 
     def post(self, headers: dict[str, str], body: Any) -> HttpResponse:
         """POST body as JSON with exactly these headers, for malformed-request tests."""

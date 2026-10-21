@@ -52,3 +52,27 @@ def test_healthy_reflects_the_healthz_status() -> None:
 
     assert ok.healthy() is True
     assert down.healthy() is False
+
+
+def test_remaining_gets_the_count_left_for_match() -> None:
+    seen: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json={"remaining": 1})
+
+    remaining = StubClient("http://stub.test:8090", transport=httpx.MockTransport(handle)).remaining("tokabc")
+
+    assert remaining == 1
+    assert (seen[0].method, seen[0].url.path) == ("GET", "/control/fail")
+    assert dict(seen[0].url.params) == {"match": "tokabc"}
+
+
+def test_remaining_raises_on_a_rejected_call() -> None:
+    stub = StubClient(
+        "http://stub.test:8090",
+        transport=httpx.MockTransport(lambda _: httpx.Response(500, text="boom")),
+    )
+
+    with pytest.raises(RuntimeError, match="boom"):
+        stub.remaining("x")
