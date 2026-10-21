@@ -956,13 +956,13 @@ If you run against a Neo4j that was not started from the `librarian-neo4j` image
 
 ```bash
 # Using cypher-shell (Community + Enterprise)
-cypher-shell -u neo4j -p <password> -f src/neo4j/001_create_constraints.cypher
+cypher-shell -u neo4j -p <password> -f db/neo4j/001_create_constraints.cypher
 
 # Enterprise Edition only (optional)
-cypher-shell -u neo4j -p <password> -f src/neo4j/002_create_existence_constraints.cypher
+cypher-shell -u neo4j -p <password> -f db/neo4j/002_create_existence_constraints.cypher
 
 # Indexes
-cypher-shell -u neo4j -p <password> -f src/neo4j/003_create_indexes.cypher
+cypher-shell -u neo4j -p <password> -f db/neo4j/003_create_indexes.cypher
 ```
 
 ### Index Configuration
