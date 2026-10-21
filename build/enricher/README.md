@@ -14,7 +14,7 @@ The canonical local workflow is:
 make build
 ```
 
-`make build` sets `LOCAL=1` and invokes `src/build/build.sh`. The script performs
+`make build` invokes `build/enricher/enricher.build.sh`. The script performs
 these stages in order:
 
 1. Builds the final image with no Docker layer cache and a freshly pulled base
@@ -37,25 +37,23 @@ The end-to-end stack requires Docker to pull these dependency images:
 It builds and uses a local OpenAI stub; a live OpenAI key is not required for these
 tests.
 
-> **Local cleanup:** Because `make build` sets `LOCAL=1`, the script removes the
-> end-to-end containers and volumes, deletes the test-runner image, and runs
-> `docker system prune -f` when it exits. Docker system prune removes stopped
-> containers, unused networks, dangling images, and unused build cache across the
-> local Docker installation. Run `LOCAL=0 src/build/build.sh` if that broader local
-> cleanup is not wanted.
+> **Cleanup:** The script removes only its own `mnemonic-e2e-enricher-<pid>`
+> compose project (containers, networks, volumes, orphans and compose-built
+> images without a custom tag), runs no prune, and does so also when the tests
+> fail or the run is interrupted.
 
 To build only the image from the repository root, without running the end-to-end
 stack or cleanup, use:
 
 ```bash
 docker build --rm --no-cache --pull \
-  --file src/build/Dockerfile \
+  --file build/enricher/enricher.Dockerfile \
   --build-arg BUILD_VER=dev \
   --build-arg BUILD_COMMIT="$(git rev-parse --short HEAD)" \
   --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   --target final \
   --tag ghcr.io/twistingmercury/mnemonic-enricher:latest \
-  src
+  .
 ```
 
 No standalone `docker run` example is provided because the worker requires a
@@ -72,7 +70,7 @@ investigating runtime issues.
 
 ## CI publication
 
-The GitHub Actions workflow runs `src/build/build.sh`, so publication occurs only
+The GitHub Actions workflow runs `build/enricher/enricher.build.sh`, so publication occurs only
 after the image build gates and end-to-end tests pass. It publishes these tags:
 
 | Git ref | Published tags |

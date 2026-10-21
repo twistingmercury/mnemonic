@@ -27,8 +27,8 @@ The canonical local entry point is the root Makefile:
 make build
 ```
 
-Run this command from the repository root. It sets `LOCAL=1` and invokes
-`src/build/build.sh`.
+Run this command from the repository root. It invokes
+`build/mcp/mcp.build.sh`.
 
 ## Pipeline
 
@@ -44,8 +44,9 @@ The build runs in this order:
 5. `build.sh` applies the configured version tag and the `latest` tag.
 6. Docker Compose starts PostgreSQL, Neo4j, and RabbitMQ, then runs
    `librarian_mcp`, `librarian_api`, and the `librarian_tests` container.
-7. The test runner's exit code determines success, after which the E2E stack
-   and its volumes are removed.
+7. The test runner's exit code determines success. The project-scoped teardown
+   (`mnemonic-e2e-mcp-<pid>`) then removes the E2E stack and its volumes, also
+   on failure or interrupt.
 
 The Docker build always uses `--no-cache` and `--pull`, so every run executes all
 quality gates and tests and starts from a fresh base image.
@@ -61,7 +62,6 @@ quality gates and tests and starts from a fresh base image.
 | `BUILD_COMMIT` | Current short Git commit, or `unknown`       | Image and binary source revision     |
 | `IMAGE_NAME`   | `ghcr.io/twistingmercury/mnemonic-mcp`       | Image repository                     |
 | `IMAGE_TAG`    | Value of `BUILD_VER`                         | Primary local image tag              |
-| `LOCAL`        | `0`; root `make build` overrides this to `1` | Enables additional local cleanup     |
 
 For example, to build with explicit metadata while retaining the canonical
 Make target:
@@ -78,16 +78,16 @@ Each successful script run produces both:
 - `${IMAGE_NAME}:latest`
 
 The script never pushes images. Local builds stop after image creation and E2E
-validation. CI invokes `src/build/build.sh` directly with the default
-`LOCAL=0`, authenticates to GHCR after validation, and pushes tags in the
+validation. CI invokes `build/mcp/mcp.build.sh` directly, authenticates to GHCR after validation, and pushes tags in the
 workflow:
 
 - `main`: `latest` and the Git-derived version
 - Other refs: `latest-dev` and the Git-derived version with a `-dev` suffix
 
-> **Warning:** The root `make build` sets `LOCAL=1`. Its cleanup currently
-> removes the E2E test-runner image and runs `docker system prune -f`, which can
-> remove other unused Docker objects on the host.
+The script removes only its own `mnemonic-e2e-mcp-<pid>` compose project
+(containers, networks, volumes, orphans and compose-built images without a custom
+tag), runs no prune, and does so also when the tests fail or the run is
+interrupted.
 
 ## Validation and troubleshooting
 
@@ -95,7 +95,7 @@ Validate the entry point and supporting files without running the build:
 
 ```bash
 make -n build
-bash -n src/build/build.sh
+bash -n build/mcp/mcp.build.sh
 docker compose -f src/tests/docker-compose.yaml config --quiet
 ```
 
