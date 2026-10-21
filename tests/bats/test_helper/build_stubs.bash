@@ -11,6 +11,7 @@ install_stubs() {
     export DOCKER_LOG="${TEST_DIR}/docker.log"
     export GIT_LOG="${TEST_DIR}/git.log"
     export BUILDKIT_LOG="${TEST_DIR}/buildkit.log"
+    export E2E_ENV_LOG="${TEST_DIR}/e2e-env.log"
 
     mkdir -p "${STUB_BIN}"
     : > "${DOCKER_LOG}"
@@ -20,6 +21,11 @@ install_stubs() {
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "${DOCKER_LOG}"
 printf '%s\n' "${DOCKER_BUILDKIT:-unset}" >> "${BUILDKIT_LOG}"
+# One line per call, same numbering as DOCKER_LOG: the compose image variables.
+printf 'API_IMAGE=%s API_PULL=%s MCP_IMAGE=%s MCP_PULL=%s ENRICHER_IMAGE=%s ENRICHER_PULL=%s\n' \
+    "${MNEMONIC_API_IMAGE:-unset}" "${MNEMONIC_API_PULL_POLICY:-unset}" \
+    "${MNEMONIC_MCP_IMAGE:-unset}" "${MNEMONIC_MCP_PULL_POLICY:-unset}" \
+    "${MNEMONIC_ENRICHER_IMAGE:-unset}" "${MNEMONIC_ENRICHER_PULL_POLICY:-unset}" >> "${E2E_ENV_LOG}"
 # Fails any invocation whose argv contains STUB_DOCKER_FAIL_ON.
 if [ -n "${STUB_DOCKER_FAIL_ON:-}" ]; then
     case "$*" in
@@ -128,4 +134,12 @@ compose_calls_without_project() {
 # The distinct project names on the `down` lines only.
 down_project_names() {
     grep -e ' down ' "${DOCKER_LOG}" | awk '{print $3}' | sort -u
+}
+
+# The compose image variables as seen by the `up` call (one line, see the shim).
+up_environment() {
+    local line_number
+
+    line_number="$(log_line_of '--abort-on-container-exit')"
+    sed -n "${line_number}p" "${E2E_ENV_LOG}"
 }

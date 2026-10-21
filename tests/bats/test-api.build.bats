@@ -93,11 +93,11 @@ teardown() {
     assert [ -n "$(log_line_of 'down -v --remove-orphans')" ]
 }
 
-@test "${COMPONENT} build - uses the legacy compose file unless MNEMONIC_E2E_COMPOSE_FILE is set" {
+@test "${COMPONENT} build - uses the shared integration compose file unless MNEMONIC_E2E_COMPOSE_FILE is set" {
     run "${SCRIPT_PATH}"
 
     assert_success
-    assert [ -n "$(log_line_of "-f ${REPO_ROOT}/tests/legacy/${COMPONENT}/docker-compose.yaml up")" ]
+    assert [ -n "$(log_line_of "-f ${REPO_ROOT}/tests/integration/docker-compose.yaml up")" ]
 }
 
 @test "${COMPONENT} build with MNEMONIC_E2E_COMPOSE_FILE set - runs e2e from that file" {
@@ -309,16 +309,6 @@ teardown() {
     assert_output --regexp "cleaned up mnemonic-e2e-${COMPONENT}-[0-9]+"
 }
 
-@test "${COMPONENT} e2e - tears down and fails when bringing up the infrastructure fails" {
-    export STUB_DOCKER_FAIL_ON=" up -d "
-
-    run "${SCRIPT_PATH}"
-
-    assert_failure
-    assert_output --partial "end-to-end tests failed"
-    assert [ -n "$(log_line_of 'down -v --remove-orphans --rmi local')" ]
-}
-
 @test "${COMPONENT} e2e - tears down when interrupted with INT" {
     export STUB_DOCKER_SIGNAL_ON="--abort-on-container-exit"
     export STUB_DOCKER_SIGNAL="INT"
@@ -384,4 +374,83 @@ teardown() {
 
     run down_project_names
     assert_equal "${#lines[@]}" "2"
+}
+
+@test "${COMPONENT} e2e - brings the whole stack up in one call that takes its exit code from mnemonic-tests" {
+    run "${SCRIPT_PATH}"
+
+    assert_success
+    run compose_calls
+    assert_line --regexp "^compose -p mnemonic-e2e-${COMPONENT}-[0-9]+ -f ${REPO_ROOT}/tests/integration/docker-compose.yaml up --build --abort-on-container-exit --exit-code-from mnemonic-tests\$"
+    run grep -c -e ' up ' "${DOCKER_LOG}"
+    assert_output "1"
+}
+
+@test "${COMPONENT} e2e - pulls and starts nothing before the single up call" {
+    run "${SCRIPT_PATH}"
+
+    assert_success
+    run grep -c -E -e ' (pull|up -d) ' "${DOCKER_LOG}"
+    assert_output "0"
+}
+
+@test "${COMPONENT} e2e - points its own component at the image it just built and never pulls it" {
+    local upper
+    upper="$(printf "%s" "${COMPONENT}" | tr '[:lower:]' '[:upper:]')"
+
+    run "${SCRIPT_PATH}"
+
+    assert_success
+    run up_environment
+    assert_output --partial "${upper}_IMAGE=ghcr.io/twistingmercury/mnemonic-${COMPONENT}:v0.5.1 "
+    assert_output --partial "${upper}_PULL=never"
+}
+
+@test "${COMPONENT} e2e - leaves the other components to the compose defaults" {
+    local other
+
+    run "${SCRIPT_PATH}"
+
+    assert_success
+    run up_environment
+    for other in API MCP ENRICHER; do
+        if [ "${other}" = "$(printf "%s" "${COMPONENT}" | tr '[:lower:]' '[:upper:]')" ]; then
+            continue
+        fi
+
+        assert_output --partial "${other}_IMAGE=unset ${other}_PULL=unset"
+    done
+}
+
+@test "${COMPONENT} e2e with a sibling image set - passes it through untouched" {
+    export MNEMONIC_API_IMAGE="local/api:t"
+    export MNEMONIC_MCP_IMAGE="local/mcp:t"
+    export MNEMONIC_ENRICHER_IMAGE="local/enricher:t"
+    export MNEMONIC_API_PULL_POLICY="never"
+    export MNEMONIC_MCP_PULL_POLICY="never"
+    export MNEMONIC_ENRICHER_PULL_POLICY="never"
+
+    run "${SCRIPT_PATH}"
+
+    assert_success
+    run up_environment
+    refute_output --partial "local/${COMPONENT}:t"
+    assert_output --partial "_PULL=never"
+}
+
+@test "${COMPONENT} e2e - prints the image used for each of the three components" {
+    run "${SCRIPT_PATH}"
+
+    assert_success
+    assert_line --regexp "^api image: .+"
+    assert_line --regexp "^mcp image: .+"
+    assert_line --regexp "^enricher image: .+"
+    assert_line "${COMPONENT} image: ghcr.io/twistingmercury/mnemonic-${COMPONENT}:v0.5.1 (pull: never)"
+}
+
+@test "${COMPONENT} build script and library - name no legacy path and no librarian service" {
+    run grep -n -i -E -e 'legacy|librarian|E2E_(INFRA|UP|PULL|EXIT)' \
+        "${SCRIPT_PATH}" "${REPO_ROOT}/build/build-lib.sh"
+
+    assert_failure 1
 }

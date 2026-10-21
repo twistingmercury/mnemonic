@@ -3,10 +3,11 @@
 #              and enricher.build.sh, which differ only in names and services.
 # Usage: source it from build/<name>/<name>.build.sh after setting PROJ_ROOT,
 #        COMPONENT, MNEMONIC_IMAGE_NAME, MNEMONIC_IMAGE_TAG, MNEMONIC_BUILD_VER,
-#        MNEMONIC_BUILD_DATE, MNEMONIC_BUILD_COMMIT, MNEMONIC_E2E_COMPOSE_FILE,
-#        E2E_INFRA_SERVICES, E2E_UP_SERVICES and E2E_EXIT_CODE_FROM (arrays for
-#        the *_SERVICES). Optional: E2E_PULL_SERVICES (array; pulled first with
-#        MNEMONIC_PULL_POLICY, default always).
+#        MNEMONIC_BUILD_DATE, MNEMONIC_BUILD_COMMIT and MNEMONIC_E2E_COMPOSE_FILE.
+#        The e2e step runs the whole stack in tests/integration with the image
+#        just built for COMPONENT; the other two components come from
+#        MNEMONIC_<API|MCP|ENRICHER>_IMAGE and MNEMONIC_<...>_PULL_POLICY
+#        (compose defaults: the published latest-dev image, always pulled).
 #
 # Both steps print one progress line and show docker output only on failure.
 # The image build always runs with --no-cache and --pull so the quality gates
@@ -62,27 +63,49 @@ build_lib::compose() {
     docker compose -p "${E2E_PROJECT}" -f "${MNEMONIC_E2E_COMPOSE_FILE}" "$@"
 }
 
-build_lib::e2e_pull() {
-    if [ "${#E2E_PULL_SERVICES[@]}" -eq 0 ]; then
-        return 0
-    fi
-
-    build_lib::run_quiet build_lib::compose pull \
-        --policy "${MNEMONIC_PULL_POLICY:-always}" "${E2E_PULL_SERVICES[@]}"
-}
-
+# One single stack: infrastructure, the three services and the runner.
 build_lib::e2e_run() {
-    if ! build_lib::e2e_pull; then
-        return 1
-    fi
-
-    if ! build_lib::run_quiet build_lib::compose up -d "${E2E_INFRA_SERVICES[@]}"; then
-        return 1
-    fi
-
     build_lib::run_quiet build_lib::compose up \
         --build --abort-on-container-exit \
-        --exit-code-from "${E2E_EXIT_CODE_FROM}" "${E2E_UP_SERVICES[@]}"
+        --exit-code-from mnemonic-tests
+}
+
+# Prints the image compose will use for one component and its pull policy.
+build_lib::e2e_report_image() {
+    local component="${1}"
+    local upper
+    local image_var
+    local policy_var
+    local image
+    local policy
+
+    upper="$(printf "%s" "${component}" | tr '[:lower:]' '[:upper:]')"
+    image_var="MNEMONIC_${upper}_IMAGE"
+    policy_var="MNEMONIC_${upper}_PULL_POLICY"
+    image="${!image_var:-ghcr.io/twistingmercury/mnemonic-${component}:latest-dev}"
+    policy="${!policy_var:-always}"
+
+    printf "%s image: %s (pull: %s)\n" "${component}" "${image}" "${policy}"
+
+    return 0
+}
+
+# Points compose at the image just built for COMPONENT and forbids pulling it,
+# so a local run and a clean CI runner use exactly the same image. The other
+# components keep whatever the caller set, or the compose defaults.
+build_lib::e2e_select_images() {
+    local upper
+    local component
+
+    upper="$(printf "%s" "${COMPONENT}" | tr '[:lower:]' '[:upper:]')"
+    export "MNEMONIC_${upper}_IMAGE=${MNEMONIC_IMAGE_NAME}:${MNEMONIC_IMAGE_TAG}"
+    export "MNEMONIC_${upper}_PULL_POLICY=never"
+
+    for component in api mcp enricher; do
+        build_lib::e2e_report_image "${component}"
+    done
+
+    return 0
 }
 
 # Removes only what this run's compose project created: containers, networks,
@@ -124,6 +147,7 @@ build_lib::e2e_tests() {
     trap 'build_lib::e2e_on_signal INT 130' INT
     trap 'build_lib::e2e_on_signal TERM 143' TERM
 
+    build_lib::e2e_select_images
     printf "starting end-to-end tests..."
     build_lib::e2e_run || rc=$?
     if [ "${rc}" -ne 0 ]; then

@@ -1,6 +1,7 @@
 # The service images come from MNEMONIC_API_IMAGE, MNEMONIC_MCP_IMAGE and
-# MNEMONIC_ENRICHER_IMAGE. pull_policy stays "missing" (not "always") so a
-# locally built image is used as is; this suite runs against local builds.
+# MNEMONIC_ENRICHER_IMAGE, each pulled according to MNEMONIC_<N>_PULL_POLICY
+# (default always, so a clean CI runner and a laptop behave the same). The build
+# scripts set "never" for the component they just built.
 name: mnemonic-it
 
 services:
@@ -60,7 +61,7 @@ services:
 
   mnemonic-api:
     image: ${MNEMONIC_API_IMAGE:-ghcr.io/twistingmercury/mnemonic-api:latest-dev}
-    pull_policy: missing
+    pull_policy: ${MNEMONIC_API_PULL_POLICY:-always}
     environment:
       MNEMONIC_DATABASE_POSTGRES_HOST: postgres
       MNEMONIC_DATABASE_POSTGRES_PASSWORD: mnemonic_dev
@@ -92,7 +93,7 @@ services:
 
   mnemonic-mcp:
     image: ${MNEMONIC_MCP_IMAGE:-ghcr.io/twistingmercury/mnemonic-mcp:latest-dev}
-    pull_policy: missing
+    pull_policy: ${MNEMONIC_MCP_PULL_POLICY:-always}
     environment:
       MNEMONIC_DATABASE_POSTGRES_HOST: postgres
       MNEMONIC_DATABASE_POSTGRES_PASSWORD: mnemonic_dev
@@ -120,7 +121,7 @@ services:
 
   mnemonic-enricher:
     image: ${MNEMONIC_ENRICHER_IMAGE:-ghcr.io/twistingmercury/mnemonic-enricher:latest-dev}
-    pull_policy: missing
+    pull_policy: ${MNEMONIC_ENRICHER_PULL_POLICY:-always}
     environment:
       MNEMONIC_DATABASE_POSTGRES_HOST: postgres
       MNEMONIC_DATABASE_POSTGRES_PASSWORD: mnemonic_dev
@@ -156,20 +157,12 @@ services:
     networks:
       - mnemonic-network
 
+  # The Python suite; its exit code is the exit code of the whole run. The
+  # MNEMONIC_* URLs default inside the image to the service names above.
   mnemonic-tests:
-    image: golang:1.27.3-alpine
-    working_dir: /src
-    volumes:
-      - .:/src:ro
-    environment:
-      CGO_ENABLED: "0"
-      GOTOOLCHAIN: local
-      MNEMONIC_API_URL: http://mnemonic-api:8080
-      MNEMONIC_MCP_URL: http://mnemonic-mcp:8081
-      MNEMONIC_MCP_OPS_URL: http://mnemonic-mcp:8080
-      MNEMONIC_ENRICHER_URL: http://mnemonic-enricher:8080
-      MNEMONIC_OPENAI_STUB_URL: http://openai_stub:8090
-    command: ["go", "test", "-count=1", "-v", "./..."]
+    build:
+      context: .
+    command: ["-v"]
     depends_on:
       mnemonic-api:
         condition: service_healthy
