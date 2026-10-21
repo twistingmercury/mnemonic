@@ -3,7 +3,7 @@
 # code and must be reachable only through these listeners.
 #
 # Dev values: the issuer and the public URLs below assume the local compose
-# stack (Keycloak on localhost:18180, edges on localhost:18080 and :18081).
+# stack (Keycloak on localhost:8180, edges on localhost:8080 and :8081).
 
 admin:
   address:
@@ -36,7 +36,7 @@ static_resources:
                       routes:
                         - match: { prefix: "/" }
                           route:
-                            cluster: librarian_api
+                            cluster: mnemonic_api
                             # The service's own write timeout is 30s.
                             timeout: 35s
                           typed_per_filter_config:
@@ -50,7 +50,7 @@ static_resources:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
                       providers:
                         keycloak:
-                          issuer: http://localhost:18180/realms/mnemonic
+                          issuer: http://localhost:8180/realms/mnemonic
                           audiences: [mnemonic-api]
                           remote_jwks: &jwks
                             http_uri:
@@ -112,7 +112,7 @@ static_resources:
                       headers_to_add:
                         - header:
                             key: WWW-Authenticate
-                            value: 'Bearer resource_metadata="http://localhost:18081/.well-known/oauth-protected-resource/mcp"'
+                            value: 'Bearer resource_metadata="http://localhost:8081/.well-known/oauth-protected-resource/mcp"'
                           append_action: OVERWRITE_IF_EXISTS_OR_ADD
                     - filter:
                         status_code_filter:
@@ -122,7 +122,7 @@ static_resources:
                       headers_to_add:
                         - header:
                             key: WWW-Authenticate
-                            value: 'Bearer error="insufficient_scope", scope="mcp:read mcp:search", resource_metadata="http://localhost:18081/.well-known/oauth-protected-resource/mcp"'
+                            value: 'Bearer error="insufficient_scope", scope="mcp:read mcp:search", resource_metadata="http://localhost:8081/.well-known/oauth-protected-resource/mcp"'
                           append_action: OVERWRITE_IF_EXISTS_OR_ADD
                 route_config:
                   name: mcp
@@ -137,7 +137,7 @@ static_resources:
                           direct_response: &prm
                             status: 200
                             body:
-                              inline_string: '{"resource":"http://localhost:18081/mcp","authorization_servers":["http://localhost:18180/realms/mnemonic"],"scopes_supported":["mcp:read","mcp:search"],"bearer_methods_supported":["header"]}'
+                              inline_string: '{"resource":"http://localhost:8081/mcp","authorization_servers":["http://localhost:8180/realms/mnemonic"],"scopes_supported":["mcp:read","mcp:search"],"bearer_methods_supported":["header"]}'
                           response_headers_to_add: &json
                             - header: { key: Content-Type, value: application/json }
                               append_action: OVERWRITE_IF_EXISTS_OR_ADD
@@ -151,7 +151,7 @@ static_resources:
                           typed_per_filter_config: *no_authz
                         - match: { prefix: "/" }
                           route:
-                            cluster: librarian_mcp
+                            cluster: mnemonic_mcp
                             # Responses may be SSE streams; no overall deadline.
                             timeout: 0s
                           typed_per_filter_config:
@@ -165,7 +165,7 @@ static_resources:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
                       providers:
                         keycloak:
-                          issuer: http://localhost:18180/realms/mnemonic
+                          issuer: http://localhost:8180/realms/mnemonic
                           audiences: [mnemonic-mcp]
                           remote_jwks: *jwks
                           payload_in_metadata: jwt_payload
@@ -182,21 +182,21 @@ static_resources:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 
   clusters:
-    - name: librarian_api
+    - name: mnemonic_api
       type: STRICT_DNS
       load_assignment:
-        cluster_name: librarian_api
+        cluster_name: mnemonic_api
         endpoints:
           - lb_endpoints:
-              - endpoint: { address: { socket_address: { address: librarian-api, port_value: 8080 } } }
+              - endpoint: { address: { socket_address: { address: mnemonic-api, port_value: 8080 } } }
 
-    - name: librarian_mcp
+    - name: mnemonic_mcp
       type: STRICT_DNS
       load_assignment:
-        cluster_name: librarian_mcp
+        cluster_name: mnemonic_mcp
         endpoints:
           - lb_endpoints:
-              - endpoint: { address: { socket_address: { address: librarian-mcp, port_value: 8081 } } }
+              - endpoint: { address: { socket_address: { address: mnemonic-mcp, port_value: 8081 } } }
 
     - name: opa
       type: STRICT_DNS

@@ -4,11 +4,11 @@
 
 services:
   envoy:
-    extends: { file: ../docker-compose.yaml, service: envoy }
+    extends: { file: ../../deploy/docker-compose.yaml, service: envoy }
   opa:
-    extends: { file: ../docker-compose.yaml, service: opa }
+    extends: { file: ../../deploy/docker-compose.yaml, service: opa }
   keycloak:
-    extends: { file: ../docker-compose.yaml, service: keycloak }
+    extends: { file: ../../deploy/docker-compose.yaml, service: keycloak }
 
   mnemonic-api:
     build: ./stub

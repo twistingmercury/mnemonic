@@ -1,6 +1,6 @@
 # The only door out of the stack. The enricher, MCP and API sit on a network
 # with no route to the internet and send their OpenAI calls here instead
-# (LIBRARIAN_OPENAI_BASE_URL). This proxy forwards two paths to api.openai.com,
+# (MNEMONIC_OPENAI_BASE_URL). This proxy forwards two paths to api.openai.com,
 # adds the real API key, and refuses everything else. The key lives only in
 # this container's environment, never in the services that use it.
 
@@ -38,7 +38,7 @@ static_resources:
                       request_headers_to_add:
                         - header:
                             key: authorization
-                            value: "Bearer %ENVIRONMENT(LIBRARIAN_OPENAI_API_KEY)%"
+                            value: "Bearer %ENVIRONMENT(OPENAI_API_EMBEDDINGS_KEY)%"
                           append_action: OVERWRITE_IF_EXISTS_OR_ADD
                       routes:
                         - match:

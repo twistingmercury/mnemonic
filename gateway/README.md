@@ -12,7 +12,7 @@ flowchart LR
     mc[MCP clients]
     ac[Admin clients]
   end
-  kc[(Keycloak<br/>:18180)]
+  kc[(Keycloak<br/>:8180)]
   subgraph gw[mnemonic-gateway]
     em[Envoy MCP edge<br/>:8081]
     ea[Envoy API edge<br/>:8080]
@@ -57,7 +57,7 @@ Each request goes through two checks:
 
 ## Access rules
 
-### API edge (`localhost:18080`, audience `mnemonic-api`)
+### API edge (`localhost:8080`, audience `mnemonic-api`)
 
 | Request | Needs |
 | --- | --- |
@@ -70,7 +70,7 @@ Each request goes through two checks:
 
 Scopes nest: `patterns:admin` includes `patterns:write`, which includes `patterns:read`.
 
-### MCP edge (`localhost:18081`, audience `mnemonic-mcp`)
+### MCP edge (`localhost:8081`, audience `mnemonic-mcp`)
 
 | Request | Needs |
 | --- | --- |
@@ -97,7 +97,7 @@ make e2e-stub        # gateway + stub services, run the e2e tests, tear down
 For the full stack, which pulls the published `latest-dev` images from ghcr.io:
 
 ```sh
-export LIBRARIAN_OPENAI_API_KEY=...
+export OPENAI_API_EMBEDDINGS_KEY=...
 make up
 make e2e
 ```
@@ -105,8 +105,8 @@ make e2e
 To use images you built with `make build` in those repos, point the stack at them:
 
 ```sh
-LIBRARIAN_API_IMAGE=ghcr.io/twistingmercury/librarian-api:latest \
-LIBRARIAN_MCP_IMAGE=ghcr.io/twistingmercury/librarian-mcp:latest make up
+MNEMONIC_API_IMAGE=ghcr.io/twistingmercury/mnemonic-api:latest \
+MNEMONIC_MCP_IMAGE=ghcr.io/twistingmercury/mnemonic-mcp:latest make up
 ```
 
 ### Getting a token
@@ -122,18 +122,18 @@ The dev realm has one service client per role. The secret is the client ID follo
 | `api-admin` | `mnemonic-api` | `patterns:admin` |
 
 ```sh
-TOKEN=$(curl -s localhost:18180/realms/mnemonic/protocol/openid-connect/token \
+TOKEN=$(curl -s localhost:8180/realms/mnemonic/protocol/openid-connect/token \
   -d grant_type=client_credentials -d client_id=api-reader -d client_secret=api-reader-secret | jq -r .access_token)
-curl -H "Authorization: Bearer $TOKEN" localhost:18080/v1/api/patterns
+curl -H "Authorization: Bearer $TOKEN" localhost:8080/v1/api/patterns
 ```
 
-For interactive MCP clients, the public client `mnemonic-mcp-client` uses authorization code with PKCE and accepts loopback redirect URIs. Sign in as `dev` / `dev`. The Keycloak admin console is at <http://localhost:18180> (`admin` / `admin`).
+For interactive MCP clients, the public client `mnemonic-mcp-client` uses authorization code with PKCE and accepts loopback redirect URIs. Sign in as `dev` / `dev`. The Keycloak admin console is at <http://localhost:8180> (`admin` / `admin`).
 
 ## Kubernetes (minikube)
 
-The same stack also runs on a local minikube cluster, from the Helm chart in `deploy/helm/librarian/`. It gets its own minikube profile, `librarian`, and every `kubectl` and `helm` call names that context, so your current context and other clusters are left alone.
+The same stack also runs on a local minikube cluster, from the Helm chart in `deploy/helm/mnemonic/`. It gets its own minikube profile, `mnemonic`, and every `kubectl` and `helm` call names that context, so your current context and other clusters are left alone.
 
-Requirements: Docker, minikube, kubectl, Helm 4, `jq`, the locally built `librarian-*` images (`latest-dev` for the services, `v1.0.0-dev` for Postgres and Neo4j), and the OpenAI key in `MNEMONIC_OPENAI_API_KEY` or `LIBRARIAN_OPENAI_API_KEY`. On Linux, set `fs.inotify.max_user_instances` to at least 512, or kube-proxy can fail with `too many open files`.
+Requirements: Docker, minikube, kubectl, Helm 4, `jq`, the locally built `mnemonic-*` images (`latest-dev` for the services, `v1.0.0-dev` for Postgres and Neo4j), and the OpenAI key in `OPENAI_API_EMBEDDINGS_KEY`. On Linux, set `fs.inotify.max_user_instances` to at least 512, or kube-proxy can fail with `too many open files`.
 
 ```sh
 make k8s-up            # profile (Calico CNI), image load, ConfigMaps, Secret, helm upgrade --install --wait
@@ -141,7 +141,7 @@ make k8s-forward       # port-forwards in the background
 make k8s-test          # end-to-end and isolation checks (real OpenAI calls)
 make k8s-forward-stop  # stop the port-forwards
 make k8s-down          # uninstall the chart and delete the namespace
-make k8s-delete        # delete the whole librarian profile
+make k8s-delete        # delete the whole mnemonic profile
 ```
 
 `make k8s-up` runs `k8s-cluster`, `k8s-images`, `k8s-config` and `k8s-secret` first. You can also run each one on its own.
@@ -150,15 +150,15 @@ make k8s-delete        # delete the whole librarian profile
 
 | Service | URL |
 | --- | --- |
-| API edge | `localhost:18080` |
-| MCP edge | `localhost:18081` |
-| Keycloak | `localhost:18180` |
+| API edge | `localhost:8080` |
+| MCP edge | `localhost:8081` |
+| Keycloak | `localhost:8180` |
 
-These are the same ports as the compose stack, so the token and `curl` examples above work unchanged. Tokens keep the issuer `http://localhost:18180/realms/mnemonic` (`keycloak.publicUrl` in `values.yaml`). Envoy fetches the JWKS over the in-cluster `keycloak` Service.
+These are the same ports as the compose stack, so the token and `curl` examples above work unchanged. Tokens keep the issuer `http://localhost:8180/realms/mnemonic` (`keycloak.publicUrl` in `values.yaml`). Envoy fetches the JWKS over the in-cluster `keycloak` Service.
 
-The chart doesn't copy any config. `make k8s-config` builds ConfigMaps from `envoy/envoy.yaml`, `envoy/envoy-egress.yaml`, `opa/` and `keycloak/realm-mnemonic.json`, and the chart mounts them by name. Pods carry a checksum of their ConfigMaps, so after you edit a file, `make k8s-up` restarts the pods that use it. The Service names match the compose service names, so `envoy.yaml` works in both stacks without changes.
+The chart doesn't copy any config. `make k8s-config` builds ConfigMaps from `gateway/envoy/envoy.yaml`, `gateway/envoy/envoy-egress.yaml`, `gateway/opa/` and `gateway/keycloak/realm-mnemonic.json`, and the chart mounts them by name. Pods carry a checksum of their ConfigMaps, so after you edit a file, `make k8s-up` restarts the pods that use it. The Service names match the compose service names, so `envoy.yaml` works in both stacks without changes.
 
-**The OpenAI key.** `make k8s-secret` pipes the key into the Secret `librarian-openai`. It never shows up as a command-line argument, in a file, or in the chart's values. Only the `egress` pod mounts that Secret. The API, MCP and enricher get the placeholder `proxy-managed` and send their OpenAI calls to `http://egress:8443/v1`. After rotating the key, run `kubectl --context librarian -n librarian rollout restart deployment/egress`. The dev credentials for Postgres, Neo4j, RabbitMQ and the Keycloak admin are the compose ones, and they're kept in a chart-managed Secret too.
+**The OpenAI key.** `make k8s-secret` pipes the key into the Secret `mnemonic-openai`. It never shows up as a command-line argument, in a file, or in the chart's values. Only the `egress` pod mounts that Secret. The API, MCP and enricher get the placeholder `proxy-managed` and send their OpenAI calls to `http://egress:8443/v1`. After rotating the key, run `kubectl --context mnemonic -n mnemonic rollout restart deployment/egress`. The dev credentials for Postgres, Neo4j, RabbitMQ and the Keycloak admin are the compose ones, and they're kept in a chart-managed Secret too.
 
 **Isolation.** Calico enforces NetworkPolicies, which minikube's default CNI does not. The namespace denies all ingress and egress by default. Every pod may query kube-dns. Beyond that, these are the only allowed flows:
 
@@ -173,7 +173,7 @@ The chart doesn't copy any config. `make k8s-config` builds ConfigMaps from `env
 
 `make k8s-test` proves the policies hold. It starts short-lived curl pods that carry a component's policy labels, or no labels at all, and checks four things. A pod with the enricher's labels can't reach `api.openai.com`, while one with the egress labels can. A pod with no labels reaches none of the data stores or services. The services can't reach each other. Only the egress pod reaches the internet. Each of these checks comes with a positive control, such as an API-labelled pod reaching Postgres, so a probe that can't connect anywhere never counts as "blocked". To switch the policies off for debugging, run `make k8s-up K8S_HELM_ARGS="--set networkPolicy.enabled=false"`.
 
-The admin UI (`librarian-admin`) isn't part of this deployment.
+The admin UI (`mnemonic-admin`) isn't part of this deployment.
 
 ## Dev-only settings
 
