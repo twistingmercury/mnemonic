@@ -47,7 +47,7 @@ graph TB
     end
 
     subgraph "Admin Tools"
-        ADMIN[Admin UI (not in this repo for now) / curl]
+        ADMIN["Admin UI (not in this repo for now) / curl"]
     end
 
     subgraph "Server Infrastructure (docker-compose)"
@@ -95,7 +95,7 @@ The application images are built `FROM scratch` and tagged from `develop`: `late
 graph TB
     subgraph "Client Tier"
         CC[Claude Code via MCP]
-        ADMIN[Admin UI (not in this repo for now) / curl]
+        ADMIN["Admin UI (not in this repo for now) / curl"]
     end
 
     subgraph "Application Tier"
@@ -135,7 +135,7 @@ graph TB
         D1[Dev 1<br/>Claude Code MCP]
         D2[Dev 2<br/>Claude Code MCP]
         DN[Dev N<br/>Claude Code MCP]
-        ADMIN[Admin UI (not in this repo for now) / curl]
+        ADMIN["Admin UI (not in this repo for now) / curl"]
     end
 
     subgraph "Server Environment (docker-compose)"
