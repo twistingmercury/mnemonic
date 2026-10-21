@@ -1,7 +1,7 @@
 apiVersion: v2
-name: librarian
+name: mnemonic
 description: >-
-  The Librarian stack (gateway, services, data stores and the OpenAI egress
+  The Mnemonic stack (gateway, services, data stores and the OpenAI egress
   proxy) for a local minikube cluster, with NetworkPolicy isolation.
 type: application
 version: 0.1.0

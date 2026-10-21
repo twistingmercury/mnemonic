@@ -1,8 +1,8 @@
-Librarian is installed in namespace {{ .Release.Namespace }}.
+Mnemonic is installed in namespace {{ .Release.Namespace }}.
 
-Reach it from the host (from the librarian-gateway repo):
+Reach it from the host (from the repository root):
 
-  make k8s-forward     # API edge localhost:18080, MCP edge localhost:18081, Keycloak localhost:18180
+  make k8s-forward     # API edge localhost:8080, MCP edge localhost:8081, Keycloak localhost:8180
   make k8s-test        # end-to-end and NetworkPolicy checks
 
 Tokens carry the issuer {{ .Values.keycloak.publicUrl }}/realms/mnemonic, so get them

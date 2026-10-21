@@ -5,10 +5,10 @@ kind: Service
 metadata:
   name: {{ $v.serviceName }}
   labels:
-    {{- include "librarian.labels" $c | nindent 4 }}
+    {{- include "mnemonic.labels" $c | nindent 4 }}
 spec:
   selector:
-    {{- include "librarian.selectorLabels" $c | nindent 4 }}
+    {{- include "mnemonic.selectorLabels" $c | nindent 4 }}
   ports:
     - name: api-edge
       port: {{ $v.apiPort }}
@@ -22,24 +22,24 @@ kind: Deployment
 metadata:
   name: envoy
   labels:
-    {{- include "librarian.labels" $c | nindent 4 }}
+    {{- include "mnemonic.labels" $c | nindent 4 }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      {{- include "librarian.selectorLabels" $c | nindent 6 }}
+      {{- include "mnemonic.selectorLabels" $c | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "librarian.labels" $c | nindent 8 }}
+        {{- include "mnemonic.labels" $c | nindent 8 }}
       annotations:
-        checksum/config: {{ include "librarian.configChecksum" (dict "ctx" $ "names" (list .Values.configMaps.envoy)) }}
+        checksum/config: {{ include "mnemonic.configChecksum" (dict "ctx" $ "names" (list .Values.configMaps.envoy)) }}
     spec:
-      {{- include "librarian.podDefaults" . | nindent 6 }}
+      {{- include "mnemonic.podDefaults" . | nindent 6 }}
       # The image's envoy user (101), started directly rather than through the
       # image entrypoint, which would start as root and switch users.
       securityContext:
-        {{- include "librarian.podSecurityContext" 101 | nindent 8 }}
+        {{- include "mnemonic.podSecurityContext" 101 | nindent 8 }}
       containers:
         - name: envoy
           image: {{ $v.image }}
@@ -62,7 +62,7 @@ spec:
           resources:
             {{- toYaml $v.resources | nindent 12 }}
           securityContext:
-            {{- include "librarian.containerSecurityContext" true | nindent 12 }}
+            {{- include "mnemonic.containerSecurityContext" true | nindent 12 }}
           volumeMounts:
             - name: config
               mountPath: /etc/envoy

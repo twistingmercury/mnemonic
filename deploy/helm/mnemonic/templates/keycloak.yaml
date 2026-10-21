@@ -1,15 +1,15 @@
 {{- $c := dict "ctx" $ "component" "keycloak" }}
 {{- $v := .Values.keycloak }}
-{{- $secret := include "librarian.credentialsSecret" . }}
+{{- $secret := include "mnemonic.credentialsSecret" . }}
 apiVersion: v1
 kind: Service
 metadata:
   name: {{ $v.serviceName }}
   labels:
-    {{- include "librarian.labels" $c | nindent 4 }}
+    {{- include "mnemonic.labels" $c | nindent 4 }}
 spec:
   selector:
-    {{- include "librarian.selectorLabels" $c | nindent 4 }}
+    {{- include "mnemonic.selectorLabels" $c | nindent 4 }}
   ports:
     - name: http
       port: {{ $v.port }}
@@ -20,7 +20,7 @@ kind: Deployment
 metadata:
   name: keycloak
   labels:
-    {{- include "librarian.labels" $c | nindent 4 }}
+    {{- include "mnemonic.labels" $c | nindent 4 }}
 spec:
   replicas: 1
   # start-dev keeps its database inside the pod, so two pods never overlap.
@@ -28,18 +28,18 @@ spec:
     type: Recreate
   selector:
     matchLabels:
-      {{- include "librarian.selectorLabels" $c | nindent 6 }}
+      {{- include "mnemonic.selectorLabels" $c | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "librarian.labels" $c | nindent 8 }}
+        {{- include "mnemonic.labels" $c | nindent 8 }}
       annotations:
-        checksum/config: {{ include "librarian.configChecksum" (dict "ctx" $ "names" (list .Values.configMaps.keycloakRealm)) }}
+        checksum/config: {{ include "mnemonic.configChecksum" (dict "ctx" $ "names" (list .Values.configMaps.keycloakRealm)) }}
         checksum/credentials: {{ include (print $.Template.BasePath "/secret-dev-credentials.yaml") . | sha256sum }}
     spec:
-      {{- include "librarian.podDefaults" . | nindent 6 }}
+      {{- include "mnemonic.podDefaults" . | nindent 6 }}
       securityContext:
-        {{- include "librarian.podSecurityContext" 1000 | nindent 8 }}
+        {{- include "mnemonic.podSecurityContext" 1000 | nindent 8 }}
       containers:
         - name: keycloak
           image: {{ $v.image }}
@@ -84,7 +84,7 @@ spec:
           # application under /opt/keycloak/lib at startup and keeps its dev
           # database under /opt/keycloak/data.
           securityContext:
-            {{- include "librarian.containerSecurityContext" false | nindent 12 }}
+            {{- include "mnemonic.containerSecurityContext" false | nindent 12 }}
           volumeMounts:
             - name: realm
               mountPath: /opt/keycloak/data/import

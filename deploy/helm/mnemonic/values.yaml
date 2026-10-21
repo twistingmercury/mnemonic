@@ -1,24 +1,24 @@
-# Values for the local minikube deployment. docker-compose.yaml in the repo
-# root is the reference stack; settings here mirror it unless noted.
+# Values for the local minikube deployment. deploy/docker-compose.yaml
+# is the reference stack; settings here mirror it unless noted.
 
-# The librarian-* images exist only in the host's Docker cache and are loaded
+# The mnemonic-* images exist only in the host's Docker cache and are loaded
 # into the node with `minikube image load` (make k8s-images), so they must
 # never be pulled.
 imagePullPolicy: IfNotPresent
 
-# ConfigMaps created by `make k8s-config` straight from envoy/, opa/ and
-# keycloak/ in the repo. The chart mounts them and never copies their content.
+# ConfigMaps created by `make k8s-config` straight from gateway/envoy/, gateway/opa/ and
+# gateway/keycloak/. The chart mounts them and never copies their content.
 configMaps:
-  envoy: librarian-envoy            # envoy/envoy.yaml
-  egress: librarian-egress          # envoy/envoy-egress.yaml
-  opaConfig: librarian-opa-config   # opa/config.yaml
-  opaPolicy: librarian-opa-policy   # opa/policy/
-  keycloakRealm: librarian-keycloak-realm  # keycloak/realm-mnemonic.json
+  envoy: mnemonic-envoy            # gateway/envoy/envoy.yaml
+  egress: mnemonic-egress          # gateway/envoy/envoy-egress.yaml
+  opaConfig: mnemonic-opa-config   # gateway/opa/config.yaml
+  opaPolicy: mnemonic-opa-policy   # gateway/opa/policy/
+  keycloakRealm: mnemonic-keycloak-realm  # gateway/keycloak/realm-mnemonic.json
 
 openai:
   # Secret holding the real OpenAI key, created by `make k8s-secret`. Only the
   # egress pod mounts it; the services get the placeholder below.
-  existingSecret: librarian-openai
+  existingSecret: mnemonic-openai
   secretKey: api-key
   placeholderKey: proxy-managed
 
@@ -64,8 +64,8 @@ networkPolicy:
 # their upstreams by these names, exactly as on the compose network.
 
 api:
-  image: ghcr.io/twistingmercury/librarian-api:latest-dev
-  serviceName: librarian-api
+  image: ghcr.io/twistingmercury/mnemonic-api:latest-dev
+  serviceName: mnemonic-api
   port: 8080
   logLevel: debug
   resources:
@@ -73,8 +73,8 @@ api:
     limits: { cpu: 500m, memory: 256Mi }
 
 mcp:
-  image: ghcr.io/twistingmercury/librarian-mcp:latest-dev
-  serviceName: librarian-mcp
+  image: ghcr.io/twistingmercury/mnemonic-mcp:latest-dev
+  serviceName: mnemonic-mcp
   # Health and version are served on the HTTP port, MCP on its own port.
   port: 8080
   mcpPort: 8081
@@ -84,8 +84,8 @@ mcp:
     limits: { cpu: 500m, memory: 256Mi }
 
 enricher:
-  image: ghcr.io/twistingmercury/librarian-enricher:latest-dev
-  serviceName: librarian-enricher
+  image: ghcr.io/twistingmercury/mnemonic-enricher:latest-dev
+  serviceName: mnemonic-enricher
   port: 8080
   logLevel: debug
   queue: enrichment-jobs
@@ -130,7 +130,7 @@ keycloak:
   # Public URL clients reach Keycloak on (kubectl port-forward, see
   # make k8s-forward). Tokens carry it as their issuer, which must match the
   # issuer in envoy/envoy.yaml.
-  publicUrl: http://localhost:18180
+  publicUrl: http://localhost:8180
   # start-dev runs a build step (kc.sh build-and-exit) before it serves, and
   # that step is OOM-killed below roughly 2Gi.
   resources:
@@ -138,7 +138,7 @@ keycloak:
     limits: { cpu: "2", memory: 3Gi }
 
 postgres:
-  image: ghcr.io/twistingmercury/librarian-postgres:v1.0.0-dev
+  image: ghcr.io/twistingmercury/mnemonic-postgres:v1.0.0-dev
   serviceName: postgres
   port: 5432
   storageClass: standard
@@ -148,7 +148,7 @@ postgres:
     limits: { cpu: "1", memory: 1Gi }
 
 neo4j:
-  image: ghcr.io/twistingmercury/librarian-neo4j:v1.0.0-dev
+  image: ghcr.io/twistingmercury/mnemonic-neo4j:v1.0.0-dev
   serviceName: neo4j
   boltPort: 7687
   storageClass: standard

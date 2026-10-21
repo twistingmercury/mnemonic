@@ -1,15 +1,15 @@
 {{- $c := dict "ctx" $ "component" "neo4j" }}
 {{- $v := .Values.neo4j }}
-{{- $secret := include "librarian.credentialsSecret" . }}
+{{- $secret := include "mnemonic.credentialsSecret" . }}
 apiVersion: v1
 kind: Service
 metadata:
   name: {{ $v.serviceName }}
   labels:
-    {{- include "librarian.labels" $c | nindent 4 }}
+    {{- include "mnemonic.labels" $c | nindent 4 }}
 spec:
   selector:
-    {{- include "librarian.selectorLabels" $c | nindent 4 }}
+    {{- include "mnemonic.selectorLabels" $c | nindent 4 }}
   ports:
     - name: bolt
       port: {{ $v.boltPort }}
@@ -20,27 +20,27 @@ kind: StatefulSet
 metadata:
   name: neo4j
   labels:
-    {{- include "librarian.labels" $c | nindent 4 }}
+    {{- include "mnemonic.labels" $c | nindent 4 }}
 spec:
   serviceName: {{ $v.serviceName }}
   replicas: 1
   selector:
     matchLabels:
-      {{- include "librarian.selectorLabels" $c | nindent 6 }}
+      {{- include "mnemonic.selectorLabels" $c | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "librarian.labels" $c | nindent 8 }}
+        {{- include "mnemonic.labels" $c | nindent 8 }}
       annotations:
         checksum/credentials: {{ include (print $.Template.BasePath "/secret-dev-credentials.yaml") . | sha256sum }}
     spec:
-      {{- include "librarian.podDefaults" . | nindent 6 }}
+      {{- include "mnemonic.podDefaults" . | nindent 6 }}
       # Neo4j needs about 10s to stop cleanly.
       terminationGracePeriodSeconds: 30
       # Runs directly as the image's neo4j user (7474) instead of starting as
       # root and dropping privileges.
       securityContext:
-        {{- include "librarian.podSecurityContext" 7474 | nindent 8 }}
+        {{- include "mnemonic.podSecurityContext" 7474 | nindent 8 }}
       containers:
         - name: neo4j
           image: {{ $v.image }}
@@ -92,7 +92,7 @@ spec:
           # conf/neo4j.conf from the NEO4J_ variables and copies APOC into the
           # plugins directory at every start.
           securityContext:
-            {{- include "librarian.containerSecurityContext" false | nindent 12 }}
+            {{- include "mnemonic.containerSecurityContext" false | nindent 12 }}
           volumeMounts:
             - name: data
               mountPath: /data
@@ -100,7 +100,7 @@ spec:
     - metadata:
         name: data
         labels:
-          {{- include "librarian.selectorLabels" $c | nindent 10 }}
+          {{- include "mnemonic.selectorLabels" $c | nindent 10 }}
       spec:
         accessModes: [ReadWriteOnce]
         storageClassName: {{ $v.storageClass }}

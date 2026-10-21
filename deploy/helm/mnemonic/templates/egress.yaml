@@ -5,38 +5,38 @@ kind: Service
 metadata:
   name: {{ $v.serviceName }}
   labels:
-    {{- include "librarian.labels" $c | nindent 4 }}
+    {{- include "mnemonic.labels" $c | nindent 4 }}
 spec:
   selector:
-    {{- include "librarian.selectorLabels" $c | nindent 4 }}
+    {{- include "mnemonic.selectorLabels" $c | nindent 4 }}
   ports:
     - name: openai
       port: {{ $v.port }}
       targetPort: openai
 ---
 # The only pod with a route to the internet and the only one that sees the
-# OpenAI key (see envoy/envoy-egress.yaml and templates/networkpolicies.yaml).
+# OpenAI key (see gateway/envoy/envoy-egress.yaml and templates/networkpolicies.yaml).
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: egress
   labels:
-    {{- include "librarian.labels" $c | nindent 4 }}
+    {{- include "mnemonic.labels" $c | nindent 4 }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      {{- include "librarian.selectorLabels" $c | nindent 6 }}
+      {{- include "mnemonic.selectorLabels" $c | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "librarian.labels" $c | nindent 8 }}
+        {{- include "mnemonic.labels" $c | nindent 8 }}
       annotations:
-        checksum/config: {{ include "librarian.configChecksum" (dict "ctx" $ "names" (list .Values.configMaps.egress)) }}
+        checksum/config: {{ include "mnemonic.configChecksum" (dict "ctx" $ "names" (list .Values.configMaps.egress)) }}
     spec:
-      {{- include "librarian.podDefaults" . | nindent 6 }}
+      {{- include "mnemonic.podDefaults" . | nindent 6 }}
       securityContext:
-        {{- include "librarian.podSecurityContext" 101 | nindent 8 }}
+        {{- include "mnemonic.podSecurityContext" 101 | nindent 8 }}
       containers:
         - name: egress
           image: {{ $v.image }}
@@ -44,7 +44,7 @@ spec:
           command: ["envoy"]
           args: ["-c", "/etc/envoy/envoy.yaml", "--log-level", {{ $v.logLevel | quote }}]
           env:
-            - name: LIBRARIAN_OPENAI_API_KEY
+            - name: OPENAI_API_EMBEDDINGS_KEY
               valueFrom:
                 secretKeyRef:
                   name: {{ required "openai.existingSecret is required" .Values.openai.existingSecret }}
@@ -61,7 +61,7 @@ spec:
           resources:
             {{- toYaml $v.resources | nindent 12 }}
           securityContext:
-            {{- include "librarian.containerSecurityContext" true | nindent 12 }}
+            {{- include "mnemonic.containerSecurityContext" true | nindent 12 }}
           volumeMounts:
             - name: config
               mountPath: /etc/envoy

@@ -23,7 +23,7 @@ kind: NetworkPolicy
 metadata:
   name: default-deny-all
   labels:
-    {{- include "librarian.labels" (dict "ctx" $ "component" "network-policy") | nindent 4 }}
+    {{- include "mnemonic.labels" (dict "ctx" $ "component" "network-policy") | nindent 4 }}
 spec:
   podSelector: {}
   policyTypes: [Ingress, Egress]
@@ -33,7 +33,7 @@ kind: NetworkPolicy
 metadata:
   name: allow-dns
   labels:
-    {{- include "librarian.labels" (dict "ctx" $ "component" "network-policy") | nindent 4 }}
+    {{- include "mnemonic.labels" (dict "ctx" $ "component" "network-policy") | nindent 4 }}
 spec:
   podSelector: {}
   policyTypes: [Egress]
@@ -94,11 +94,11 @@ kind: NetworkPolicy
 metadata:
   name: {{ $policy.component }}
   labels:
-    {{- include "librarian.labels" (dict "ctx" $ "component" "network-policy") | nindent 4 }}
+    {{- include "mnemonic.labels" (dict "ctx" $ "component" "network-policy") | nindent 4 }}
 spec:
   podSelector:
     matchLabels:
-      {{- include "librarian.policyLabels" (dict "ctx" $ "component" $policy.component) | nindent 6 }}
+      {{- include "mnemonic.policyLabels" (dict "ctx" $ "component" $policy.component) | nindent 6 }}
   policyTypes: [Ingress, Egress]
   ingress:
     {{- range $rule := $policy.ingress | default list }}
@@ -111,7 +111,7 @@ spec:
         {{- range $rule.from }}
         - podSelector:
             matchLabels:
-              {{- include "librarian.policyLabels" (dict "ctx" $ "component" .) | nindent 14 }}
+              {{- include "mnemonic.policyLabels" (dict "ctx" $ "component" .) | nindent 14 }}
         {{- end }}
       {{- else }}
       # No "from": any source, as the edges are reached through port-forward.
@@ -123,7 +123,7 @@ spec:
         {{- range $rule.to }}
         - podSelector:
             matchLabels:
-              {{- include "librarian.policyLabels" (dict "ctx" $ "component" .) | nindent 14 }}
+              {{- include "mnemonic.policyLabels" (dict "ctx" $ "component" .) | nindent 14 }}
         {{- end }}
       ports:
         {{- range $rule.ports }}
