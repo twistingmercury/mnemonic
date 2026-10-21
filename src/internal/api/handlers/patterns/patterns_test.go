@@ -5,8 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -269,6 +271,232 @@ func TestPatternWrite_InvalidFields(t *testing.T) {
 			assert.Equal(t, tt.wantCode, resp.Errors[0].Code)
 		})
 	}
+}
+
+// --- Validation helpers ---
+
+// fieldErr is the field and code pair of one validation error.
+type fieldErr struct {
+	field string
+	code  string
+}
+
+// validBody returns a create/update payload that passes validation, with the
+// overrides applied and the omitted keys removed.
+func validBody(t *testing.T, overrides map[string]any, omit ...string) string {
+	t.Helper()
+
+	fields := map[string]any{
+		"name":        "go-error-handling",
+		"description": "Test pattern description",
+		"content":     "# Test Pattern\n\nContent here",
+		"tags":        []string{"go", "test"},
+		"entity_type": "go-pattern",
+		"language":    "go",
+		"domain":      "backend",
+	}
+	maps.Copy(fields, overrides)
+	for _, key := range omit {
+		delete(fields, key)
+	}
+
+	raw, err := json.Marshal(fields)
+	require.NoError(t, err)
+
+	return string(raw)
+}
+
+// doRequest sends one request through the router and returns the recorded response.
+func doRequest(router *gin.Engine, method, path, body string) *httptest.ResponseRecorder {
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	return w
+}
+
+// problemWant is the RFC 7807 envelope a handler is expected to produce.
+type problemWant struct {
+	status int
+	slug   string
+	title  string
+	path   string
+}
+
+// decodeProblem checks the RFC 7807 envelope and returns the decoded body.
+func decodeProblem(t *testing.T, w *httptest.ResponseRecorder, want problemWant) handlers.ProblemDetail {
+	t.Helper()
+
+	require.Equal(t, want.status, w.Code)
+
+	var resp handlers.ProblemDetail
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, handlers.ProblemBaseURI+want.slug, resp.Type)
+	assert.Equal(t, want.title, resp.Title)
+	assert.Equal(t, want.status, resp.Status)
+	assert.Equal(t, want.path, resp.Instance)
+
+	return resp
+}
+
+// decodeValidationProblem checks for a 400 validation problem on path and
+// returns the field/code pairs it reports, in order.
+func decodeValidationProblem(t *testing.T, w *httptest.ResponseRecorder, path string) []fieldErr {
+	t.Helper()
+
+	resp := decodeProblem(t, w, problemWant{http.StatusBadRequest, "validation-error", "Validation Error", path})
+	assert.NotEmpty(t, resp.Detail)
+
+	var got []fieldErr
+	for _, e := range resp.Errors {
+		got = append(got, fieldErr{e.Field, e.Code})
+	}
+
+	return got
+}
+
+// TestPatternWrite_ValidationRejects checks that create and update answer 400
+// with a problem body naming every violated field, and never reach the service.
+func TestPatternWrite_ValidationRejects(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		body string
+		want []fieldErr
+	}{
+		{"name missing", validBody(t, nil, "name"), []fieldErr{{"name", "REQUIRED"}}},
+		{"name 129 chars", validBody(t, map[string]any{"name": "a" + strings.Repeat("b", 128)}), []fieldErr{{"name", "MAX_LENGTH"}}},
+		{"name uppercase", validBody(t, map[string]any{"name": "Go-Pattern"}), []fieldErr{{"name", "INVALID_FORMAT"}}},
+		{"name leading digit", validBody(t, map[string]any{"name": "1go-pattern"}), []fieldErr{{"name", "INVALID_FORMAT"}}},
+		{"name underscore", validBody(t, map[string]any{"name": "go_pattern"}), []fieldErr{{"name", "INVALID_FORMAT"}}},
+		{"content missing", validBody(t, nil, "content"), []fieldErr{{"content", "REQUIRED"}}},
+		{"content 100001 bytes", validBody(t, map[string]any{"content": strings.Repeat("x", 100_001)}), []fieldErr{{"content", "TOO_LARGE"}}},
+		{"description 501 chars", validBody(t, map[string]any{"description": strings.Repeat("d", 501)}), []fieldErr{{"description", "MAX_LENGTH"}}},
+		{"tags 21 items", validBody(t, map[string]any{"tags": make([]string, 21)}), []fieldErr{{"tags", "MAX_ITEMS"}}},
+		{"entity_type missing", validBody(t, nil, "entity_type"), []fieldErr{{"entity_type", "REQUIRED"}}},
+		{"language missing", validBody(t, nil, "language"), []fieldErr{{"language", "REQUIRED"}}},
+		{"domain missing", validBody(t, nil, "domain"), []fieldErr{{"domain", "REQUIRED"}}},
+		{"domain not kebab-case", validBody(t, map[string]any{"domain": "Not A Domain"}), []fieldErr{{"domain", "INVALID_FORMAT"}}},
+		{"empty object", `{}`, []fieldErr{
+			{"name", "REQUIRED"}, {"content", "REQUIRED"}, {"entity_type", "REQUIRED"},
+			{"language", "REQUIRED"}, {"domain", "REQUIRED"},
+		}},
+		// Malformed JSON fails before field validation, so no field errors are listed.
+		{"malformed JSON", `{"name": `, nil},
+	}
+
+	endpoints := []struct {
+		name   string
+		method string
+		path   string
+	}{
+		{"create", http.MethodPost, "/v1/api/patterns"},
+		{"update", http.MethodPut, "/v1/api/patterns/" + uuid.New().String()},
+	}
+
+	for _, ep := range endpoints {
+		for _, tt := range tests {
+			t.Run(ep.name+"/"+tt.name, func(t *testing.T) {
+				t.Parallel()
+				// No service expectations: an invalid body must never reach it.
+				psvc := new(mockPatternService)
+				router := newTestRouter(psvc, new(mockSearchService))
+
+				w := doRequest(router, ep.method, ep.path, tt.body)
+
+				got := decodeValidationProblem(t, w, ep.path)
+				assert.Equal(t, tt.want, got)
+				psvc.AssertExpectations(t)
+			})
+		}
+	}
+}
+
+// TestPatternWrite_AcceptsLimits pins the inclusive upper bounds so the
+// rejection cases above cannot pass because a limit is off by one.
+func TestPatternWrite_AcceptsLimits(t *testing.T) {
+	t.Parallel()
+
+	body := validBody(t, map[string]any{
+		"name":        "a" + strings.Repeat("b", 127),
+		"content":     strings.Repeat("x", 100_000),
+		"description": strings.Repeat("d", 500),
+		"tags":        make([]string, 20),
+	})
+	updatePath := "/v1/api/patterns/" + uuid.New().String()
+
+	tests := []struct {
+		name       string
+		method     string
+		path       string
+		wantStatus int
+	}{
+		{"create", http.MethodPost, "/v1/api/patterns", http.StatusAccepted},
+		{"update", http.MethodPut, updatePath, http.StatusNoContent},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			psvc := new(mockPatternService)
+			router := newTestRouter(psvc, new(mockSearchService))
+			pattern := makePattern("go-error-handling")
+			psvc.On("Create", mock.Anything, mock.Anything).Return(pattern, nil)
+			psvc.On("Update", mock.Anything, mock.Anything, mock.Anything).Return(pattern, nil)
+
+			w := doRequest(router, tt.method, tt.path, body)
+
+			assert.Equal(t, tt.wantStatus, w.Code)
+		})
+	}
+}
+
+// TestPatternWrite_InvalidID checks that a non-UUID id is rejected on every
+// route that takes one, before the service is called.
+func TestPatternWrite_InvalidID(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+	}{
+		{"update", http.MethodPut, "/v1/api/patterns/not-a-uuid", validBody(t, nil)},
+		{"delete", http.MethodDelete, "/v1/api/patterns/not-a-uuid", ""},
+		{"chunks", http.MethodGet, "/v1/api/patterns/not-a-uuid/chunks", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			psvc := new(mockPatternService)
+			router := newTestRouter(psvc, new(mockSearchService))
+
+			w := doRequest(router, tt.method, tt.path, tt.body)
+
+			got := decodeValidationProblem(t, w, tt.path)
+			assert.Equal(t, []fieldErr{{"id", "INVALID_FORMAT"}}, got)
+			psvc.AssertExpectations(t)
+		})
+	}
+}
+
+func TestPatternUpdate_NotFound(t *testing.T) {
+	t.Parallel()
+	psvc := new(mockPatternService)
+	router := newTestRouter(psvc, new(mockSearchService))
+
+	id := uuid.New()
+	path := "/v1/api/patterns/" + id.String()
+	psvc.On("Update", mock.Anything, id, mock.Anything).
+		Return(nil, fmt.Errorf("%w: pattern %s", service.ErrNotFound, id))
+
+	w := doRequest(router, http.MethodPut, path, validBody(t, nil))
+
+	resp := decodeProblem(t, w, problemWant{http.StatusNotFound, "not-found", "Not Found", path})
+	assert.Contains(t, resp.Detail, id.String())
+	psvc.AssertExpectations(t)
 }
 
 func TestPatternGet_Success(t *testing.T) {
@@ -568,4 +796,178 @@ func TestPatternGet_ChunksPopulated(t *testing.T) {
 	assert.Equal(t, "enriched", second["enrichment_status"])
 
 	psvc.AssertExpectations(t)
+}
+
+// --- List and search query validation ---
+
+// recordListOptions returns a mock callback that stores the ListOptions the
+// handler passes to the service.
+func recordListOptions(dst *patternsvc.ListOptions) func(mock.Arguments) {
+	return func(args mock.Arguments) {
+		*dst = args.Get(2).(patternsvc.ListOptions)
+	}
+}
+
+// recordSearchOptions returns a mock callback that stores the SearchOptions
+// the handler passes to the service.
+func recordSearchOptions(dst *searchsvc.SearchOptions) func(mock.Arguments) {
+	return func(args mock.Arguments) {
+		*dst = args.Get(1).(searchsvc.SearchOptions)
+	}
+}
+
+func TestPatternList_InvalidQuery(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		query     string
+		wantField string
+	}{
+		{"limit zero", "limit=0", "limit"},
+		{"limit above max", "limit=101", "limit"},
+		{"limit negative", "limit=-1", "limit"},
+		{"limit not a number", "limit=abc", "limit"},
+		{"cursor not base64", "cursor=!!!", "cursor"},
+		// "eA==" is valid base64 for "x", which is not a JSON cursor payload.
+		{"cursor not JSON", "cursor=eA==", "cursor"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			psvc := new(mockPatternService)
+			router := newTestRouter(psvc, new(mockSearchService))
+			path := "/v1/api/patterns"
+
+			w := doRequest(router, http.MethodGet, path+"?"+tt.query, "")
+
+			got := decodeValidationProblem(t, w, path)
+			assert.Equal(t, []fieldErr{{tt.wantField, "INVALID_VALUE"}}, got)
+			psvc.AssertExpectations(t)
+		})
+	}
+}
+
+// TestPatternList_Pagination checks the default page size and that the
+// handler asks for one extra row to learn whether another page exists.
+func TestPatternList_Pagination(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		query        string
+		returned     int
+		wantLimit    int
+		wantRequest  int
+		wantData     int
+		wantHasMore  bool
+		wantNextPage bool
+	}{
+		{"default limit", "", 1, 20, 21, 1, false, false},
+		{"more rows than limit", "?limit=2", 3, 2, 3, 2, true, true},
+		{"exactly limit rows", "?limit=2", 2, 2, 3, 2, false, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			psvc := new(mockPatternService)
+			router := newTestRouter(psvc, new(mockSearchService))
+			rows := make([]*patternrepo.Pattern, tt.returned)
+			for i := range rows {
+				rows[i] = makePattern(fmt.Sprintf("pattern-%d", i))
+			}
+			var got patternsvc.ListOptions
+			psvc.On("List", mock.Anything, mock.Anything, mock.Anything).
+				Run(recordListOptions(&got)).Return(rows, nil)
+
+			w := doRequest(router, http.MethodGet, "/v1/api/patterns"+tt.query, "")
+
+			require.Equal(t, http.StatusOK, w.Code)
+			assert.Equal(t, patternsvc.ListOptions{Offset: 0, Limit: tt.wantRequest}, got)
+
+			var resp struct {
+				Data       []map[string]any    `json:"data"`
+				Pagination handlers.Pagination `json:"pagination"`
+			}
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			assert.Len(t, resp.Data, tt.wantData)
+			assert.Equal(t, tt.wantLimit, resp.Pagination.Limit)
+			assert.Equal(t, tt.wantHasMore, resp.Pagination.HasMore)
+			if !tt.wantNextPage {
+				assert.Nil(t, resp.Pagination.NextCursor)
+				return
+			}
+
+			require.NotNil(t, resp.Pagination.NextCursor)
+			assert.Equal(t, handlers.EncodeCursor(tt.wantLimit), *resp.Pagination.NextCursor)
+		})
+	}
+}
+
+func TestSearch_InvalidQuery(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		query     string
+		wantField string
+		wantCode  string
+	}{
+		{"q 1001 chars", "q=" + strings.Repeat("a", 1001), "q", "MAX_LENGTH"},
+		{"limit zero", "q=x&limit=0", "limit", "INVALID_VALUE"},
+		{"limit 51", "q=x&limit=51", "limit", "INVALID_VALUE"},
+		{"limit not a number", "q=x&limit=abc", "limit", "INVALID_VALUE"},
+		{"threshold below zero", "q=x&threshold=-0.1", "threshold", "INVALID_VALUE"},
+		{"threshold above one", "q=x&threshold=1.1", "threshold", "INVALID_VALUE"},
+		{"threshold not a number", "q=x&threshold=abc", "threshold", "INVALID_VALUE"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			// No search expectations: an invalid query must never reach the service.
+			ssvc := new(mockSearchService)
+			router := newTestRouter(new(mockPatternService), ssvc)
+			path := "/v1/api/patterns/search"
+
+			w := doRequest(router, http.MethodGet, path+"?"+tt.query, "")
+
+			got := decodeValidationProblem(t, w, path)
+			assert.Equal(t, []fieldErr{{tt.wantField, tt.wantCode}}, got)
+			ssvc.AssertExpectations(t)
+		})
+	}
+}
+
+// TestSearch_ForwardsOptions checks the defaults, the inclusive bounds and
+// the comma-split tag filter as the service sees them.
+func TestSearch_ForwardsOptions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		query string
+		want  searchsvc.SearchOptions
+	}{
+		{"defaults", "q=x", searchsvc.SearchOptions{Query: "x", Limit: 10, Threshold: 0.7}},
+		{"lower bounds", "q=x&limit=1&threshold=0", searchsvc.SearchOptions{Query: "x", Limit: 1, Threshold: 0}},
+		{"upper bounds", "q=x&limit=50&threshold=1", searchsvc.SearchOptions{Query: "x", Limit: 50, Threshold: 1}},
+		{"q 1000 chars", "q=" + strings.Repeat("a", 1000), searchsvc.SearchOptions{Query: strings.Repeat("a", 1000), Limit: 10, Threshold: 0.7}},
+		{"tags split on comma", "q=x&tags=a,b", searchsvc.SearchOptions{Query: "x", Limit: 10, Threshold: 0.7, Tags: []string{"a", "b"}}},
+		{"language and domain", "q=x&language=go&domain=backend", searchsvc.SearchOptions{Query: "x", Limit: 10, Threshold: 0.7, Language: "go", Domain: "backend"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ssvc := new(mockSearchService)
+			router := newTestRouter(new(mockPatternService), ssvc)
+			var got searchsvc.SearchOptions
+			ssvc.On("SearchPatterns", mock.Anything, mock.Anything).
+				Run(recordSearchOptions(&got)).Return(&searchsvc.SearchResult{}, nil)
+
+			w := doRequest(router, http.MethodGet, "/v1/api/patterns/search?"+tt.query, "")
+
+			require.Equal(t, http.StatusOK, w.Code)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }
