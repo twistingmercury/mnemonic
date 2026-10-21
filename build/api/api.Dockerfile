@@ -3,7 +3,7 @@
 # unit tests, then build binary
 #------------------------------------------------------------
 ARG BUILDPLATFORM
-FROM --platform=${BUILDPLATFORM} ghcr.io/twistingmercury/golang-tooling:go1.27.2 AS build
+FROM --platform=${BUILDPLATFORM} ghcr.io/twistingmercury/golang-tooling:go1.27.3 AS build
 
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64

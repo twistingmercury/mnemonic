@@ -1,6 +1,6 @@
 module github.com/twistingmercury/librarian
 
-go 1.27.2
+go 1.27.3
 
 require (
 	github.com/exaring/otelpgx v0.13.0
