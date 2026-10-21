@@ -1,6 +1,6 @@
-# mnemonic-dbs — Architecture Overview
+# Database Images — Architecture Overview
 
-> Back to [Database Architecture](README.md) | [Project README](../../../README.md)
+> Back to [Database Architecture](README.md) | [Design Index](../../README.md)
 
 ## Table of Contents
 
@@ -12,34 +12,34 @@
 
 ## Introduction
 
-`mnemonic-dbs` owns the database schema and pre-seeded Docker images for the Mnemonic project. It produces two images — `mnemonic-postgres` and `mnemonic-neo4j` — that application services pull directly instead of running migrations at startup.
+The `db/` component owns the database schema and pre-seeded Docker images for the Mnemonic project. It produces two images — `librarian-postgres` and `librarian-neo4j` — that application services pull directly instead of running migrations at startup.
 
-The repo is intentionally decoupled from the application code. Schema changes are made here, tested, built into new image tags, and consumed by `mnemonic-mcp`, `mnemonic-api`, and `mnemonic-enricher` by updating their image references. Today every service's `docker-compose.yaml` (local dev and `src/tests` e2e), and `mnemonic-integration-tests`, pin `ghcr.io/twistingmercury/librarian-postgres:v1.0.0-dev` and `ghcr.io/twistingmercury/librarian-neo4j:v1.0.0-dev`. This gives schema changes their own lifecycle: reviewed, tested, and versioned independently.
+The component is intentionally decoupled from the application code, even though it sits in the same monorepo. Schema changes are made in `db/`, tested, built into new image tags, and consumed by the mcp, api and enricher services by updating their image references. Today the compose files and the Helm chart pin `ghcr.io/twistingmercury/librarian-postgres:v1.0.0-dev` and `ghcr.io/twistingmercury/librarian-neo4j:v1.0.0-dev`. This gives schema changes their own lifecycle: reviewed, tested, and versioned independently.
 
 ## Core Concept
 
 ```mermaid
 graph LR
-    subgraph mnemonic-dbs["mnemonic-dbs (this repo)"]
-        PG_SQL["src/postgres/*.up.sql"]
-        NEO_CYP["src/neo4j/*.cypher"]
-        PG_BUILD["postgres/build.sh"]
-        NEO_BUILD["neo4j/build.sh"]
+    subgraph db["db/ (this component)"]
+        PG_SQL["db/postgres/*.up.sql"]
+        NEO_CYP["db/neo4j/*.cypher"]
+        PG_BUILD["db/postgres/build.sh"]
+        NEO_BUILD["db/neo4j/build.sh"]
         PG_SQL --> PG_BUILD
         NEO_CYP --> NEO_BUILD
     end
 
     subgraph GHCR["GitHub Container Registry"]
-        PG_IMG["mnemonic-postgres:v1.0.0-dev"]
-        NEO_IMG["mnemonic-neo4j:v1.0.0-dev"]
+        PG_IMG["librarian-postgres:v1.0.0-dev"]
+        NEO_IMG["librarian-neo4j:v1.0.0-dev"]
         PG_BUILD --> PG_IMG
         NEO_BUILD --> NEO_IMG
     end
 
     subgraph Apps["Application Services"]
-        API["mnemonic-api"]
-        MCP["mnemonic-mcp"]
-        ENR["mnemonic-enricher"]
+        API["api service"]
+        MCP["mcp service"]
+        ENR["enricher service"]
         PG_IMG --> API
         PG_IMG --> MCP
         PG_IMG --> ENR
@@ -51,13 +51,13 @@ graph LR
 
 ## System Model
 
-| Component | Description |
-| --- | --- |
-| `src/postgres/` | SQL schema files (`*.up.sql`) and Dockerfile for the Postgres image |
-| `src/neo4j/` | Cypher schema files and Dockerfile/build script for the Neo4j image |
-| `src/tests/` | BATS test suites and test runner scripts that verify schema correctness |
-| `src/docker-compose.yaml` | Local test infrastructure (isolated ports, not used by application services) |
-| CI workflow | Triggers on schema file changes, runs tests, builds and pushes both images to GHCR |
+| Component                 | Description                                                                        |
+| ------------------------- | ---------------------------------------------------------------------------------- |
+| `db/postgres/`            | SQL schema files (`*.up.sql`) and Dockerfile for the Postgres image                |
+| `db/neo4j/`               | Cypher schema files and Dockerfile/build script for the Neo4j image                |
+| `db/tests/`               | BATS test suites and test runner scripts that verify schema correctness            |
+| `src/docker-compose.yaml` | Local test infrastructure (isolated ports, not used by application services)       |
+| CI workflow               | Triggers on schema file changes, runs tests, builds and pushes both images to GHCR |
 
 ## Key Principles
 

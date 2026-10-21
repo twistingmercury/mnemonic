@@ -1,6 +1,8 @@
 # Service Layer Design
 
-> Back to [Design Documents](README.md) | [Project README](../../README.md)
+> Back to [Design Documents](README.md)
+
+**Code paths:** a path written as `internal/<dir>/...` is relative to the service's source directory, `src/internal/<service>/`. For example, `internal/metrics/tools.go` in the mcp service is `src/internal/mcp/metrics/tools.go`.
 
 ## Table of Contents
 
@@ -54,15 +56,15 @@
 
 [Table of Contents](#table-of-contents)
 
-> **Architecture Reference:** [System Architecture - Component Breakdown](../architecture/system/02-system-architecture.md#component-breakdown) | [Data Architecture - Data Flow Patterns](../architecture/system/04-data-architecture.md#data-flow-patterns)
+> **Architecture Reference:** [System Architecture - Component Breakdown](architecture/system/02-system-architecture.md#component-breakdown) | [Data Architecture - Data Flow Patterns](architecture/system/04-data-architecture.md#data-flow-patterns)
 
-The service layer pattern is shared across all three Mnemonic services (`mnemonic-mcp`, `mnemonic-api`, `mnemonic-enricher`), but each service contains only the services and repositories its job needs. There is no shared Go module; each repository carries its own copy of the packages it uses.
+The service layer pattern is shared across all three Mnemonic services (the mcp service, the api service, the enricher service), but each service contains only the services and repositories its job needs. There is no shared Go module; each repository carries its own copy of the packages it uses.
 
-| Service             | Services                                                                                                             | Repositories                                                                                   |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `mnemonic-api`      | `pattern.Service` (CRUD, chunking, job creation, publish), `search.Service` (REST search), `openai.EmbeddingService` | pattern, chunk, enrichmentjob (insert only), graph (read + `DeletePattern`); `queue.Publisher` |
-| `mnemonic-mcp`      | `search.Service` (vector search + graph expansion), `pattern.Service` (read-only), `openai.EmbeddingService`         | pattern, chunk, graph (all read-only)                                                          |
-| `mnemonic-enricher` | `enrichment.Service` (job processing), `openai.EmbeddingService`, `openai.ExtractionService`                         | pattern, chunk, enrichmentjob, graph (`SyncPattern` only); `queue.Subscriber`                  |
+| Service          | Services                                                                                                             | Repositories                                                                                   |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| api service      | `pattern.Service` (CRUD, chunking, job creation, publish), `search.Service` (REST search), `openai.EmbeddingService` | pattern, chunk, enrichmentjob (insert only), graph (read + `DeletePattern`); `queue.Publisher` |
+| mcp service      | `search.Service` (vector search + graph expansion), `pattern.Service` (read-only), `openai.EmbeddingService`         | pattern, chunk, graph (all read-only)                                                          |
+| enricher service | `enrichment.Service` (job processing), `openai.EmbeddingService`, `openai.ExtractionService`                         | pattern, chunk, enrichmentjob, graph (`SyncPattern` only); `queue.Subscriber`                  |
 
 The service layer sits between the transport handlers (REST, MCP, queue worker) and the data repositories. It is responsible for:
 
@@ -81,21 +83,21 @@ The service layer does NOT:
 
 ```mermaid
 graph TB
-    subgraph "mnemonic-mcp"
+    subgraph "mcp service"
         MCP[MCP Tool Handlers<br/>:8081/mcp]
         TD[mcpserver.Services<br/>MCP facade]
         MSEARCH[search.Service<br/>vector + graph expansion]
         MPS[pattern.Service<br/>read-only]
     end
 
-    subgraph "mnemonic-api"
+    subgraph "api service"
         REST[REST Handlers<br/>Gin :8080 /v1/api]
         PS[pattern.Service<br/>CRUD + jobs + publish]
         ASEARCH[search.Service]
         PUB[queue.Publisher<br/>RabbitMQ]
     end
 
-    subgraph "mnemonic-enricher"
+    subgraph "enricher service"
         WORKER[enricher.Worker<br/>consumer + retry sweep + maintenance]
         ES[enrichment.Service]
         EMB[EmbeddingService]
@@ -141,24 +143,24 @@ graph TB
 
 [Table of Contents](#table-of-contents)
 
-Service interfaces and implementations live under `src/internal/service/` in each repo. Each domain gets its own sub-package to keep repository type imports unambiguous. Sentinel errors live in `internal/service/errors.go` in the API; the MCP server has none and passes repository errors through.
+Service interfaces and implementations live under `src/internal/<service>/service/` in each service. Each domain gets its own sub-package to keep repository type imports unambiguous. Sentinel errors live in `internal/service/errors.go` in the API; the MCP server has none and passes repository errors through.
 
 ```text
-mnemonic-api/src/internal/
+src/internal/api/
     handlers/            # respond.go (errors, cursors), patterns/ (REST), operations/ (/health, /version)
     queue/               # Publisher interface; rabbitmq/ implementation
     repository/          # chunk, enrichmentjob, graph, pattern; DBTX, TxBeginner
     service/             # errors.go; pattern, search, openai (embedding)
     server/              # wiring, routes, HTTP servers
 
-mnemonic-mcp/src/internal/
+src/internal/mcp/
     mcpserver/           # MCP server, tools, handlers, Services
     repository/          # chunk, graph, pattern (read-only)
     service/             # pattern (read-only), search, openai (embedding)
     handlers/operations/ # /health, /version
     server/              # wiring, HTTP servers
 
-mnemonic-enricher/src/internal/
+src/internal/enricher/
     enricher/            # Worker: consumer, retry sweep, maintenance
     queue/               # Subscriber interface; rabbitmq/ implementation
     repository/          # chunk, enrichmentjob, graph (SyncPattern), pattern
@@ -169,7 +171,7 @@ mnemonic-enricher/src/internal/
 
 All three also have `config`, `database` (api: `database/graphdb`, `database/vectordb`), `health`, `metrics`, `telemetry` and `version`; the API also has `middleware`. The Go module paths are `github.com/twistingmercury/librarian-api`, `github.com/twistingmercury/librarian-mcp` (the MCP service) and `github.com/twistingmercury/librarian-enricher`.
 
-`mcpserver.Services` (in `mnemonic-mcp`'s `internal/mcpserver/server.go`) is a struct of function fields that `internal/server` fills with the MCP service methods.
+`mcpserver.Services` (in the mcp service's `src/internal/mcp/mcpserver/server.go`) is a struct of function fields that `src/internal/mcp/server` fills with the MCP service methods.
 
 ## External Service Interfaces
 
@@ -231,7 +233,7 @@ Each domain service defines the operations that handlers call. Service methods a
 
 ### PatternService
 
-`mnemonic-api/src/internal/service/pattern/service.go`:
+`src/internal/api/service/pattern/service.go`:
 
 ```go
 // Service defines the operations for managing pattern lifecycle.
@@ -314,7 +316,7 @@ type ListOptions struct {
 
 ### SearchService
 
-`mnemonic-api/src/internal/service/search/service.go` (REST `GET /v1/api/patterns/search`):
+`src/internal/api/service/search/service.go` (REST `GET /v1/api/patterns/search`):
 
 ```go
 type Service interface {
@@ -356,7 +358,7 @@ Steps: embed the query (`ErrServiceUnavailable` on failure), call `ChunkReposito
 
 ### MCP Read Services
 
-`mnemonic-mcp` has concrete service structs (no interfaces; the function fields of `mcpserver.Services` are the seam for tests):
+The mcp service has concrete service structs (no interfaces; the function fields of `mcpserver.Services` are the seam for tests):
 
 ```go
 // internal/service/search
@@ -397,7 +399,7 @@ func (s *Service) FindRelatedPatterns(ctx context.Context, patternID uuid.UUID, 
 
 ### EnrichmentService
 
-`mnemonic-enricher/src/internal/service/enrichment/service.go`. Only the enricher has an enrichment service; the API creates jobs directly through its `enrichmentjob` repository inside `pattern.Service`.
+`src/internal/enricher/service/enrichment/service.go`. Only the enricher has an enrichment service; the API creates jobs directly through its `enrichmentjob` repository inside `pattern.Service`.
 
 ```go
 // ErrJobFailed is returned by ProcessJob when a pipeline step failed and the
@@ -438,14 +440,14 @@ type Service interface {
 ### Queue Interfaces
 
 ```go
-// mnemonic-api/src/internal/queue
+// src/internal/api/queue
 type Publisher interface {
     // Publish enqueues a job identified by jobID.
     Publish(ctx context.Context, jobID uuid.UUID) error
     Close() error
 }
 
-// mnemonic-enricher/src/internal/queue
+// src/internal/enricher/queue
 type Delivery struct {
     Body    []byte
     Headers map[string]string // string headers, incl. W3C trace context
@@ -513,7 +515,7 @@ Handlers call the function they were given and format the results as markdown te
 ### RelatedPattern Struct
 
 ```go
-// Package: internal/repository/graph (mnemonic-api and mnemonic-mcp)
+// Package: internal/repository/graph (the api service and the mcp service)
 type RelatedPattern struct {
     ID             uuid.UUID
     Name           string
@@ -579,9 +581,9 @@ The graph query has no special case for the all-zero UUID: it matches no `RELATE
 
 [Table of Contents](#table-of-contents)
 
-> **Architecture Reference:** [Data Architecture - Transaction Handling](../architecture/system/04-data-architecture.md#transaction-handling) | [Data Architecture - Cross-Database Consistency](../architecture/system/04-data-architecture.md#cross-database-consistency)
+> **Architecture Reference:** [Data Architecture - Transaction Handling](architecture/system/04-data-architecture.md#transaction-handling) | [Data Architecture - Cross-Database Consistency](architecture/system/04-data-architecture.md#cross-database-consistency)
 
-This section specifies which API operations are atomic and how they compose. All are in `mnemonic-api/src/internal/service/pattern/service.go`.
+This section specifies which API operations are atomic and how they compose. All are in `src/internal/api/service/pattern/service.go`.
 
 ### Pattern Create
 
@@ -673,7 +675,7 @@ The enricher does not use multi-statement transactions; each repository call is 
 
 [Table of Contents](#table-of-contents)
 
-> **Architecture Reference:** [Data Architecture - Cross-Database Consistency](../architecture/system/04-data-architecture.md#cross-database-consistency)
+> **Architecture Reference:** [Data Architecture - Cross-Database Consistency](architecture/system/04-data-architecture.md#cross-database-consistency)
 
 Mnemonic uses Postgres, Neo4j and RabbitMQ. They cannot share a transaction. The coordination pattern is:
 
@@ -744,7 +746,7 @@ The service layer defines its own sentinel errors in `internal/service/errors.go
 **Note:** There is no authentication in the current local, single-user phase. Post-MVP, authentication and authorization are planned to be handled externally (Envoy and OPA) before requests reach the application, so service methods do not define sentinel errors for 401/403.
 
 ```go
-// Package: internal/service (mnemonic-api)
+// Package: internal/service (the api service)
 var (
     // ErrNotFound indicates the requested entity does not exist.
     ErrNotFound = errors.New("not found")
@@ -760,7 +762,7 @@ var (
 )
 ```
 
-`mnemonic-mcp` has no service-level sentinels: its services return repository errors wrapped with context, and not-found is `patternrepo.ErrNotFound` ("pattern not found"). In the API, `ErrInvalidInput` is mapped by the REST layer but no service returns it today; field validation happens in the handler.
+The mcp service has no service-level sentinels: its services return repository errors wrapped with context, and not-found is `patternrepo.ErrNotFound` ("pattern not found"). In the API, `ErrInvalidInput` is mapped by the REST layer but no service returns it today; field validation happens in the handler.
 
 Service implementations wrap these sentinels with context:
 
@@ -777,7 +779,7 @@ if err != nil {
 
 ### REST Error Mapping
 
-`handlers.RespondError` (`mnemonic-api/src/internal/handlers/respond.go`) maps service errors to HTTP status codes and RFC 7807 Problem Details (with `instance` = request path and `traceId` when a span is active):
+`handlers.RespondError` (`src/internal/api/handlers/respond.go`) maps service errors to HTTP status codes and RFC 7807 Problem Details (with `instance` = request path and `traceId` when a span is active):
 
 | Service Error                   | HTTP Status               | Problem Type URI                                            | `detail`                          |
 | ------------------------------- | ------------------------- | ----------------------------------------------------------- | --------------------------------- |
@@ -802,7 +804,7 @@ MCP handlers map service errors to the sentinels in `internal/mcpserver/errors.g
 ### Mapping Implementation
 
 ```go
-// REST handler (mnemonic-api internal/handlers/patterns)
+// REST handler (the api service internal/handlers/patterns)
 func (h *Handler) Get(c *gin.Context) {
     id, err := uuid.Parse(c.Param("id"))
     if err != nil {
@@ -821,7 +823,7 @@ func (h *Handler) Get(c *gin.Context) {
 ```
 
 ```go
-// MCP handler (mnemonic-mcp internal/mcpserver)
+// MCP handler (the mcp service internal/mcpserver)
 func handleGetPattern(getPattern func(context.Context, uuid.UUID) (*patternrepo.Pattern, *patternsvc.GraphContext, error), logger zerolog.Logger) mcp.ToolHandlerFor[GetPatternInput, any] {
     return func(ctx context.Context, _ *mcp.CallToolRequest, input GetPatternInput) (*mcp.CallToolResult, any, error) {
         id, err := uuid.Parse(input.ID)
@@ -967,7 +969,7 @@ SyncPattern(ctx context.Context, pattern Pattern, concepts []Concept, minSimilar
 
 ### Enrichment Service Interface Usage
 
-`enricher.Worker.Run` (`mnemonic-enricher/src/internal/enricher/enrichment.go`) drives the service. It is not a poll loop; deliveries and a retry ticker share one bounded set of worker slots:
+`enricher.Worker.Run` (`src/internal/enricher/enricher/enrichment.go`) drives the service. It is not a poll loop; deliveries and a retry ticker share one bounded set of worker slots:
 
 ```go
 // Simplified from Worker.Run
@@ -1006,7 +1008,7 @@ The OpenAPI spec defines cursor-based pagination with opaque base64 cursors. The
 
 ### Cursor Encoding
 
-The cursor is an opaque base64-encoded string encoding a simple offset (`mnemonic-api/src/internal/handlers/respond.go`):
+The cursor is an opaque base64-encoded string encoding a simple offset (`src/internal/api/handlers/respond.go`):
 
 ```go
 type CursorPayload struct {
@@ -1086,10 +1088,10 @@ func (s *patternService) List(ctx context.Context, filter patternRepo.Filter, op
 
 [Table of Contents](#table-of-contents)
 
-Each service wires its dependencies in `src/internal/server/server.go` (`wireDependencies`) after opening the database connections; `cmd/main/main.go` only parses flags, loads config and calls `server.ListenAndServe`. Dependencies are injected via constructor functions.
+Each service wires its dependencies in `src/internal/<service>/server/server.go` (`wireDependencies`) after opening the database connections; `cmd/main/main.go` only parses flags, loads config and calls `server.ListenAndServe`. Dependencies are injected via constructor functions.
 
 ```go
-// mnemonic-api
+// the api service
 patternRepo := patternrepo.NewRepository(pgPool)
 enrichmentJobRepo := enrichmentjobrepo.NewRepository(pgPool)
 graphRepo := graphrepo.NewRepository(neo4jDriver, cfg.Database.Neo4j.Database, registry.Database)
@@ -1102,7 +1104,7 @@ patternSvc := patternsvc.New(patternRepo, enrichmentJobRepo, graphRepo, pgPool, 
 ```
 
 ```go
-// mnemonic-mcp
+// the mcp service
 searchSvc := searchsvc.New(embeddingSvc, patternRepo, chunkRepo, graphRepo, registry.Patterns, logger)
 patternSvc := patternsvc.New(patternRepo, graphRepo, logger)
 services := mcpserver.Services{
@@ -1115,7 +1117,7 @@ mcpHTTPServer := mcpserver.NewMCPHTTPServer(cfg.MCP, cfg.Server.Host, mcpserver.
 ```
 
 ```go
-// mnemonic-enricher
+// the enricher service
 embeddingSvc := openaisvc.NewEmbeddingService(cfg.OpenAI)
 extractionSvc := openaisvc.NewExtractionService(cfg.OpenAI)
 enrichmentSvc := enrichmentsvc.New(
@@ -1157,8 +1159,8 @@ In the enricher, `queue.provider` must be `rabbitmq`; any other value fails star
 
 **Architecture Documents:**
 
-- [System Architecture](../architecture/system/02-system-architecture.md) - Component overview and data flow
-- [Data Architecture](../architecture/system/04-data-architecture.md) - Data model, transaction handling, cross-database consistency
+- [System Architecture](architecture/system/02-system-architecture.md) - Component overview and data flow
+- [Data Architecture](architecture/system/04-data-architecture.md) - Data model, transaction handling, cross-database consistency
 
 **Design Documents:**
 

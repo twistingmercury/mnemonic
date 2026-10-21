@@ -1,6 +1,6 @@
 # Data Architecture
 
-> Back to [System Architecture](README.md) | [Project README](../../../README.md)
+> Back to [System Architecture](README.md) | [Design Index](../../README.md)
 
 ## Table of Contents
 
@@ -90,11 +90,11 @@ flowchart LR
   enricher -->|"write graph<br/>(one write tx per pattern)"| neo4j
 ```
 
-| Service | PostgreSQL | Neo4j |
-| --- | --- | --- |
-| Admin API (`mnemonic-api`) | CRUD on `patterns`; insert/delete `pattern_chunks`; insert `enrichment_jobs`; chunk similarity search | Reads concepts and `RELATED_TO`; `DeletePattern` removes the node and its now-orphaned concepts. Never creates nodes or edges. |
-| Enricher (`mnemonic-enricher`) | Claims and updates `enrichment_jobs`; writes chunk embeddings and status; writes pattern enrichment status; deletes old completed/failed jobs | `SyncPattern`: merges `Pattern`, `Concept`, `MENTIONED_IN` and recomputes `RELATED_TO` in a single write transaction |
-| MCP Server (`mnemonic-mcp`) | Read-only: chunk similarity search, pattern lookups | Read-only: concepts and `RELATED_TO` |
+| Service                     | PostgreSQL                                                                                                                                    | Neo4j                                                                                                                          |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Admin API (api service)     | CRUD on `patterns`; insert/delete `pattern_chunks`; insert `enrichment_jobs`; chunk similarity search                                         | Reads concepts and `RELATED_TO`; `DeletePattern` removes the node and its now-orphaned concepts. Never creates nodes or edges. |
+| Enricher (enricher service) | Claims and updates `enrichment_jobs`; writes chunk embeddings and status; writes pattern enrichment status; deletes old completed/failed jobs | `SyncPattern`: merges `Pattern`, `Concept`, `MENTIONED_IN` and recomputes `RELATED_TO` in a single write transaction           |
+| MCP Server (mcp service)    | Read-only: chunk similarity search, pattern lookups                                                                                           | Read-only: concepts and `RELATED_TO`                                                                                           |
 
 ### Database Technology Stack
 
@@ -110,7 +110,7 @@ flowchart LR
 - Pattern chunks: sections of each pattern, split at `[//]: pattern` markers (used for embedding and semantic search)
 - Enrichment jobs: durable queue state for chunk embedding and graph sync
 
-**Planned, no schema yet:** `agents`, `skills`, `skill_files`, `pattern_agent_associations`. `mnemonic-dbs` has no migrations for them, and no service has code for them.
+**Planned, no schema yet:** `agents`, `skills`, `skill_files`, `pattern_agent_associations`. The `db/` component has no migrations for them, and no service has code for them.
 
 **Constraint Level:** ACID transactions, foreign keys with CASCADE deletes, NOT NULL constraints on required columns.
 
@@ -124,7 +124,7 @@ flowchart LR
 
 - Chunk embeddings: 2000-dimensional vectors generated from OpenAI text-embedding-3-large (Matryoshka truncation), stored in `pattern_chunks.embedding`. `openai.embedding_dimensions` defaults to 2000 in all three services.
 
-**Index Type:** HNSW on `pattern_chunks.embedding` (`vector_cosine_ops`), per the [mnemonic-dbs schema reference](../dbs/08-data-architecture.md#indexes).
+**Index Type:** HNSW on `pattern_chunks.embedding` (`vector_cosine_ops`), per the [database schema reference](../dbs/08-data-architecture.md#indexes).
 
 **Query Layer:** Native SQL with the `<=>` operator for cosine distance.
 
@@ -150,7 +150,7 @@ The planned `Agent` node and `RELEVANT_FOR` relationship have no schema (the Cyp
 
 #### Entity Relationship Diagram
 
-The three tables in the schema, which are all the services use. See also the [mnemonic-dbs ER diagram](../dbs/08-data-architecture.md#entity-relationship-diagram).
+The three tables in the schema, which are all the services use. See also the [database ER diagram](../dbs/08-data-architecture.md#entity-relationship-diagram).
 
 ```mermaid
 erDiagram
@@ -208,7 +208,7 @@ erDiagram
 
 #### Agents
 
-**Status:** Planned, not implemented. There is no `agents` table in `mnemonic-dbs`, and no service has an agent repository, endpoint, or query. The planned design is in [Data Storage Implementation](../../design/data-storage.md#jsonb-document-model).
+**Status:** Planned, not implemented. There is no `agents` table in `db/`, and no service has an agent repository, endpoint, or query. The planned design is in [Data Storage Implementation](../../data-storage.md#jsonb-document-model).
 
 #### Patterns
 
@@ -240,7 +240,7 @@ erDiagram
 
 #### Skills
 
-**Status:** Planned, not implemented. There are no `skills` or `skill_files` tables in `mnemonic-dbs`. See [Data Storage Implementation](../../design/data-storage.md#jsonb-document-model) for the planned design.
+**Status:** Planned, not implemented. There are no `skills` or `skill_files` tables in `db/`. See [Data Storage Implementation](../../data-storage.md#jsonb-document-model) for the planned design.
 
 #### Pattern Chunks
 
@@ -288,7 +288,7 @@ The enricher embeds `"<pattern name> | <tags> | <section title>\n\n<content>"` (
 | `completed_at` | TIMESTAMPTZ | YES | Set on success |
 | `created_at`, `updated_at` | TIMESTAMPTZ | NO | Application set |
 
-**Constraints (from mnemonic-dbs):** `enrichment_jobs_target_exclusive` requires exactly one of `pattern_id` and `chunk_id`; both FKs cascade on delete; partial unique indexes reject a second pending/processing job for the same chunk (`idx_enrichment_jobs_unique_pending_chunk`) or, for legacy jobs, the same pattern (`idx_enrichment_jobs_unique_pending`). The API maps that unique violation to `ErrJobAlreadyPending`.
+**Constraints (from `db/`):** `enrichment_jobs_target_exclusive` requires exactly one of `pattern_id` and `chunk_id`; both FKs cascade on delete; partial unique indexes reject a second pending/processing job for the same chunk (`idx_enrichment_jobs_unique_pending_chunk`) or, for legacy jobs, the same pattern (`idx_enrichment_jobs_unique_pending`). The API maps that unique violation to `ErrJobAlreadyPending`.
 
 **Lifecycle:**
 
@@ -314,7 +314,7 @@ stateDiagram-v2
 
 #### PostgreSQL Schema
 
-The schema is owned by `mnemonic-dbs` and baked into the `mnemonic-postgres` image; see [mnemonic-dbs Data Architecture](../dbs/08-data-architecture.md) and [Data Storage Implementation](../../design/data-storage.md#postgresql-migrations) for the DDL.
+The schema is owned by `db/` and baked into the `librarian-postgres` image; see [Database Images Data Architecture](../dbs/08-data-architecture.md) and [Data Storage Implementation](../../data-storage.md#postgresql-migrations) for the DDL.
 
 **Note:** Application manages `updated_at` timestamps on write. No database triggers.
 
@@ -589,13 +589,13 @@ If the graph query fails, the pattern is returned without `graph` and a warning 
 
 #### Schema Versioning
 
-**Migration Tool:** Docker entrypoint scripts. PostgreSQL migrations are `.up.sql` files applied via `docker-entrypoint-initdb.d` when the `mnemonic-postgres` container first starts. Neo4j migrations are `.cypher` files applied via `cypher-shell` during image build. Mnemonic services never manage DDL or run migrations. See [dbs ADR-001](../dbs/02-architectural-decisions.md) for the rationale behind this approach.
+**Migration Tool:** Docker entrypoint scripts. PostgreSQL migrations are `.up.sql` files applied via `docker-entrypoint-initdb.d` when the `librarian-postgres` container first starts. Neo4j migrations are `.cypher` files applied via `cypher-shell` during image build. Mnemonic services never manage DDL or run migrations. See [dbs ADR-001](../dbs/02-architectural-decisions.md) for the rationale behind this approach.
 
-**Location:** The migration files live in the separate `mnemonic-dbs` repository (`src/postgres/000001_*.up.sql` to `000006_*.up.sql`, `src/neo4j/001_*.cypher` to `003_*.cypher`). There are no `.down.sql` files. See [mnemonic-dbs Deployment Architecture](../dbs/05-deployment-architecture.md).
+**Location:** The migration files live in `db/` (`db/postgres/000001_*.up.sql` to `000006_*.up.sql`, `db/neo4j/001_*.cypher` to `003_*.cypher`). There are no `.down.sql` files. See [Database Images Deployment Architecture](../dbs/05-deployment-architecture.md).
 
 **Version Tracking:**
 
-Migration state is implicit in the Docker image tag — each image version contains a known set of migrations. The services currently pin `mnemonic-postgres:v1.0.0-dev` and `mnemonic-neo4j:v1.0.0-dev`. Rollback is accomplished by pulling a prior image tag.
+Migration state is implicit in the Docker image tag — each image version contains a known set of migrations. The services currently pin `librarian-postgres:v1.0.0-dev` and `librarian-neo4j:v1.0.0-dev`. Rollback is accomplished by pulling a prior image tag.
 
 #### Forward-Compatible Migrations
 
@@ -632,7 +632,7 @@ Migration state is implicit in the Docker image tag — each image version conta
 
 #### Rollback Procedures
 
-No down migrations are maintained. To roll back, point the services at a prior `mnemonic-postgres` / `mnemonic-neo4j` image tag:
+No down migrations are maintained. To roll back, point the services at a prior `librarian-postgres` / `librarian-neo4j` image tag:
 
 ```bash
 docker pull ghcr.io/twistingmercury/librarian-postgres:<previous-tag>
@@ -651,7 +651,7 @@ docker pull ghcr.io/twistingmercury/librarian-neo4j:<previous-tag>
 
 #### Index Strategies
 
-**PostgreSQL Indexes** (defined in mnemonic-dbs; the "Used by" column says which service query benefits):
+**PostgreSQL Indexes** (defined in `db/`; the "Used by" column says which service query benefits):
 
 | Index | Table | Column(s) | Type | Used by |
 | --- | --- | --- | --- | --- |

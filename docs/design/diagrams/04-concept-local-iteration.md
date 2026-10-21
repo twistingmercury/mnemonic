@@ -1,6 +1,6 @@
 # MVP 4
 
-> Back to [Project README](../../README.md)
+> Back to [Design Index](../README.md)
 
 MVP 4 introduces local Kubernetes deployment and explicit authentication/authorization controls.
 

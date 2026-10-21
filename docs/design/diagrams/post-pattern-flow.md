@@ -1,12 +1,12 @@
 # POST /v1/api/patterns — Activity Diagram
 
-> Back to [Project README](../../README.md)
+> Back to [Design Index](../README.md)
 
-Posting a pattern has two halves. `mnemonic-api` validates the request, writes the pattern, its chunks and one enrichment job per chunk in a single PostgreSQL transaction, publishes each job ID to the RabbitMQ `enrichment-jobs` queue, and returns `202 Accepted`. `mnemonic-enricher` then embeds each chunk and, after the pattern's last chunk is embedded, extracts concepts and syncs the Neo4j graph. For the end-to-end sequence across all components, see [System Architecture - Data Loading via Admin API](../architecture/system/02-system-architecture.md#data-loading-via-admin-api).
+Posting a pattern has two halves. The api service validates the request, writes the pattern, its chunks and one enrichment job per chunk in a single PostgreSQL transaction, publishes each job ID to the RabbitMQ `enrichment-jobs` queue, and returns `202 Accepted`. The enricher service then embeds each chunk and, after the pattern's last chunk is embedded, extracts concepts and syncs the Neo4j graph. For the end-to-end sequence across all components, see [System Architecture - Data Loading via Admin API](../architecture/system/02-system-architecture.md#data-loading-via-admin-api).
 
 ## API: request to 202 Accepted
 
-Source: `mnemonic-api` `src/internal/handlers/patterns/patterns.go` (`Create`), `src/internal/service/pattern/service.go` (`Create`, `insertChunksAndJobs`, `publishJob`), `src/internal/queue/rabbitmq/publisher.go` (`Publish`).
+Source: the api service `src/internal/api/handlers/patterns/patterns.go` (`Create`), `src/internal/api/service/pattern/service.go` (`Create`, `insertChunksAndJobs`, `publishJob`), `src/internal/api/queue/rabbitmq/publisher.go` (`Publish`).
 
 ```mermaid
 flowchart TD
@@ -60,7 +60,7 @@ flowchart TD
 
 ## Enricher: job to enriched pattern
 
-Source: `mnemonic-enricher` `src/internal/enricher/enrichment.go` (`Run`, `handleDelivery`, `handleRetry`), `src/internal/service/enrichment/service.go` (`processChunkJob`, `runGraphPipeline`), `src/internal/repository/enrichmentjob/repository.go` (`Start`, `ClaimDue`, `MarkFailed`).
+Source: the enricher service `src/internal/enricher/enrichment.go` (`Run`, `handleDelivery`, `handleRetry`), `src/internal/enricher/service/enrichment/service.go` (`processChunkJob`, `runGraphPipeline`), `src/internal/enricher/repository/enrichmentjob/repository.go` (`Start`, `ClaimDue`, `MarkFailed`).
 
 ```mermaid
 flowchart TD

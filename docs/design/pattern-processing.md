@@ -1,6 +1,6 @@
 # Pattern Enrichment
 
-> Back to [Design Documents](README.md) | [Project README](../../README.md)
+> Back to [Design Documents](README.md)
 
 ## Table of Contents
 
@@ -18,7 +18,7 @@
 
 ## Overview
 
-> **Architecture Reference:** [System Architecture - Mnemonic Enricher](../architecture/system/02-system-architecture.md#mnemonic-enricher) | [ADR-004: Pattern Storage and Enrichment Pipeline](../architecture/system/00-architectural-decisions.md#adr-004)
+> **Architecture Reference:** [System Architecture - Mnemonic Enricher](architecture/system/02-system-architecture.md#mnemonic-enricher) | [ADR-004: Pattern Storage and Enrichment Pipeline](architecture/system/00-architectural-decisions.md#adr-004)
 
 Pattern enrichment transforms raw pattern content into searchable, interconnected knowledge. When a pattern is created or updated, Mnemonic automatically enriches it to enable:
 
@@ -29,8 +29,8 @@ Enrichment data feeds all three MCP tools: `search_patterns` (chunk embeddings p
 
 The work is split across two services:
 
-- **`mnemonic-api`** validates the pattern, splits it into chunks, and writes the pattern, its chunks and one enrichment job per chunk in a single Postgres transaction. After commit it publishes each job ID to RabbitMQ.
-- **`mnemonic-enricher`** consumes the job IDs, embeds each chunk, and, when the last chunk of a pattern is embedded, extracts concepts from the whole pattern and syncs the Neo4j graph.
+- **The api service** validates the pattern, splits it into chunks, and writes the pattern, its chunks and one enrichment job per chunk in a single Postgres transaction. After commit it publishes each job ID to RabbitMQ.
+- **The enricher service** consumes the job IDs, embeds each chunk, and, when the last chunk of a pattern is embedded, extracts concepts from the whole pattern and syncs the Neo4j graph.
 
 This design is inspired by Cognee's cognify pipeline (chunk, classify, extract, integrate, summarize) but adapted for Mnemonic's simpler use case: patterns are already curated documents, not raw data requiring extensive preprocessing.
 
@@ -38,7 +38,7 @@ This design is inspired by Cognee's cognify pipeline (chunk, classify, extract, 
 
 ## Enrichment Model
 
-> **Architecture Reference:** [Communication Patterns - Response Structure](../architecture/system/03-communication-patterns.md#response-structure)
+> **Architecture Reference:** [Communication Patterns - Response Structure](architecture/system/03-communication-patterns.md#response-structure)
 
 Patterns include enrichment status fields to track processing state:
 
@@ -74,17 +74,17 @@ The pattern is `enriched` only when ALL its `pattern_chunks` rows are `enriched`
 
 ## Automatic Enrichment Flow
 
-> **Architecture Reference:** [System Architecture - Data Flow](../architecture/system/02-system-architecture.md#data-flow)
+> **Architecture Reference:** [System Architecture - Data Flow](architecture/system/02-system-architecture.md#data-flow)
 
 Enrichment is triggered automatically when a pattern is created or updated. The API responds immediately while enrichment processes asynchronously in the background.
 
 ```mermaid
 sequenceDiagram
     participant Client as Client (REST API)
-    participant API as mnemonic-api
+    participant API as api service
     participant PG as Postgres
     participant RMQ as RabbitMQ<br/>enrichment-jobs
-    participant Enricher as mnemonic-enricher
+    participant Enricher as enricher service
     participant OpenAI as OpenAI API
     participant Neo4j as Neo4j
 
@@ -131,7 +131,7 @@ Key characteristics:
 
 ### Create, Update and Delete in the API
 
-All three are in `mnemonic-api/src/internal/service/pattern/service.go`.
+All three are in `src/internal/api/service/pattern/service.go`.
 
 | Operation                        | Postgres (one transaction)                                                                                                                                                         | After commit                                                                                           |
 | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
@@ -143,7 +143,7 @@ Every update re-chunks and re-enriches the whole pattern, even when only metadat
 
 ## Enrichment Pipeline
 
-> **Architecture Reference:** [System Architecture - Mnemonic Enricher](../architecture/system/02-system-architecture.md#mnemonic-enricher) | [Concept](../concept.md)
+> **Architecture Reference:** [System Architecture - Mnemonic Enricher](architecture/system/02-system-architecture.md#mnemonic-enricher) | [Concept](concept.md)
 
 ### Write-time Enrichment
 
@@ -306,7 +306,7 @@ This LLM call adds 1-5 seconds of processing time per pattern, which is why enri
 
 #### Step 4: Create Relationships
 
-`GraphRepository.SyncPattern` (`mnemonic-enricher/src/internal/repository/graph/repository.go`) runs all graph writes for the pattern in **one Neo4j write transaction**, so a failure part way leaves the graph unchanged:
+`GraphRepository.SyncPattern` (`src/internal/enricher/repository/graph/repository.go`) runs all graph writes for the pattern in **one Neo4j write transaction**, so a failure part way leaves the graph unchanged:
 
 ```cypher
 // 1. Create/update the pattern node
@@ -419,17 +419,17 @@ Where `graph_score` would consider hop distance from matched patterns and shared
 
 ## Enrichment Worker Deployment
 
-> **Architecture Reference:** [Deployment Architecture - Component Deployment](../architecture/system/06-deployment-architecture.md#component-deployment) | [Deployment Architecture - Post-MVP](../architecture/system/06-deployment-architecture.md#post-mvp)
+> **Architecture Reference:** [Deployment Architecture - Component Deployment](architecture/system/06-deployment-architecture.md#component-deployment) | [Deployment Architecture - Post-MVP](architecture/system/06-deployment-architecture.md#post-mvp)
 
 ### Standalone Enrichment Service
 
-The enricher runs as an independent service (`mnemonic-enricher`) consuming messages from RabbitMQ. It is decoupled from the Admin API and MCP server; the only shared state is the databases.
+The enricher runs as an independent service (the enricher service) consuming messages from RabbitMQ. It is decoupled from the Admin API and MCP server; the only shared state is the databases.
 
 ```mermaid
 flowchart LR
-  api["mnemonic-api"] -->|"jobs (tx)"| pg[("PostgreSQL + PGVector")]
+  api["api service"] -->|"jobs (tx)"| pg[("PostgreSQL + PGVector")]
   api -->|"publish job_id"| rabbit[("RabbitMQ<br/>enrichment-jobs")]
-  rabbit -->|"consume, manual ack"| enricher["mnemonic-enricher"]
+  rabbit -->|"consume, manual ack"| enricher["enricher service"]
   enricher -->|"retry sweep 15s,<br/>maintenance 5m"| pg
   enricher -->|"embeddings, extraction"| openai["OpenAI API"]
   enricher -->|"store embeddings, status"| pg
@@ -517,7 +517,7 @@ Notes:
 
 ### Scaling
 
-Multiple `mnemonic-enricher` instances can run concurrently:
+Multiple enricher service instances can run concurrently:
 
 - RabbitMQ distributes messages across connected consumers automatically
 - Each instance processes jobs independently, up to `worker_count` at a time
@@ -537,7 +537,7 @@ Multiple `mnemonic-enricher` instances can run concurrently:
 
 ## External Service Dependencies
 
-> **Architecture Reference:** [Requirements - Scope Boundaries](../requirements.md#scope-boundaries) | [System Architecture - Boundary Definitions](../architecture/system/02-system-architecture.md#boundary-definitions)
+> **Architecture Reference:** [Requirements - Scope Boundaries](requirements.md#scope-boundaries) | [System Architecture - Boundary Definitions](architecture/system/02-system-architecture.md#boundary-definitions)
 
 Pattern enrichment requires external API calls for embedding generation and entity extraction. All three services read `openai.base_url` (default `https://api.openai.com/v1`); the clients append `/embeddings` or `/chat/completions`. Pointing it elsewhere is how the integration tests use an OpenAI stub.
 
@@ -583,7 +583,7 @@ Additional LLM providers (Anthropic, Azure OpenAI) can be added post-MVP if need
 
 ## Configuration Requirements
 
-> **Architecture Reference:** [Deployment Architecture - Operational Considerations](../architecture/system/06-deployment-architecture.md#operational-considerations)
+> **Architecture Reference:** [Deployment Architecture - Operational Considerations](architecture/system/06-deployment-architecture.md#operational-considerations)
 
 ### Required Environment Variables
 
@@ -594,7 +594,7 @@ LIBRARIAN_OPENAI_API_KEY=sk-...
 
 ### Application Configuration
 
-Configuration follows the patterns established in [configuration.md](configuration.md). Enricher settings relevant to enrichment, with their defaults (`mnemonic-enricher/src/internal/config/defaults.go`):
+Configuration follows the patterns established in [configuration.md](configuration.md). Enricher settings relevant to enrichment, with their defaults (`src/internal/enricher/config/defaults.go`):
 
 ```yaml
 openai:
@@ -677,7 +677,7 @@ The enricher bounds concurrency with `worker_count` and retries failed calls `re
 
 ## Deployment Requirements
 
-> **Architecture Reference:** [Deployment Architecture - Infrastructure Requirements](../architecture/system/06-deployment-architecture.md#infrastructure-requirements) | [Deployment Architecture - Deployment Topology](../architecture/system/06-deployment-architecture.md#deployment-topology)
+> **Architecture Reference:** [Deployment Architecture - Infrastructure Requirements](architecture/system/06-deployment-architecture.md#infrastructure-requirements) | [Deployment Architecture - Deployment Topology](architecture/system/06-deployment-architecture.md#deployment-topology)
 >
 > **Observability Reference:** [Enrichment Worker Observability](observability-implementation.md#enrichment-worker-observability) — metrics, tracing spans, and structured logging for the enrichment pipeline
 
@@ -712,18 +712,18 @@ Before deploying pattern enrichment, verify:
 
 ### Health Check Endpoint
 
-`GET /health` on the enricher (`src/internal/health/health.go`) checks PostgreSQL, Neo4j, and the OpenAI embedding and extraction models (the OpenAI checks have Warning severity). RabbitMQ is not part of the enricher's health check.
+`GET /health` on the enricher (`src/internal/enricher/health/health.go`) checks PostgreSQL, Neo4j, and the OpenAI embedding and extraction models (the OpenAI checks have Warning severity). RabbitMQ is not part of the enricher's health check.
 
 ## Internal Dependencies
 
-> **Architecture Reference:** [System Architecture - Mnemonic Enricher](../architecture/system/02-system-architecture.md#mnemonic-enricher)
+> **Architecture Reference:** [System Architecture - Mnemonic Enricher](architecture/system/02-system-architecture.md#mnemonic-enricher)
 
 ### PGVector Configuration
 
 Vector embeddings are stored in `pattern_chunks.embedding`, not `patterns.embedding`. The `patterns` table no longer has an `embedding` column.
 
 ```sql
--- mnemonic-dbs 000006_update_embedding_dimensions.up.sql (000005 created the
+-- db/ 000006_update_embedding_dimensions.up.sql (000005 created the
 -- column as vector(1536) with the same HNSW index)
 drop index if exists idx_pattern_chunks_embedding;
 
@@ -734,19 +734,19 @@ create index idx_pattern_chunks_embedding
     on pattern_chunks using hnsw (embedding vector_cosine_ops);
 ```
 
-The index uses pgvector's default build parameters (`m = 16`, `ef_construction = 64`). The column dimension must match `openai.embedding_dimensions` (default 2000); changing it needs a new migration in `mnemonic-dbs`.
+The index uses pgvector's default build parameters (`m = 16`, `ef_construction = 64`). The column dimension must match `openai.embedding_dimensions` (default 2000); changing it needs a new migration in `db/`.
 
 ### Neo4j Schema
 
 ```cypher
-// mnemonic-dbs src/neo4j/001_create_constraints.cypher
+// db/neo4j/001_create_constraints.cypher
 CREATE CONSTRAINT pattern_id_unique IF NOT EXISTS
 FOR (p:Pattern) REQUIRE p.id IS UNIQUE;
 
 CREATE CONSTRAINT concept_name_unique IF NOT EXISTS
 FOR (c:Concept) REQUIRE c.name IS UNIQUE;
 
-// mnemonic-dbs src/neo4j/003_create_indexes.cypher
+// db/neo4j/003_create_indexes.cypher
 CREATE INDEX pattern_name_index IF NOT EXISTS
 FOR (p:Pattern) ON (p.name);
 
@@ -766,7 +766,7 @@ There is no `Agent` constraint or index: the planned agent feature has no graph 
 
 ### Entity Extraction Prompt
 
-The enricher (`src/internal/service/openai/extraction.go`) sends a system message and a user message:
+The enricher (`src/internal/enricher/service/openai/extraction.go`) sends a system message and a user message:
 
 ```text
 [system]
@@ -787,8 +787,8 @@ Pattern content:
 
 ## References
 
-- [Architecture Overview](../architecture/system/README.md)
-- [System Architecture](../architecture/system/02-system-architecture.md) - Storage stack details
+- [Architecture Overview](architecture/system/README.md)
+- [System Architecture](architecture/system/02-system-architecture.md) - Storage stack details
 - [Service Layer](service-layer.md) - Service and repository interfaces behind this pipeline
 - Mnemonic OpenAPI Spec (mnemonic-v1.yaml, in source repository) - Full API definition
 

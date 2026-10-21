@@ -1,10 +1,10 @@
 # Mnemonic Design Change Log
 
-> Back to [Design Documents](README.md) | [Project README](../../README.md)
+> Back to [Design Documents](README.md)
 
 This document tracks changes to design documents when implementation differs from original design. Each entry explains what changed and why.
 
-> **Architecture Reference:** [Observability Architecture](../architecture/system/07-observability-architecture.md) | [Deployment Architecture](../architecture/system/06-deployment-architecture.md)
+> **Architecture Reference:** [Observability Architecture](architecture/system/07-observability-architecture.md) | [Deployment Architecture](architecture/system/06-deployment-architecture.md)
 
 ## Table of Contents
 
@@ -24,13 +24,13 @@ Each entry includes:
 
 ## Change Log
 
-### 2026-10-16: MCP Server on Protocol 2026-07-28 (mnemonic-mcp v0.5.0)
+### 2026-10-16: MCP Server on Protocol 2026-07-28 (the mcp service v0.5.0)
 
 **Design Documents**: `mcp-server.md`, `../architecture/mnemonic/08-mcp-tools.md`, `../architecture/system/07-observability-architecture.md`
 
 - **Original**: Clients sent `initialize`, then `tools/list` and `tools/call`; the server advertised `logging` and `tools.listChanged`; any `Origin` was accepted; tool spans were always children of the `/mcp` HTTP span
 - **Implementation**: Sessionless 2026-07-28 requests (`_meta` plus `MCP-Protocol-Version`, `Mcp-Method`, `Mcp-Name`), `server/discover`, capabilities `{"tools":{}}`, a one-hour `tools/list` cache hint, 403 for cross-origin browser requests, and `_meta.traceparent` parenting the tool span; older clients still use `initialize`
-- **Justification**: The MCP specification revision 2026-07-28 removes the handshake and sessions, deprecates logging, and requires servers to validate `Origin`; go-sdk v1.8.0 implements the protocol and `mnemonic-mcp` closes the remaining gaps
+- **Justification**: The MCP specification revision 2026-07-28 removes the handshake and sessions, deprecates logging, and requires servers to validate `Origin`; go-sdk v1.8.0 implements the protocol and the mcp service closes the remaining gaps
 
 ### 2026-10-15: Service Layer, Enrichment and MCP Docs Aligned with v0.4.0 Code
 
@@ -45,7 +45,7 @@ Each entry includes:
 #### 2. Per-Service Packages
 
 - **Original**: One set of service interfaces described as if shared, including an `EnrichmentService` in the API
-- **Implementation**: Each repo carries only what it uses. API: `pattern.Service` (creates jobs and publishes them itself), `search.Service`; MCP: read-only `search.Service` and `pattern.Service` structs; enricher: `enrichment.Service`. Dead code (the MCP enricher and write paths, the enricher's MCP and search packages) was removed.
+- **Implementation**: Each service carries only what it uses. API: `pattern.Service` (creates jobs and publishes them itself), `search.Service`; MCP: read-only `search.Service` and `pattern.Service` structs; enricher: `enrichment.Service`. Dead code (the MCP enricher and write paths, the enricher's MCP and search packages) was removed.
 - **Justification**: Dead-code removal in v0.4.0; the docs no longer describe packages that do not exist.
 
 #### 3. Chunking and Enrichment Jobs
@@ -71,7 +71,7 @@ Each entry includes:
 - **Removed:** Routing engine, routing rules, ACE CLI
 - **Added:** MCP server for Claude Code integration, skills storage, Admin REST API
 - **Changed:** Mnemonic's focus from agent routing to team knowledge graph + tooling synchronization
-- **See:** Pivot Proposal (2026-02-14-mnemonic-pivot-knowledge-sync.md, in source repository), [ADR-008](../architecture/system/00-architectural-decisions.md)
+- **See:** Pivot Proposal (2026-02-14-mnemonic-pivot-knowledge-sync.md, in source repository), [ADR-008](architecture/system/00-architectural-decisions.md)
 
 ### 2026-01-28: Phase 3 Observability Implementation
 

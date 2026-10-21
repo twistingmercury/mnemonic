@@ -1,6 +1,6 @@
 # Communication Patterns
 
-> Back to [System Architecture](README.md) | [Project README](../../../README.md)
+> Back to [System Architecture](README.md) | [Design Index](../../README.md)
 
 ## Table of Contents
 
@@ -128,9 +128,9 @@ Claude Code must handle MCP server errors gracefully.
 
 ## Admin to REST API Communication
 
-Admin tools (Admin UI, curl, scripts) communicate with Mnemonic via the REST API under `/v1/api` on port 8080. The REST API manages patterns only: `POST`/`GET /patterns`, `GET /patterns/search`, `GET`/`PUT`/`DELETE /patterns/:id`, and `GET /patterns/:id/chunks`. Swagger UI is served at `/swagger/index.html`.
+Admin tools (Admin UI, curl, scripts) communicate with Mnemonic via the REST API under `/v1/api` on port 8080. The REST API manages patterns only: `POST`/`GET /patterns`, `GET /patterns/search`, `GET`/`PUT`/`DELETE /patterns/:id`, and `GET /patterns/:id/chunks`. Swagger UI is served at `/swagger/index.html`. The admin UI is not part of this repository for now.
 
-> **API Reference:** <!-- design docs remain in mnemonic-api/docs/design/ -->
+> **API Reference:** <!-- design docs live in docs/design/ -->
 
 ### Admin Operations
 

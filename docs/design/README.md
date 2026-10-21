@@ -1,10 +1,8 @@
 # Design Documents
 
-> Back to [Project README](../../README.md)
+Implementation-level design documents covering cross-cutting concerns shared by the Go services (the mcp, api and enricher services under `src/`). These docs describe _how_ things are built. For _what_ and _why_, see the [architecture documents](architecture/system/README.md).
 
-Implementation-level design documents covering cross-cutting concerns shared by the Go services (`mnemonic-mcp`, `mnemonic-api`, `mnemonic-enricher`). These docs describe _how_ things are built. For _what_ and _why_, see the [architecture documents](../architecture/).
-
-All design docs assume familiarity with the [System Architecture](../architecture/system/README.md) and [Requirements](../requirements.md).
+All design docs assume familiarity with the [System Architecture](architecture/system/README.md) and [Requirements](requirements.md).
 
 ## Recommended Reading Order
 
@@ -29,6 +27,14 @@ If you are new to the codebase, read the design docs in this order — each buil
 | [Pattern Processing](pattern-processing.md)                     | Enrichment pipeline: chunking, embeddings, entity extraction, Neo4j relationships, RabbitMQ dispatch, retry sweep, job lifecycle |
 | [Observability Implementation](observability-implementation.md) | OpenTelemetry integration, tracing, metrics, structured logging via zerolog                                                      |
 | [Design Changelog](design-changelog.md)                         | History of design decisions and iterations                                                                                       |
+
+## Other Documents
+
+- [What Is Mnemonic?](concept.md) and [Requirements](requirements.md), with the [Requirements Traceability Matrix](requirements-traceability.md)
+- [Architecture](architecture/system/README.md): system, communication, data, security, deployment and observability; database images under [architecture/dbs](architecture/dbs/README.md); MCP tools under [architecture/mnemonic](architecture/mnemonic/README.md)
+- [Diagrams](diagrams/01-concept-local-iteration.md): concept diagrams for each iteration, plus the POST activity diagram
+- [Glossary](reference/glossary.md) and [Pattern File Schema](reference/pattern-schema.md)
+- [From Coding Patterns to Any Knowledge](librarian_from_coding_patterns_to_any_knowledge.md): design direction for generalizing beyond coding patterns
 
 ---
 

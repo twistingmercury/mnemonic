@@ -1,8 +1,10 @@
 # Observability Implementation Design
 
-> Back to [Design Documents](README.md) | [Project README](../../README.md)
+> Back to [Design Documents](README.md)
 
-**Note:** This document describes the observability code as implemented in `mnemonic-api` (v0.5.0), `mnemonic-enricher` (v0.5.0) and `mnemonic-mcp` (v0.6.0). Earlier versions of this page carried long, hypothetical code listings (handler dependency structs, instrumented repository wrappers, cache and tooling metrics, otelx v1 APIs) that never matched the code; they have been replaced with the actual design and short excerpts. File paths are relative to each service's `src/` directory.
+**Code paths:** a path written as `internal/<dir>/...` is relative to the service's source directory, `src/internal/<service>/`. For example, `internal/metrics/tools.go` in the mcp service is `src/internal/mcp/metrics/tools.go`.
+
+**Note:** This document describes the observability code as implemented in the api service (v0.5.0), the enricher service (v0.5.0) and the mcp service (v0.6.0). Earlier versions of this page carried long, hypothetical code listings (handler dependency structs, instrumented repository wrappers, cache and tooling metrics, otelx v1 APIs) that never matched the code; they have been replaced with the actual design and short excerpts. File paths are relative to each service's `src/` directory.
 
 ## Table of Contents
 
@@ -22,9 +24,9 @@
 
 ## Overview
 
-> **Architecture Reference:** [Observability Architecture](../architecture/system/07-observability-architecture.md) | [Requirements](../requirements.md)
+> **Architecture Reference:** [Observability Architecture](architecture/system/07-observability-architecture.md) | [Requirements](requirements.md)
 
-This document provides the Go implementation design for MVP observability in Mnemonic, as defined in the [Observability Architecture](../architecture/system/07-observability-architecture.md). The architecture page lists every metric, span and health check; this page explains where in the code they come from and how they fit together.
+This document provides the Go implementation design for MVP observability in Mnemonic, as defined in the [Observability Architecture](architecture/system/07-observability-architecture.md). The architecture page lists every metric, span and health check; this page explains where in the code they come from and how they fit together.
 
 **MVP Scope (implemented):**
 
@@ -40,7 +42,7 @@ This document provides the Go implementation design for MVP observability in Mne
 
 ### Service Codebase Layout
 
-Each service repo follows the same `src/` layout. Observability-related packages:
+Each service follows the same `src/internal/<service>/` layout. Observability-related packages:
 
 ```text
 src/
@@ -67,7 +69,7 @@ src/
 
 ## otelx Package Integration
 
-> **Architecture Reference:** [Observability Architecture - Observability Stack](../architecture/system/07-observability-architecture.md#observability-stack)
+> **Architecture Reference:** [Observability Architecture - Observability Stack](architecture/system/07-observability-architecture.md#observability-stack)
 
 ### Package Capabilities
 
@@ -158,7 +160,7 @@ Consequences:
 
 ## Distributed Tracing Implementation
 
-> **Architecture Reference:** [Observability Architecture - Distributed Tracing](../architecture/system/07-observability-architecture.md#distributed-tracing)
+> **Architecture Reference:** [Observability Architecture - Distributed Tracing](architecture/system/07-observability-architecture.md#distributed-tracing)
 
 ### Trace Structure
 
@@ -215,7 +217,7 @@ if toolMetrics != nil {
 
 ### Trace Propagation Across RabbitMQ
 
-The API injects the producer span's context into the AMQP message headers; the enricher extracts it before starting the consumer span, so one trace covers the HTTP request, the publish and the enrichment. The end-to-end flow is drawn in [Observability Architecture - Distributed Tracing](../architecture/system/07-observability-architecture.md#distributed-tracing); the code-level hand-off is:
+The API injects the producer span's context into the AMQP message headers; the enricher extracts it before starting the consumer span, so one trace covers the HTTP request, the publish and the enrichment. The end-to-end flow is drawn in [Observability Architecture - Distributed Tracing](architecture/system/07-observability-architecture.md#distributed-tracing); the code-level hand-off is:
 
 ```mermaid
 sequenceDiagram
@@ -236,7 +238,7 @@ sequenceDiagram
     Note over W: Start consumer span<br/>"process enrichment-jobs"<br/>parent = producer span
 ```
 
-Producer side (`mnemonic-api/src/internal/queue/rabbitmq/publisher.go`):
+Producer side (`src/internal/api/queue/rabbitmq/publisher.go`):
 
 ```go
 msg := amqp.Publishing{
@@ -250,7 +252,7 @@ otel.GetTextMapPropagator().Inject(ctx, headerCarrier(msg.Headers))
 
 `headerCarrier` adapts `amqp.Table` to `propagation.TextMapCarrier`. On a publish error the publisher waits `queue.rabbitmq.reconnect_delay`, reconnects once and retries with the same headers.
 
-Consumer side (`mnemonic-enricher/src/internal/enricher/enrichment.go`):
+Consumer side (`src/internal/enricher/enricher/enrichment.go`):
 
 ```go
 ctx := otel.GetTextMapPropagator().Extract(drainCtx, propagation.MapCarrier(d.Headers))
@@ -278,7 +280,7 @@ Attributes follow OpenTelemetry semantic conventions where they exist (`messagin
 
 ## Metrics Implementation
 
-> **Architecture Reference:** [Observability Architecture - Metrics](../architecture/system/07-observability-architecture.md#metrics)
+> **Architecture Reference:** [Observability Architecture - Metrics](architecture/system/07-observability-architecture.md#metrics)
 
 ### Metrics Categories
 
@@ -328,7 +330,7 @@ Not implemented. Agent and skill tooling metrics belonged to the pre-pivot desig
 
 ## Enrichment Worker Observability
 
-> **Architecture Reference:** [Observability Architecture - Metrics](../architecture/system/07-observability-architecture.md#metrics) | [Pattern Processing](pattern-processing.md)
+> **Architecture Reference:** [Observability Architecture - Metrics](architecture/system/07-observability-architecture.md#metrics) | [Pattern Processing](pattern-processing.md)
 
 The enricher's `Worker` (`internal/enricher/enrichment.go`) gives every unit of work, whether a queue delivery or a job claimed by the retry sweep, exactly one span and one metrics record. Both paths end in `finish()`:
 
@@ -412,11 +414,11 @@ The publish failures counter is created next to its use, inside the RabbitMQ pub
 
 ## Structured Logging Implementation
 
-> **Architecture Reference:** [Observability Architecture - Structured Logging](../architecture/system/07-observability-architecture.md#structured-logging)
+> **Architecture Reference:** [Observability Architecture - Structured Logging](architecture/system/07-observability-architecture.md#structured-logging)
 
 ### Using otelx Gin Middleware
 
-The MCP server and enricher use the otelx Gin logging middleware. From `internal/server/server.go` (mnemonic-mcp; the enricher is the same):
+The MCP server and enricher use the otelx Gin logging middleware. From `src/internal/mcp/server/server.go` (the mcp service; the enricher is the same):
 
 ```go
 func setupRouter(tel *otelx.Telemetry) *gin.Engine {
@@ -507,7 +509,7 @@ Every line has the fields otelx adds (`service`, `version`, `environment`, `time
 
 ## Handler Instrumentation Patterns
 
-> **Architecture Reference:** [System Architecture - Component Breakdown](../architecture/system/02-system-architecture.md#component-breakdown) | [Observability Architecture - Key Takeaways](../architecture/system/07-observability-architecture.md#key-takeaways)
+> **Architecture Reference:** [System Architecture - Component Breakdown](architecture/system/02-system-architecture.md#component-breakdown) | [Observability Architecture - Key Takeaways](architecture/system/07-observability-architecture.md#key-takeaways)
 
 ### Handler Dependencies
 
@@ -542,7 +544,7 @@ No per-handler registration is needed. Middleware is attached once in `setupRout
 
 ## Database Instrumentation
 
-> **Architecture Reference:** [Observability Architecture - Metrics](../architecture/system/07-observability-architecture.md#metrics)
+> **Architecture Reference:** [Observability Architecture - Metrics](architecture/system/07-observability-architecture.md#metrics)
 
 ### Postgres/PGVector Instrumentation
 
@@ -600,9 +602,9 @@ Postgres pool metrics come from `otelpgx.RecordStats` (acquired, idle and total 
 
 ## Health Check Implementation
 
-> **Architecture Reference:** [Observability Architecture - Health Check Endpoint](../architecture/system/07-observability-architecture.md#health-check-endpoint)
+> **Architecture Reference:** [Observability Architecture - Health Check Endpoint](architecture/system/07-observability-architecture.md#health-check-endpoint)
 
-Mnemonic uses [`github.com/twistingmercury/heartbeat/v2`](https://github.com/twistingmercury/heartbeat) for health checks. Every service registers `GET /health` and `GET /version` on its main HTTP server (`server.port`, default 8080). The response shape (`status`, `name`, `resource`, `machine`, `utc_date_time`, `request_duration_ms`, `dependencies`) and the per-service checks are shown in the [architecture page](../architecture/system/07-observability-architecture.md#health-check-endpoint).
+Mnemonic uses [`github.com/twistingmercury/heartbeat/v2`](https://github.com/twistingmercury/heartbeat) for health checks. Every service registers `GET /health` and `GET /version` on its main HTTP server (`server.port`, default 8080). The response shape (`status`, `name`, `resource`, `machine`, `utc_date_time`, `request_duration_ms`, `dependencies`) and the per-service checks are shown in the [architecture page](architecture/system/07-observability-architecture.md#health-check-endpoint).
 
 ### Heartbeat Integration
 
@@ -619,7 +621,7 @@ func SetupHandlers(r *gin.Engine, deps []heartbeat.DependencyDescriptor) {
 
 ### Dependency Registration
 
-`health.Descriptors(health.Dependencies{...})` in `internal/health/health.go` is called after the database connections are open, and its result is passed to `operations.SetupHandlers`. It builds `heartbeat.DependencyDescriptor` values with a `CheckFunc` and a 3-second `Timeout` each (condensed from mnemonic-api):
+`health.Descriptors(health.Dependencies{...})` in `src/internal/api/health/health.go` is called after the database connections are open, and its result is passed to `operations.SetupHandlers`. It builds `heartbeat.DependencyDescriptor` values with a `CheckFunc` and a 3-second `Timeout` each (condensed from the api service):
 
 ```go
 descriptors = []heartbeat.DependencyDescriptor{

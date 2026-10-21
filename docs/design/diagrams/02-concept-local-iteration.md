@@ -1,6 +1,6 @@
 # MVP 2
 
-> Back to [Project README](../../README.md)
+> Back to [Design Index](../README.md)
 
 Iteration 2 decomposes the local runtime and introduces async enrichment:
 

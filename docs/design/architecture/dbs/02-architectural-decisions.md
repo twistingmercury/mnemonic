@@ -1,6 +1,6 @@
-# mnemonic-dbs — Architectural Decisions
+# Database Images — Architectural Decisions
 
-> Back to [Database Architecture](README.md) | [Project README](../../../README.md)
+> Back to [Database Architecture](README.md) | [Design Index](../../README.md)
 
 ## Table of Contents
 
@@ -20,12 +20,12 @@ Each architectural decision is recorded as an ADR with the following structure:
 
 ## Decision Summary
 
-| ADR #   | Title                                                            | Status   | Date       |
-| ------- | ---------------------------------------------------------------- | -------- | ---------- |
-| ADR-001 | Pre-seeded images over runtime migration tooling                 | Accepted | 2026-03-19 |
-| ADR-002 | Separate repo from application code                              | Accepted | 2026-03-19 |
-| ADR-003 | docker-entrypoint-initdb.d for Postgres; docker commit for Neo4j | Accepted | 2026-03-19 |
-| ADR-004 | Neo4j Community Edition only                                     | Accepted | 2026-03-19 |
+| ADR #   | Title                                                            | Status     | Date       |
+| ------- | ---------------------------------------------------------------- | ---------- | ---------- |
+| ADR-001 | Pre-seeded images over runtime migration tooling                 | Accepted   | 2026-03-19 |
+| ADR-002 | Separate repo from application code                              | Superseded | 2026-03-19 |
+| ADR-003 | docker-entrypoint-initdb.d for Postgres; docker commit for Neo4j | Accepted   | 2026-03-19 |
+| ADR-004 | Neo4j Community Edition only                                     | Accepted   | 2026-03-19 |
 
 ## Decisions
 
@@ -58,15 +58,15 @@ _Negative:_
 
 ### ADR-002: Separate repo from application code
 
-**Status:** Accepted
+**Status:** Superseded (monorepo, 2026-10-21): the component now lives in `db/` in the Librarian monorepo. The text below is the original decision, kept as history.
 
 **Context:**
 
-The database schema was originally embedded inside the `mnemonic` application repo under `src/migrations/`. With `mnemonic-api` splitting out as a separate service, both application repos would need to share or duplicate migration files. Keeping schema in an application repo also couples schema release cadence to application release cadence.
+The database schema was originally embedded inside the `mnemonic` application repo under `src/migrations/`. With the api service splitting out as a separate service, both application repos would need to share or duplicate migration files. Keeping schema in an application repo also couples schema release cadence to application release cadence.
 
 **Decision:**
 
-Extract schema into its own repo (`mnemonic-dbs`). All three application repos (`mnemonic-mcp`, `mnemonic-api`, `mnemonic-enricher`) pull the pre-built images from GHCR. Schema changes have their own PR, review, and CI pipeline.
+Extract schema into its own repo (`db/`). All three application repos (the mcp service, the api service, the enricher service) pull the pre-built images from GHCR. Schema changes have their own PR, review, and CI pipeline.
 
 **Consequences:**
 
@@ -74,11 +74,11 @@ _Positive:_
 
 - Schema changes are reviewed and deployed independently of application changes
 - No duplication of SQL/Cypher files across application repos
-- Clear ownership: `mnemonic-dbs` is the single source of truth for database schema
+- Clear ownership: `db/` is the single source of truth for database schema
 
 _Negative:_
 
-- Schema changes require a two-step deploy: update `mnemonic-dbs` first, then update image references in application repos
+- Schema changes require a two-step deploy: update `db/` first, then update image references in application repos
 - Adds a dependency between repos that must be coordinated
 
 ---

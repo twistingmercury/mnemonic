@@ -1,6 +1,6 @@
 # Security Architecture
 
-> Back to [System Architecture](README.md) | [Project README](../../../README.md)
+> Back to [System Architecture](README.md) | [Design Index](../../README.md)
 
 **MVP stance:** The Mnemonic services run in a trusted network environment without authentication ([SE-1](../../requirements.md#se-1)). The MCP interface is read-only ([SE-4](../../requirements.md#se-4)) and database credentials are injected from the runtime environment ([SE-6](../../requirements.md#se-6)). Apart from [Current State](#current-state-local-phase), this document describes the **planned** Post-MVP production security architecture; none of Envoy, OPA, JWT, API keys or identity headers is implemented.
 
@@ -28,19 +28,19 @@
 
 ## Current State (Local Phase)
 
-This is what the code does today (`mnemonic-api` v0.5.0, `mnemonic-enricher` v0.5.0, `mnemonic-mcp` v0.6.0). The phase is a trusted, local, single-user environment.
+This is what the code does today (the api service v0.5.0, the enricher service v0.5.0, the mcp service v0.6.0). The phase is a trusted, local, single-user environment.
 
-| Surface                                                               | Current behavior                                                                                                                                                               |
-| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| MCP `/mcp` on :8081 (`mnemonic-mcp`)                                  | No authentication. Streamable HTTP (MCP 2026-07-28), stateless, read-only tools only (`search_patterns`, `find_related_patterns`, `get_pattern`); cross-origin browser requests get 403 |
-| REST `/v1/api` and `/swagger` on :8080 (`mnemonic-api`)               | No authentication or authorization; any caller can create, update and delete patterns                                                                                          |
-| `/health`, `/version` on :8080 and `/metrics` on :9090 (all services) | Unauthenticated                                                                                                                                                                |
-| TLS                                                                   | None in process; the API removed `server.tls.*`, so TLS, if needed, terminates at a reverse proxy                                                                              |
-| Secrets                                                               | `openai.api_key`, PostgreSQL, Neo4j and RabbitMQ passwords come from config or `LIBRARIAN_*` environment variables (for example `LIBRARIAN_OPENAI_API_KEY`); none are hard-coded |
-| PostgreSQL                                                            | `database.postgres.ssl_mode`, default `prefer`                                                                                                                                 |
-| RabbitMQ                                                              | SASL PLAIN credentials passed separately from the connection URL                                                                                                               |
-| Error responses                                                       | Public 500 and 503 bodies use fixed messages; private logs redact upstream bodies, URLs and credential fields                                                                  |
-| Data sent off-host                                                    | Pattern content and search queries go to the OpenAI API (`openai.base_url`) for embeddings and concept extraction                                                              |
+| Surface                                                               | Current behavior                                                                                                                                                                        |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MCP `/mcp` on :8081 (mcp service)                                     | No authentication. Streamable HTTP (MCP 2026-07-28), stateless, read-only tools only (`search_patterns`, `find_related_patterns`, `get_pattern`); cross-origin browser requests get 403 |
+| REST `/v1/api` and `/swagger` on :8080 (api service)                  | No authentication or authorization; any caller can create, update and delete patterns                                                                                                   |
+| `/health`, `/version` on :8080 and `/metrics` on :9090 (all services) | Unauthenticated                                                                                                                                                                         |
+| TLS                                                                   | None in process; the API removed `server.tls.*`, so TLS, if needed, terminates at a reverse proxy                                                                                       |
+| Secrets                                                               | `openai.api_key`, PostgreSQL, Neo4j and RabbitMQ passwords come from config or `LIBRARIAN_*` environment variables (for example `LIBRARIAN_OPENAI_API_KEY`); none are hard-coded        |
+| PostgreSQL                                                            | `database.postgres.ssl_mode`, default `prefer`                                                                                                                                          |
+| RabbitMQ                                                              | SASL PLAIN credentials passed separately from the connection URL                                                                                                                        |
+| Error responses                                                       | Public 500 and 503 bodies use fixed messages; private logs redact upstream bodies, URLs and credential fields                                                                           |
+| Data sent off-host                                                    | Pattern content and search queries go to the OpenAI API (`openai.base_url`) for embeddings and concept extraction                                                                       |
 
 Everything below this section is planned.
 
@@ -311,7 +311,7 @@ graph TB
 
 ## Admin Authentication Flow (Post-MVP Only)
 
-> **Note:** This section describes authentication for the Admin REST API in Post-MVP (Production Deployment). MVP uses the Admin UI directly with no token-based authentication.
+> **Note:** This section describes authentication for the Admin REST API in Post-MVP (Production Deployment). MVP uses the Admin UI directly with no token-based authentication. The admin UI is not part of this repository for now.
 
 ### Device Code Flow
 

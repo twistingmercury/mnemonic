@@ -1,6 +1,6 @@
 # What Is Mnemonic?
 
-> Back to [Project README](../README.md)
+> Back to [Design Index](README.md)
 
 ## The problem it solves
 

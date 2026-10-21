@@ -1,6 +1,6 @@
 # Deployment Architecture
 
-> Back to [System Architecture](README.md) | [Project README](../../../README.md)
+> Back to [System Architecture](README.md) | [Design Index](../../README.md)
 
 ## Table of Contents
 
@@ -22,16 +22,15 @@
 
 Mnemonic deploys as six containers orchestrated by docker-compose. Three application services handle distinct responsibilities: read-only MCP serving, admin CRUD, and asynchronous enrichment. RabbitMQ decouples write-path operations from enrichment processing. The services call the OpenAI API for embeddings and concept extraction; Claude Code's own inference and tool execution happen on user workstations.
 
-The full six-container local stack is defined in `mnemonic-api`'s root `docker-compose.yaml`. Compose files in the repositories:
+The full six-container local stack is defined in `deploy/docker-compose.yaml`. Compose files in the monorepo:
 
-| File                                                        | Contents                                                                                                                                                            |
-| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mnemonic-api/docker-compose.yaml`                          | Local development: postgres, neo4j, rabbitmq, api (locally built `:latest`, host port 3000), mcp (`latest-dev`, host ports 8090/8091/9091), enricher (`latest-dev`) |
-| `mnemonic-mcp/docker-compose.yaml`                          | Local development: postgres, neo4j, rabbitmq, mcp (locally built, host ports 8081 and 9090), api (`latest-dev`, host port 8080); no enricher                        |
-| `<repo>/src/tests/docker-compose.yaml` (api, mcp, enricher) | Each service's E2E suite, run by `src/build/build.sh`, with an OpenAI stub in place of api.openai.com                                                               |
-| `mnemonic-integration-tests/docker-compose.yaml`            | Cross-service black-box tests: all three published `latest-dev` images, postgres, neo4j, rabbitmq and an OpenAI stub (`LIBRARIAN_OPENAI_BASE_URL`)                   |
+| File                                                              | Contents                                                                                                                                                   |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `deploy/docker-compose.yaml`                                      | Local stack: Envoy edges, OPA, Keycloak, the OpenAI egress proxy, postgres, neo4j, rabbitmq, and the api, mcp and enricher services (see the gateway docs) |
+| `tests/legacy/<service>/docker-compose.yaml` (api, mcp, enricher) | Former per-service E2E suites, kept under `tests/legacy/`, with an OpenAI stub in place of api.openai.com                                                  |
+| `tests/integration/docker-compose.yaml`                           | Cross-service black-box tests: all three published `latest-dev` images, postgres, neo4j, rabbitmq and an OpenAI stub (`LIBRARIAN_OPENAI_BASE_URL`)         |
 
-`mnemonic-enricher` has no root `docker-compose.yaml`.
+The enricher service has no compose file of its own; it runs from `deploy/docker-compose.yaml`.
 
 ```mermaid
 graph TB
@@ -42,16 +41,16 @@ graph TB
     end
 
     subgraph "Admin Tools"
-        ADMIN[Admin UI / curl]
+        ADMIN[Admin UI (not in this repo for now) / curl]
     end
 
     subgraph "Server Infrastructure (docker-compose)"
-        MCP[mnemonic-mcp<br/>MCP Server :8081<br/>health :8080, metrics :9090]
-        API[mnemonic-api<br/>Admin REST API :8080<br/>metrics :9090]
-        ENRICHER[mnemonic-enricher<br/>Enrichment Worker<br/>health :8080, metrics :9090]
+        MCP[mcp service<br/>MCP Server :8081<br/>health :8080, metrics :9090]
+        API[api service<br/>Admin REST API :8080<br/>metrics :9090]
+        ENRICHER[enricher service<br/>Enrichment Worker<br/>health :8080, metrics :9090]
         RMQ[rabbitmq<br/>:5672 / :15672]
-        PG[(mnemonic-postgres<br/>PostgreSQL + PGVector<br/>:5432)]
-        NEO[(mnemonic-neo4j<br/>Neo4j<br/>:7687)]
+        PG[(postgres<br/>PostgreSQL + PGVector<br/>:5432)]
+        NEO[(neo4j<br/>Neo4j<br/>:7687)]
     end
 
     OAI([OpenAI API])
@@ -71,16 +70,16 @@ graph TB
     MCP & API & ENRICHER --> OAI
 ```
 
-| Container         | Image                                                                                                  | Container ports                                                        | Role                   |
-| ----------------- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- | ---------------------- |
-| mnemonic-mcp      | ghcr.io/twistingmercury/librarian-mcp                                                                       | 8081 (`/mcp`), 8080 (`/health`, `/version`), 9090 (`/metrics`)         | MCP server (read-only) |
-| mnemonic-api      | ghcr.io/twistingmercury/librarian-api                                                                   | 8080 (`/v1/api`, `/swagger`, `/health`, `/version`), 9090 (`/metrics`) | Admin REST API         |
-| mnemonic-enricher | ghcr.io/twistingmercury/librarian-enricher                                                            | 8080 (`/health`, `/version`), 9090 (`/metrics`)                        | Enrichment worker      |
-| rabbitmq          | rabbitmq:3-management-alpine (api and integration-tests compose; mcp compose uses 4-management-alpine) | 5672/15672                                                             | Message queue          |
-| mnemonic-postgres | ghcr.io/twistingmercury/librarian-postgres:v1.0.0-dev                                                   | 5432                                                                   | PostgreSQL + PGVector  |
-| mnemonic-neo4j    | ghcr.io/twistingmercury/librarian-neo4j:v1.0.0-dev                                                      | 7687                                                                   | Neo4j                  |
+| Container        | Image                                                                                                  | Container ports                                                        | Role                   |
+| ---------------- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- | ---------------------- |
+| mcp service      | ghcr.io/twistingmercury/librarian-mcp                                                                  | 8081 (`/mcp`), 8080 (`/health`, `/version`), 9090 (`/metrics`)         | MCP server (read-only) |
+| api service      | ghcr.io/twistingmercury/librarian-api                                                                  | 8080 (`/v1/api`, `/swagger`, `/health`, `/version`), 9090 (`/metrics`) | Admin REST API         |
+| enricher service | ghcr.io/twistingmercury/librarian-enricher                                                             | 8080 (`/health`, `/version`), 9090 (`/metrics`)                        | Enrichment worker      |
+| rabbitmq         | rabbitmq:3-management-alpine (api and integration-tests compose; mcp compose uses 4-management-alpine) | 5672/15672                                                             | Message queue          |
+| postgres         | ghcr.io/twistingmercury/librarian-postgres:v1.0.0-dev                                                  | 5432                                                                   | PostgreSQL + PGVector  |
+| neo4j            | ghcr.io/twistingmercury/librarian-neo4j:v1.0.0-dev                                                     | 7687                                                                   | Neo4j                  |
 
-The application images are built `FROM scratch` and tagged from `develop`: `latest-dev` and `vX.Y.Z-dev` (for example `v0.4.0-dev`). Health checks run the binary with `--health`, which calls its own `/health`: the api image declares this as a Docker `HEALTHCHECK`, and the compose files declare it for all three services. Host port mappings differ per compose file (see the table above).
+The application images are built `FROM scratch` and tagged from `develop`: `latest-dev` and `vX.Y.Z-dev`. The version comes from the component's own tag (for example `api/v0.4.0` gives `v0.4.0-dev`). Health checks run the binary with `--health`, which calls its own `/health`: the api image declares this as a Docker `HEALTHCHECK`, and the compose files declare it for all three services. Host port mappings differ per compose file (see the table above).
 
 ### Deployment Topology
 
@@ -90,13 +89,13 @@ The application images are built `FROM scratch` and tagged from `develop`: `late
 graph TB
     subgraph "Client Tier"
         CC[Claude Code via MCP]
-        ADMIN[Admin UI / curl]
+        ADMIN[Admin UI (not in this repo for now) / curl]
     end
 
     subgraph "Application Tier"
-        MCP[mnemonic-mcp<br/>Read-Only MCP Server]
-        API[mnemonic-api<br/>Admin REST API]
-        ENRICHER[mnemonic-enricher<br/>Enrichment Worker]
+        MCP[mcp service<br/>Read-Only MCP Server]
+        API[api service<br/>Admin REST API]
+        ENRICHER[enricher service<br/>Enrichment Worker]
     end
 
     subgraph "Messaging Tier"
@@ -130,16 +129,16 @@ graph TB
         D1[Dev 1<br/>Claude Code MCP]
         D2[Dev 2<br/>Claude Code MCP]
         DN[Dev N<br/>Claude Code MCP]
-        ADMIN[Admin UI / curl]
+        ADMIN[Admin UI (not in this repo for now) / curl]
     end
 
     subgraph "Server Environment (docker-compose)"
-        MCP[mnemonic-mcp<br/>:8081]
-        API[mnemonic-api<br/>:8080]
-        ENRICHER[mnemonic-enricher]
+        MCP[mcp service<br/>:8081]
+        API[api service<br/>:8080]
+        ENRICHER[enricher service]
         RMQ[rabbitmq<br/>:5672 / :15672]
-        PG[(mnemonic-postgres<br/>:5432)]
-        NEO[(mnemonic-neo4j<br/>:7687)]
+        PG[(postgres<br/>:5432)]
+        NEO[(neo4j<br/>:7687)]
     end
 
     D1 -->|"MCP"| MCP
@@ -248,12 +247,12 @@ The server-side deployment consists of six containers running via docker-compose
 ```mermaid
 graph TB
     subgraph "MVP Deployment (docker-compose)"
-        MCP[mnemonic-mcp<br/>:8081]
-        API[mnemonic-api<br/>:8080]
-        ENRICHER[mnemonic-enricher]
+        MCP[mcp service<br/>:8081]
+        API[api service<br/>:8080]
+        ENRICHER[enricher service]
         RMQ[rabbitmq<br/>:5672 / :15672]
-        PG[(mnemonic-postgres<br/>:5432)]
-        NEO[(mnemonic-neo4j<br/>:7687)]
+        PG[(postgres<br/>:5432)]
+        NEO[(neo4j<br/>:7687)]
     end
 
     MCP --> PG
@@ -268,20 +267,20 @@ graph TB
 
 #### Client Requirements
 
-| Requirement       | MVP Local Deployment  |
-| ----------------- | --------------------- |
-| Claude Code       | Required              |
-| MCP Support       | Required              |
-| Anthropic API key | Via Claude Code       |
-| Network access    | To mnemonic-mcp :8081 |
+| Requirement       | MVP Local Deployment        |
+| ----------------- | --------------------------- |
+| Claude Code       | Required                    |
+| MCP Support       | Required                    |
+| Anthropic API key | Via Claude Code             |
+| Network access    | To the mcp service on :8081 |
 
 #### Admin Requirements
 
-| Requirement    | MVP Local Deployment        |
-| -------------- | --------------------------- |
-| HTTP client    | Required (Admin UI or curl) |
-| Network access | To mnemonic-api :8080       |
-| Authentication | None (trusted network)      |
+| Requirement    | MVP Local Deployment                                                           |
+| -------------- | ------------------------------------------------------------------------------ |
+| HTTP client    | Required (curl, or the admin UI, which is not part of this repository for now) |
+| Network access | To the api service on :8080                                                    |
+| Authentication | None (trusted network)                                                         |
 
 ### Operational Considerations
 
@@ -289,51 +288,51 @@ graph TB
 
 Key metrics to monitor:
 
-| Component         | Metrics                                                                                                                                 |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| mnemonic-mcp      | `http.server.request.duration` (otelgin), `mnemonic.mcp.tool_calls`, `mnemonic.mcp.tool_duration`, `mnemonic.patterns.query_latency` / `returned`      |
-| mnemonic-api      | `http.server.request.duration` (otelgin), `mnemonic.db.query_latency` / `query_errors`, `mnemonic.patterns.*`, `mnemonic.queue.publish_failures_total` |
-| mnemonic-enricher | `mnemonic.enrichment.jobs`, `mnemonic.enrichment.job_duration`, pending job age in `enrichment_jobs`                                    |
-| RabbitMQ          | Queue depth, message rates, consumer count                                                                                              |
-| Postgres          | Connection count, query latency, storage usage                                                                                          |
-| Neo4j             | Query latency, memory usage, connection count                                                                                           |
+| Component        | Metrics                                                                                                                                                |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| mcp service      | `http.server.request.duration` (otelgin), `mnemonic.mcp.tool_calls`, `mnemonic.mcp.tool_duration`, `mnemonic.patterns.query_latency` / `returned`      |
+| api service      | `http.server.request.duration` (otelgin), `mnemonic.db.query_latency` / `query_errors`, `mnemonic.patterns.*`, `mnemonic.queue.publish_failures_total` |
+| enricher service | `mnemonic.enrichment.jobs`, `mnemonic.enrichment.job_duration`, pending job age in `enrichment_jobs`                                                   |
+| RabbitMQ         | Queue depth, message rates, consumer count                                                                                                             |
+| Postgres         | Connection count, query latency, storage usage                                                                                                         |
+| Neo4j            | Query latency, memory usage, connection count                                                                                                          |
 
 #### Logging
 
 All application services emit structured logs with trace correlation via OpenTelemetry (see [Observability Architecture](07-observability-architecture.md)).
 
-| Component         | Log Focus                                       |
-| ----------------- | ----------------------------------------------- |
-| mnemonic-mcp      | Pattern searches, errors                        |
-| mnemonic-api      | CRUD operations, message publishing, errors     |
-| mnemonic-enricher | Enrichment processing, OpenAI API calls, errors |
+| Component        | Log Focus                                       |
+| ---------------- | ----------------------------------------------- |
+| mcp service      | Pattern searches, errors                        |
+| api service      | CRUD operations, message publishing, errors     |
+| enricher service | Enrichment processing, OpenAI API calls, errors |
 
 ### Independent Deployment Pipelines
 
-Each application service and the database images have independent CI/CD pipelines. Database migrations and application code are versioned and deployed independently.
+Each application service and the database images build and release independently. Database migrations and application code are versioned and deployed independently.
 
 ```mermaid
 graph TB
-    subgraph "Source Repositories"
-        MCP_SRC[mnemonic-mcp<br/>src/]
-        API_SRC[mnemonic-api<br/>src/]
-        ENR_SRC[mnemonic-enricher<br/>src/]
-        DBS_SRC[mnemonic-dbs<br/>postgres/ neo4j/]
+    subgraph "Monorepo (one repository)"
+        MCP_SRC["mcp: src/cmd/mcp, src/internal/mcp"]
+        API_SRC["api: src/cmd/api, src/internal/api"]
+        ENR_SRC["enricher: src/cmd/enricher, src/internal/enricher"]
+        DBS_SRC["db: postgres/ neo4j/"]
     end
 
-    subgraph "CI/CD Pipelines"
-        MCP_CI[mnemonic-mcp CI/CD<br/>Build, Test, Push to GHCR]
-        API_CI[mnemonic-api CI/CD<br/>Build, Test, Push to GHCR]
-        ENR_CI[mnemonic-enricher CI/CD<br/>Build, Test, Push to GHCR]
-        DBS_CI[mnemonic-dbs CI/CD<br/>Build, Test, Push to GHCR]
+    subgraph "Build and Release"
+        MCP_CI["mcp build, test, push<br/>(only when its inputs change)"]
+        API_CI["api build, test, push<br/>(only when its inputs change)"]
+        ENR_CI["enricher build, test, push<br/>(only when its inputs change)"]
+        DBS_CI["db build, test, push<br/>(only when db/ changes)"]
     end
 
     subgraph "Container Registry (GHCR)"
-        MCP_IMG[ghcr.io/.../mnemonic]
-        API_IMG[ghcr.io/.../mnemonic-api]
-        ENR_IMG[ghcr.io/.../mnemonic-enrichment]
-        PG_IMG[ghcr.io/.../mnemonic-postgres]
-        NEO_IMG[ghcr.io/.../mnemonic-neo4j]
+        MCP_IMG[ghcr.io/twistingmercury/librarian-mcp]
+        API_IMG[ghcr.io/twistingmercury/librarian-api]
+        ENR_IMG[ghcr.io/twistingmercury/librarian-enricher]
+        PG_IMG[ghcr.io/twistingmercury/librarian-postgres]
+        NEO_IMG[ghcr.io/twistingmercury/librarian-neo4j]
     end
 
     MCP_SRC --> MCP_CI --> MCP_IMG
@@ -343,28 +342,26 @@ graph TB
     DBS_SRC --> DBS_CI --> NEO_IMG
 ```
 
-Each Go service has one workflow in `.github/workflows` (`mnemonic-api-ci.yaml`, `mnemonic-enrichment-ci.yaml`, `mnemonic-ci.yaml` for mcp) that follows the pattern documented in the [Go CI/CD diagram](../../diagrams/example-go-ci-cd-diagram.md): `src/build/build.sh` builds the Docker image, runs quality gates and unit tests inside the build stage, and runs the E2E suite against `src/tests/docker-compose.yaml`. On a push to `develop` the workflow then pushes `latest-dev` and `<tag>-dev` (the latest git tag, for example `v0.4.0-dev`) to GHCR. Pull request builds run the same build and tests but never push, so `latest-dev` always matches `develop`. There is no `main` branch yet; `develop` is the trunk. Dependabot opens weekly grouped updates (gomod, docker, actions) against `develop`.
-
-`mnemonic-integration-tests` (`integration-tests.yaml`) runs on pushes and PRs to `develop`, nightly, and on demand, against the published `latest-dev` images.
+Each component has its own build script (`build/<component>/<component>.build.sh` for the Go services, `db/postgres/build.sh` and `db/neo4j/build.sh` for the database images). Release tags are per component (`api/vX.Y.Z`, `mcp/vX.Y.Z`, `enricher/vX.Y.Z`, `db/vX.Y.Z`, `helm/vX.Y.Z`), so tagging one component does not build or publish another. CI workflows for the monorepo are not in the repository yet; the intended model is that a push to `develop` builds only the components whose inputs changed, and that pull request builds run the same build and tests without pushing. Dependabot configuration is also still to come.
 
 **Pipeline Summary:**
 
-| Pipeline             | Repository                 | Triggers On                                              | Produces                                      |
-| -------------------- | -------------------------- | -------------------------------------------------------- | --------------------------------------------- |
-| mnemonic-mcp CI      | mnemonic-mcp               | `src/` changes (code, build, tests), workflow file       | `ghcr.io/twistingmercury/librarian-mcp`            |
-| mnemonic-api CI      | mnemonic-api               | `src/` changes, root compose and Makefile, workflow file | `ghcr.io/twistingmercury/librarian-api`        |
-| mnemonic-enricher CI | mnemonic-enricher          | `src/` changes (code, build, tests), workflow file       | `ghcr.io/twistingmercury/librarian-enricher` |
-| Integration Tests    | mnemonic-integration-tests | push/PR to `develop`, nightly                            | Pass/fail only (no image)                     |
-| mnemonic-dbs CI/CD   | mnemonic-dbs               | `postgres/` or `neo4j/` changes                          | Database images                               |
+| Pipeline          | Location                                    | Triggers On                                                                     | Produces                                     |
+| ----------------- | ------------------------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------- |
+| mcp build         | `src/cmd/mcp`, `src/internal/mcp`           | changes to its Go dependencies, `build/mcp/`, `src/go.mod` or `src/go.sum`      | `ghcr.io/twistingmercury/librarian-mcp`      |
+| api build         | `src/cmd/api`, `src/internal/api`           | changes to its Go dependencies, `build/api/`, `src/go.mod` or `src/go.sum`      | `ghcr.io/twistingmercury/librarian-api`      |
+| enricher build    | `src/cmd/enricher`, `src/internal/enricher` | changes to its Go dependencies, `build/enricher/`, `src/go.mod` or `src/go.sum` | `ghcr.io/twistingmercury/librarian-enricher` |
+| Integration Tests | `tests/integration`                         | push/PR to `develop`, nightly                                                   | Pass/fail only (no image)                    |
+| db build          | `db/`                                       | changes under `db/postgres/` or `db/neo4j/`                                     | Database images                              |
 
 **Why Independent Pipelines?**
 
-| Scenario           | Without Separation              | With Separation                |
-| ------------------ | ------------------------------- | ------------------------------ |
-| MCP query bug fix  | Rebuilds all services           | Only mnemonic-mcp deploys      |
-| New admin endpoint | Rebuilds MCP and enricher too   | Only mnemonic-api deploys      |
-| Schema migration   | Rebuilds all application images | Only database images rebuild   |
-| Enricher tuning    | Touches unrelated services      | Only mnemonic-enricher deploys |
+| Scenario           | Without Separation              | With Separation                   |
+| ------------------ | ------------------------------- | --------------------------------- |
+| MCP query bug fix  | Rebuilds all services           | Only the mcp service deploys      |
+| New admin endpoint | Rebuilds MCP and enricher too   | Only the api service deploys      |
+| Schema migration   | Rebuilds all application images | Only database images rebuild      |
+| Enricher tuning    | Touches unrelated services      | Only the enricher service deploys |
 
 **Deployment Order for Breaking Changes:**
 
@@ -391,7 +388,7 @@ Move stateful infrastructure to AWS managed services while keeping application s
 - Replace local Neo4j with AWS Neptune
 - Replace local RabbitMQ with AWS SQS
 
-Application services (mnemonic-mcp, mnemonic-api, mnemonic-enricher) remain local. This validates cloud data-tier connectivity without changing the application runtime.
+Application services (mcp, api and enricher services) remain local. This validates cloud data-tier connectivity without changing the application runtime.
 
 See [MVP 3 concept diagram](../../diagrams/03-concept-local-iteration.md).
 

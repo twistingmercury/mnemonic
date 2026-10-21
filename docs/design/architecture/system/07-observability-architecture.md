@@ -1,6 +1,6 @@
 # Observability Architecture
 
-> Back to [System Architecture](README.md) | [Project README](../../../README.md)
+> Back to [System Architecture](README.md) | [Design Index](../../README.md)
 
 ## Table of Contents
 
@@ -51,7 +51,7 @@ MVP instruments each service with OpenTelemetry through the [`otelx`](https://gi
 
 **Why this first:** Proper instrumentation is the foundation. Once the application emits telemetry correctly, the collection and visualization infrastructure can be added without code changes.
 
-For the Go implementation (packages, middleware order, exact attributes), see [Observability Implementation Design](../../design/observability-implementation.md). For the configuration keys, see [Configuration](../../design/configuration.md#configuration-reference).
+For the Go implementation (packages, middleware order, exact attributes), see [Observability Implementation Design](../../observability-implementation.md). For the configuration keys, see [Configuration](../../configuration.md#configuration-reference).
 
 ### Metrics
 
@@ -203,10 +203,10 @@ Writing a pattern produces one trace that crosses RabbitMQ. The API commits the 
 ```mermaid
 sequenceDiagram
     participant C as Client
-    participant API as mnemonic-api
+    participant API as api service
     participant PG as Postgres
     participant MQ as RabbitMQ<br/>queue enrichment-jobs
-    participant ENR as mnemonic-enricher
+    participant ENR as enricher service
     participant N4J as Neo4j
 
     C->>API: POST /v1/api/patterns<br/>(traceparent optional)

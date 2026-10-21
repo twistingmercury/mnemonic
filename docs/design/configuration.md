@@ -1,6 +1,6 @@
 # Mnemonic Server Configuration
 
-> Back to [Design Documents](README.md) | [Project README](../../README.md)
+> Back to [Design Documents](README.md)
 
 ## Table of Contents
 
@@ -9,9 +9,9 @@
   - [Precedence Rules](#precedence-rules)
   - [Loading Behavior](#loading-behavior)
 - [Configuration File](#configuration-file)
-  - [MCP Server](#mcp-server-mnemonic-mcp)
-  - [Admin API](#admin-api-mnemonic-api)
-  - [Enricher](#enricher-mnemonic-enricher)
+  - [MCP Server](#mcp-server-mcp-service)
+  - [Admin API](#admin-api-api-service)
+  - [Enricher](#enricher-enricher-service)
 - [Environment Variables](#environment-variables)
 - [OpenTelemetry Standard Variables](#opentelemetry-standard-variables)
 - [otelx Dependency](#otelx-dependency)
@@ -34,9 +34,9 @@
 
 [Table of Contents](#table-of-contents)
 
-> **Architecture Reference:** [System Architecture - Component Breakdown](../architecture/system/02-system-architecture.md#component-breakdown) | [Deployment Architecture - Component Deployment](../architecture/system/06-deployment-architecture.md#component-deployment)
+> **Architecture Reference:** [System Architecture - Component Breakdown](architecture/system/02-system-architecture.md#component-breakdown) | [Deployment Architecture - Component Deployment](architecture/system/06-deployment-architecture.md#component-deployment)
 
-Each Mnemonic service (`mnemonic-mcp`, `mnemonic-api`, `mnemonic-enricher`) uses the same layered configuration system built on Viper, but each service has its own `internal/config` package (`config.go` and `defaults.go`) that defines only the settings relevant to that service.
+Each Mnemonic service (the mcp service, the api service, the enricher service) uses the same layered configuration system built on Viper, but each service has its own `internal/config` package (`config.go` and `defaults.go`) that defines only the settings relevant to that service.
 
 The configuration system is built on [`github.com/spf13/viper`](https://github.com/spf13/viper). Viper provides unified support for multiple configuration sources with well-defined precedence. This design enables:
 
@@ -44,11 +44,11 @@ The configuration system is built on [`github.com/spf13/viper`](https://github.c
 - **File-based configuration**: Persistent settings in YAML format (via `viper.ReadInConfig()`)
 - **Environment overrides**: Container and CI/CD friendly (via `viper.AutomaticEnv()` with the `LIBRARIAN_` prefix)
 
-| Service             | Config Prefix | Config File                 | Service-specific sections             |
-| ------------------- | ------------- | --------------------------- | ------------------------------------- |
-| `mnemonic-mcp`      | `LIBRARIAN_`   | `/etc/mnemonic/config.yaml` | `mcp.*` (MCP endpoint on port 8081)   |
-| `mnemonic-api`      | `LIBRARIAN_`   | `/etc/mnemonic/config.yaml` | `queue.*` (publisher), `vocabulary.*` |
-| `mnemonic-enricher` | `LIBRARIAN_`   | `/etc/mnemonic/config.yaml` | `queue.*` (consumer), `enrichment.*`  |
+| Service          | Config Prefix | Config File                 | Service-specific sections             |
+| ---------------- | ------------- | --------------------------- | ------------------------------------- |
+| mcp service      | `LIBRARIAN_`  | `/etc/mnemonic/config.yaml` | `mcp.*` (MCP endpoint on port 8081)   |
+| api service      | `LIBRARIAN_`  | `/etc/mnemonic/config.yaml` | `queue.*` (publisher), `vocabulary.*` |
+| enricher service | `LIBRARIAN_`  | `/etc/mnemonic/config.yaml` | `queue.*` (consumer), `enrichment.*`  |
 
 All three share `server.*` (health/version HTTP server), `database.*`, `openai.*`, `logging.*` and `observability.*`.
 
@@ -86,11 +86,11 @@ Viper's `MergeInConfig()` is NOT used. Configuration is loaded with `ReadInConfi
 
 **Missing or broken files** (differs slightly per service):
 
-| Service             | No file found  | Selected file cannot be read or parsed                                                                  |
-| ------------------- | -------------- | ------------------------------------------------------------------------------------------------------- |
-| `mnemonic-api`      | Defaults + env | Always fatal, whether the file came from `--config`, `LIBRARIAN_CONFIG_FILE` or discovery                |
-| `mnemonic-enricher` | Defaults + env | Fatal only when set explicitly via `--config` or `LIBRARIAN_CONFIG_FILE`; a discovered file is ignored   |
-| `mnemonic-mcp`      | Defaults + env | Fatal only when set explicitly via `LIBRARIAN_CONFIG_FILE`; a discovered file is ignored                 |
+| Service          | No file found  | Selected file cannot be read or parsed                                                                 |
+| ---------------- | -------------- | ------------------------------------------------------------------------------------------------------ |
+| api service      | Defaults + env | Always fatal, whether the file came from `--config`, `LIBRARIAN_CONFIG_FILE` or discovery              |
+| enricher service | Defaults + env | Fatal only when set explicitly via `--config` or `LIBRARIAN_CONFIG_FILE`; a discovered file is ignored |
+| mcp service      | Defaults + env | Fatal only when set explicitly via `LIBRARIAN_CONFIG_FILE`; a discovered file is ignored               |
 
 After loading, every service validates the result and refuses to start if validation fails (see [Configuration Validation](#configuration-validation)).
 
@@ -98,13 +98,13 @@ After loading, every service validates the result and refuses to start if valida
 
 [Table of Contents](#table-of-contents)
 
-> **Architecture Reference:** [System Architecture - Component Breakdown](../architecture/system/02-system-architecture.md#component-breakdown) | [Deployment Architecture](../architecture/system/06-deployment-architecture.md#component-deployment)
+> **Architecture Reference:** [System Architecture - Component Breakdown](architecture/system/02-system-architecture.md#component-breakdown) | [Deployment Architecture](architecture/system/06-deployment-architecture.md#component-deployment)
 
 Each Mnemonic service reads configuration from its own YAML file. Each file contains only the settings relevant to that service. Every key is optional; the examples below show the compiled defaults (secrets left empty).
 
 **Default location**: `/etc/mnemonic/config.yaml` (production) or `./config.yaml` (development)
 
-### MCP Server (`mnemonic-mcp`)
+### MCP Server (mcp service)
 
 ```yaml
 server:                     # health/version HTTP server
@@ -163,7 +163,7 @@ observability:
     otlp_insecure: true
 ```
 
-### Admin API (`mnemonic-api`)
+### Admin API (api service)
 
 The `database` section is the same as for the MCP server. The API's `server` section has no `tls` block.
 
@@ -176,7 +176,7 @@ server:
   idle_timeout: "120s"
   shutdown_timeout: "5s"
 database:
-  # ... same keys and defaults as mnemonic-mcp
+  # ... same keys and defaults as mcp service
 queue:
   rabbitmq:
     host: "localhost"
@@ -210,15 +210,15 @@ observability:
     otlp_insecure: true
 ```
 
-### Enricher (`mnemonic-enricher`)
+### Enricher (enricher service)
 
-The `server` section matches `mnemonic-mcp` (including `tls`), and `database` matches both other services.
+The `server` section matches the mcp service (including `tls`), and `database` matches both other services.
 
 ```yaml
 server:
-  # ... same keys and defaults as mnemonic-mcp, port 8080 serves /health and /version
+  # ... same keys and defaults as mcp service, port 8080 serves /health and /version
 database:
-  # ... same keys and defaults as mnemonic-mcp
+  # ... same keys and defaults as mcp service
 queue:
   provider: "rabbitmq"      # only supported value
   rabbitmq:
@@ -274,7 +274,7 @@ All Mnemonic configuration options can be set via environment variables using th
 ```bash
 # Server and MCP endpoint
 export LIBRARIAN_SERVER_PORT="8080"
-export LIBRARIAN_MCP_PORT="8081"                 # mnemonic-mcp only
+export LIBRARIAN_MCP_PORT="8081"                 # the mcp service only
 
 # Database credentials (recommended for secrets)
 export LIBRARIAN_DATABASE_POSTGRES_PASSWORD="secret"
@@ -323,7 +323,7 @@ Mnemonic uses the `github.com/twistingmercury/otelx/v2` package (v2.0.0) to simp
 - **Zerolog-based structured logging**: JSON lines with trace correlation helpers (trace_id, span_id in log entries)
 - **Prometheus metrics exporter**: Its own registry and HTTP server on a configurable address and path, including Go runtime and process metrics
 - **Trace provider**: OTLP gRPC by default, or a supplied exporter (Mnemonic supplies one, see above); sets the W3C Trace Context and Baggage propagator globally
-- **Gin middleware** (`github.com/twistingmercury/otelx/middleware/gin/v2`): Request logging with trace correlation, used by `mnemonic-mcp` and `mnemonic-enricher`
+- **Gin middleware** (`github.com/twistingmercury/otelx/middleware/gin/v2`): Request logging with trace correlation, used by the mcp service and the enricher service
 
 The otelx package handles the complexity of OpenTelemetry SDK setup, allowing Mnemonic to focus on emitting telemetry rather than configuring exporters. For detailed implementation patterns using otelx, see [Observability Implementation Design](observability-implementation.md).
 
@@ -351,7 +351,7 @@ The keys live under `queue.rabbitmq` in both services. Credentials are sent via 
 
 [Table of Contents](#table-of-contents)
 
-The Services column shows which services define each key: **A** = `mnemonic-api`, **E** = `mnemonic-enricher`, **M** = `mnemonic-mcp`. Queue keys are listed under [RabbitMQ Configuration](#rabbitmq-configuration).
+The Services column shows which services define each key: **A** = the api service, **E** = the enricher service, **M** = the mcp service. Queue keys are listed under [RabbitMQ Configuration](#rabbitmq-configuration).
 
 | Setting                                         | Type     | Default                     | Environment Variable                                     | Services | Description                                                                                 |
 | ----------------------------------------------- | -------- | --------------------------- | -------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------- |
@@ -411,7 +411,7 @@ The Services column shows which services define each key: **A** = `mnemonic-api`
 
 > **Not implemented:** Rate limiting (`rate_limit.*`), a statement-logging switch (`observability.log_db_statements`), MCP session timeouts and enricher polling settings (`poll_interval`, `max_attempts`) appeared in earlier drafts of this document. None of them exist in code.
 >
-> **Removed from the API:** `logging.format`, `logging.include_caller`, `observability.health.enabled`, `observability.health.path`, `openai.extraction_model`, `openai.max_requests_per_minute` and `queue.provider` were validated by `mnemonic-api` but never used, and have been removed from it. Viper ignores them if they are still set. The health route is fixed at `/health`. The enricher still reads `openai.extraction_model` and `queue.provider`.
+> **Removed from the API:** `logging.format`, `logging.include_caller`, `observability.health.enabled`, `observability.health.path`, `openai.extraction_model`, `openai.max_requests_per_minute` and `queue.provider` were validated by the api service but never used, and have been removed from it. Viper ignores them if they are still set. The health route is fixed at `/health`. The enricher still reads `openai.extraction_model` and `queue.provider`.
 
 ## Environment Variable Naming Conventions
 
@@ -449,19 +449,19 @@ All Mnemonic environment variables use the `LIBRARIAN_` prefix with the followin
 Configuration files are searched in the following order; the first match wins:
 
 ```text
-1. --config flag (mnemonic-api and mnemonic-enricher)
+1. --config flag (the api service and the enricher service)
 2. $LIBRARIAN_CONFIG_FILE (if set)
 3. /etc/mnemonic/config.yaml (production)
 4. ./config.yaml (development)
 ```
 
-`mnemonic-enricher` takes `--config <path>`, which takes precedence over `LIBRARIAN_CONFIG_FILE`, along with `--version` and `--health`. `mnemonic-mcp` has no `--config` flag; its only command-line flags are `--version` and `--health`. `--version` prints to stdout. All three binaries support `--health`, which calls `http://localhost:<server.port>/health` and exits 0 only on HTTP 200 (overall status OK or Warning); it is used as the container `HEALTHCHECK`. Each service resolves `server.port` for `--health` from the same sources as the server, including the config file (the MCP server honours `LIBRARIAN_CONFIG_FILE` and the discovered files). The API and MCP server fail the probe if the port is outside 1-65535.
+The enricher service takes `--config <path>`, which takes precedence over `LIBRARIAN_CONFIG_FILE`, along with `--version` and `--health`. The mcp service has no `--config` flag; its only command-line flags are `--version` and `--health`. `--version` prints to stdout. All three binaries support `--health`, which calls `http://localhost:<server.port>/health` and exits 0 only on HTTP 200 (overall status OK or Warning); it is used as the container `HEALTHCHECK`. Each service resolves `server.port` for `--health` from the same sources as the server, including the config file (the MCP server honours `LIBRARIAN_CONFIG_FILE` and the discovered files). The API and MCP server fail the probe if the port is outside 1-65535.
 
 ## Viper Initialization
 
 [Table of Contents](#table-of-contents)
 
-The following is a condensed version of the loading code in `mnemonic-api/src/internal/config/config.go` (`Resolve` and `LoadWithFlags`). The enricher and MCP server do the same with `Resolve` and `Load`, differing only in the file-error handling described in [Loading Behavior](#loading-behavior). All config structs use `mapstructure` tags (not `yaml`, `json`, or `env` tags) because Viper's `Unmarshal()` delegates to the `mapstructure` library.
+The following is a condensed version of the loading code in `src/internal/api/config/config.go` (`Resolve` and `LoadWithFlags`). The enricher and MCP server do the same with `Resolve` and `Load`, differing only in the file-error handling described in [Loading Behavior](#loading-behavior). All config structs use `mapstructure` tags (not `yaml`, `json`, or `env` tags) because Viper's `Unmarshal()` delegates to the `mapstructure` library.
 
 ```go
 func Resolve(flags *pflag.FlagSet) (*viper.Viper, error) {
@@ -512,7 +512,7 @@ func LoadWithFlags(flags *pflag.FlagSet) (*MnemonicConfig, error) {
 
 [Table of Contents](#table-of-contents)
 
-> **Architecture Reference:** [Security Architecture - Token Storage](../architecture/system/01-security-architecture.md#token-storage) | [Communication Patterns - Security Considerations](../architecture/system/03-communication-patterns.md#security-considerations)
+> **Architecture Reference:** [Security Architecture - Token Storage](architecture/system/01-security-architecture.md#token-storage) | [Communication Patterns - Security Considerations](architecture/system/03-communication-patterns.md#security-considerations)
 
 ### Secrets Handling
 
@@ -547,7 +547,7 @@ export LIBRARIAN_DATABASE_POSTGRES_PASSWORD="secure-password"
 export LIBRARIAN_OPENAI_API_KEY="sk-openai-key"
 ```
 
-**Secret management integrations** (Post-MVP; see [Deployment Architecture](../architecture/system/06-deployment-architecture.md)):
+**Secret management integrations** (Post-MVP; see [Deployment Architecture](architecture/system/06-deployment-architecture.md)):
 
 - AWS Secrets Manager
 - HashiCorp Vault
@@ -886,9 +886,9 @@ classDiagram
 
 [Table of Contents](#table-of-contents)
 
-- [Architecture Overview](../architecture/system/README.md) - System context
-- [System Architecture](../architecture/system/02-system-architecture.md) - Component layout
-- [Deployment Architecture](../architecture/system/06-deployment-architecture.md) - Deployment environments
+- [Architecture Overview](architecture/system/README.md) - System context
+- [System Architecture](architecture/system/02-system-architecture.md) - Component layout
+- [Deployment Architecture](architecture/system/06-deployment-architecture.md) - Deployment environments
 - [Pattern Processing](pattern-processing.md) - OpenAI configuration for enrichment
 - [Observability Implementation](observability-implementation.md) - otelx integration details
 - [Viper](https://github.com/spf13/viper) - Configuration library used by Mnemonic

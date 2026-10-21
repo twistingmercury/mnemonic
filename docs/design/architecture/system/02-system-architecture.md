@@ -1,6 +1,6 @@
 # System Architecture
 
-> Back to [System Architecture](README.md) | [Project README](../../../README.md)
+> Back to [System Architecture](README.md) | [Design Index](../../README.md)
 
 ## Table of Contents
 
@@ -28,21 +28,21 @@
 
 Mnemonic uses a decomposed service architecture with three independent services communicating through a message queue and shared data stores.
 
-| Service    | Repository          | Image                                         | Ports                                                           | Role                                           |
-| ---------- | ------------------- | --------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------- |
-| MCP Server | `mnemonic-mcp`      | `ghcr.io/twistingmercury/librarian-mcp`            | 8081 `/mcp`, 8080 `/health` `/version`, 9090 `/metrics`         | Sole read-only MCP interface for Claude Code   |
-| Admin API  | `mnemonic-api`      | `ghcr.io/twistingmercury/librarian-api`        | 8080 `/v1/api` `/swagger` `/health` `/version`, 9090 `/metrics` | REST API for pattern CRUD and search           |
-| Enricher   | `mnemonic-enricher` | `ghcr.io/twistingmercury/librarian-enricher` | 8080 `/health` `/version`, 9090 `/metrics`                      | Standalone worker for async pattern enrichment |
+| Service    | Location           | Image                                        | Ports                                                           | Role                                           |
+| ---------- | ------------------ | -------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------- |
+| MCP Server | `src/cmd/mcp`      | `ghcr.io/twistingmercury/librarian-mcp`      | 8081 `/mcp`, 8080 `/health` `/version`, 9090 `/metrics`         | Sole read-only MCP interface for Claude Code   |
+| Admin API  | `src/cmd/api`      | `ghcr.io/twistingmercury/librarian-api`      | 8080 `/v1/api` `/swagger` `/health` `/version`, 9090 `/metrics` | REST API for pattern CRUD and search           |
+| Enricher   | `src/cmd/enricher` | `ghcr.io/twistingmercury/librarian-enricher` | 8080 `/health` `/version`, 9090 `/metrics`                      | Standalone worker for async pattern enrichment |
 
-All three services serve `/health` and `/version` on `server.port` (default 8080) and Prometheus metrics on `observability.metrics.port` (default 9090, path `/metrics`). Only `mnemonic-mcp` listens on 8081 (`mcp.port`).
+All three services serve `/health` and `/version` on `server.port` (default 8080) and Prometheus metrics on `observability.metrics.port` (default 9090, path `/metrics`). Only the mcp service listens on 8081 (`mcp.port`).
 
 ```mermaid
 flowchart LR
-    CC["Claude Code"] -- "Streamable HTTP<br/>POST /mcp :8081" --> MCP["mnemonic-mcp<br/>(read-only tools)"]
-    Admin["Admin UI / curl"] -- "REST /v1/api :8080" --> API["mnemonic-api"]
+    CC["Claude Code"] -- "Streamable HTTP<br/>POST /mcp :8081" --> MCP["mcp service<br/>(read-only tools)"]
+    Admin["Admin UI (not in this repo for now) / curl"] -- "REST /v1/api :8080" --> API["api service"]
     API -- "write pattern, chunks,<br/>enrichment jobs (one tx)" --> PG[("PostgreSQL<br/>+ pgvector")]
     API -- "publish job_id<br/>(traceparent header)" --> MQ[["RabbitMQ<br/>enrichment-jobs"]]
-    MQ -- consume --> ENR["mnemonic-enricher"]
+    MQ -- consume --> ENR["enricher service"]
     ENR -- "15s retry sweep<br/>(SKIP LOCKED)" --> PG
     ENR -- "chunk embeddings,<br/>job and pattern status" --> PG
     ENR -- "concepts, RELATED_TO" --> NEO[("Neo4j")]
@@ -63,7 +63,7 @@ This is the MVP 2 topology. For the full evolution from monolith through cloud d
 
 ### Mnemonic MCP Server
 
-The MCP server (`mnemonic-mcp`, MCP on port 8081) exclusively provides the read-only MCP interface for Claude Code to search the team knowledge graph. `mnemonic-api` does not serve MCP or listen on port 8081.
+The MCP server (the mcp service, MCP on port 8081) exclusively provides the read-only MCP interface for Claude Code to search the team knowledge graph. The api service does not serve MCP or listen on port 8081.
 
 **Responsibilities:**
 
@@ -80,7 +80,7 @@ The MCP server (`mnemonic-mcp`, MCP on port 8081) exclusively provides the read-
 
 ### Mnemonic Admin API
 
-The Admin API (`mnemonic-api`, port 8080) provides a REST interface for pattern management and search under `/v1/api`, plus Swagger at `/swagger/*any`. Health and version are served on the same port; metrics on port 9090.
+The Admin API (the api service, port 8080) provides a REST interface for pattern management and search under `/v1/api`, plus Swagger at `/swagger/*any`. Health and version are served on the same port; metrics on port 9090.
 
 **Responsibilities:**
 
@@ -98,7 +98,7 @@ The Admin API (`mnemonic-api`, port 8080) provides a REST interface for pattern 
 
 ### Mnemonic Enricher
 
-The Enricher (`mnemonic-enricher`) is a standalone worker that processes pattern enrichment asynchronously. Its only HTTP surface is `/health` and `/version` on port 8080 and metrics on port 9090.
+The Enricher (the enricher service) is a standalone worker that processes pattern enrichment asynchronously. Its only HTTP surface is `/health` and `/version` on port 8080 and metrics on port 9090.
 
 **Responsibilities:**
 
@@ -185,10 +185,10 @@ Pattern creation is a synchronous transactional write to PostgreSQL, followed by
 ```mermaid
 sequenceDiagram
     participant Admin
-    participant API as mnemonic-api
+    participant API as api service
     participant PG as PostgreSQL
     participant RMQ as RabbitMQ (enrichment-jobs)
-    participant ENR as mnemonic-enricher
+    participant ENR as enricher service
     participant OPENAI as OpenAI
     participant NEO as Neo4j
 

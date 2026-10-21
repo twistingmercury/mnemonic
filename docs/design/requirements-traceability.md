@@ -1,38 +1,40 @@
 # Requirements Traceability Matrix
 
-> Back to [Project README](../README.md)
+> Back to [Design Index](README.md)
+
+**Code paths:** a path written as `internal/<dir>/...` is relative to the service's source directory, `src/internal/<service>/`. For example, `internal/metrics/tools.go` in the mcp service is `src/internal/mcp/metrics/tools.go`.
 
 This matrix maps each requirement to the architecture and design documents that address it, and then to the code and tests that implement it today.
 
-- [Implementation Status](#implementation-status) — where each requirement lives in code (`mnemonic-api` v0.5.0, `mnemonic-enricher` v0.5.0, `mnemonic-mcp` v0.6.0, `develop`) and which tests cover it
+- [Implementation Status](#implementation-status) — where each requirement lives in code (the api service v0.5.0, the enricher service v0.5.0, the mcp service v0.6.0, `develop`) and which tests cover it
 - [Architecture References](#knowledge-management) — the design documents behind each requirement
 
 ## Implementation Status
 
 Paths are relative to each service repository's `src/` directory. Test suites:
 
-- **Unit/integration** — `*_test.go` next to the code (`make tests-unit`; database-backed `*_integration_test.go` via `make tests-integration` in mnemonic-api)
-- **Service E2E** — each service's `tests/e2e` suite, run against that service's container (`tests/run-e2e.sh`)
-- **Cross-service** — the five black-box tests in mnemonic-integration-tests (`src/health_test.go`, `src/pipeline_test.go`), run against published images and an OpenAI stub
+- **Unit/integration** — `*_test.go` next to the code (`make tests-unit`; database-backed `*_integration_test.go` via `make tests-integration` in the api service)
+- **Service E2E** — each service's E2E suite, kept under `tests/legacy/<service>/e2e` and run by `tests/legacy/<service>/run-e2e.sh`, against that service's container
+- **Cross-service** — the five black-box tests in `tests/integration/` (`tests/integration/health_test.go`, `tests/integration/pipeline_test.go`), run against published images and an OpenAI stub
 
 Status: **Implemented**, **Partial** (see note), **Not implemented**, or **Post-MVP** (deliberately deferred).
 
 ```mermaid
 flowchart LR
-    subgraph API[mnemonic-api]
+    subgraph API[api service]
         H[handlers/patterns] --> PS[service/pattern]
         PS --> PUB[queue/rabbitmq/publisher]
     end
-    subgraph ENR[mnemonic-enricher]
+    subgraph ENR[enricher service]
         W[enricher/enrichment.go] --> ES[service/enrichment]
         ES --> GR[repository/graph]
     end
-    subgraph MCP[mnemonic-mcp]
+    subgraph MCP[mcp service]
         T[mcpserver] --> SS[service/search]
         T --> PSV[service/pattern]
     end
     PUB -->|enrichment-jobs| W
-    IT[mnemonic-integration-tests] -.-> API
+    IT[integration tests] -.-> API
     IT -.-> MCP
     IT -.-> ENR
 ```

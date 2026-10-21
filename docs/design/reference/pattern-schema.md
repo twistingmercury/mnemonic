@@ -1,12 +1,12 @@
 # Pattern File Schema
 
-> Back to [Project README](../../README.md)
+> Back to [Design Index](../README.md)
 
 This document defines the schema for Mnemonic pattern files.
 
 Pattern files are Markdown documents with YAML frontmatter. When a file is loaded, each frontmatter field becomes a field of the API's create request (`POST /v1/api/patterns`) and the body becomes `content`. The body uses `[//]: pattern` decorators to mark which sections are indexed as searchable chunks. The whole body is stored and returned by `get_pattern`, but only decorated sections become chunks; content before the first decorator, including the `## Overview` section and the H1 title, is never indexed.
 
-The constraints below are the ones mnemonic-api enforces (`src/internal/handlers/patterns/patterns.go`, `validatePatternFields`) on both create and update. A violation returns `400` with one `{field, code, message}` entry per problem.
+The constraints below are the ones the api service enforces (`src/internal/api/handlers/patterns/patterns.go`, `validatePatternFields`) on both create and update. A violation returns `400` with one `{field, code, message}` entry per problem.
 
 ---
 
@@ -22,7 +22,7 @@ The constraints below are the ones mnemonic-api enforces (`src/internal/handlers
 | `domain`      | string | enum       | Kebab-case, max 64 characters, and in the API's `vocabulary.domains` list (below).                                 |
 | `content`     | string | Markdown   | The file body. Non-empty, at most 100,000 bytes.                                                                   |
 
-Default `vocabulary.languages` (`src/internal/config/defaults.go`):
+Default `vocabulary.languages` (`src/internal/api/config/defaults.go`):
 `agnostic`, `bash`, `c`, `cpp`, `csharp`, `cql`, `cypher`, `dart`, `delphi`, `docker`, `elixir`, `erlang`, `go`, `json`, `java`, `javascript`, `kotlin`, `lua`, `markdown`, `matlab`, `mql`, `objective-c`, `perl`, `php`, `plsql`, `powershell`, `python`, `r`, `react`, `ruby`, `rust`, `scala`, `shell`, `sql`, `swift`, `terraform`, `toml`, `tsql`, `typescript`, `visual-basic`, `yaml`, `zig`.
 
 Default `vocabulary.domains`:
@@ -116,7 +116,7 @@ The `[//]: pattern` decorator controls which sections are stored in the Mnemonic
 - Lines before the first decorator are not indexed (they are still stored with the pattern)
 - A pattern with no decorated sections (or only empty ones) is indexed as one chunk holding the whole trimmed content, titled by its first heading or `Content` if it has none
 
-The splitter is `splitIntoChunks` in mnemonic-api `src/internal/service/pattern/service.go`.
+The splitter is `splitIntoChunks` in the api service `src/internal/api/service/pattern/service.go`.
 
 ```mermaid
 flowchart TD

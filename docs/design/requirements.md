@@ -1,6 +1,6 @@
 # Mnemonic Requirements
 
-> Back to [Project README](../README.md)
+> Back to [Design Index](README.md)
 
 ## Table of Contents
 
@@ -20,7 +20,7 @@ See [concept.md](concept.md) for the full problem statement and rationale.
 
 Mnemonic must provide a searchable team knowledge base. An admin REST API handles all writes; a read-only MCP interface serves Claude Code.
 
-Requirements marked **Not implemented** below are not met by the current code (`mnemonic-api` v0.5.0, `mnemonic-enricher` v0.5.0, `mnemonic-mcp` v0.6.0). See the [Requirements Traceability Matrix](requirements-traceability.md) for where each requirement is implemented and tested.
+Requirements marked **Not implemented** below are not met by the current code (the api service v0.5.0, the enricher service v0.5.0, the mcp service v0.6.0). See the [Requirements Traceability Matrix](requirements-traceability.md) for where each requirement is implemented and tested.
 
 ## Knowledge Management
 

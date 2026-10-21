@@ -1,6 +1,6 @@
 # MCP Tools
 
-> Back to [MCP Service Architecture](README.md) | [Project README](../../../README.md)
+> Back to [MCP Service Architecture](README.md) | [Design Index](../../README.md)
 
 ## Table of Contents
 
@@ -13,7 +13,7 @@
 
 ## Overview
 
-Mnemonic exposes 3 read-only MCP tools for pattern search: `search_patterns`, `find_related_patterns`, and `get_pattern`. These tools are called during conversation when Claude Code needs team knowledge. They are served by the `mnemonic-mcp` service; the MCP service has no write tools (patterns are managed through the REST API).
+Mnemonic exposes 3 read-only MCP tools for pattern search: `search_patterns`, `find_related_patterns`, and `get_pattern`. These tools are called during conversation when Claude Code needs team knowledge. They are served by the the mcp service service; the MCP service has no write tools (patterns are managed through the REST API).
 
 ## Tool Discovery
 
@@ -58,7 +58,7 @@ Browser requests from another origin (an `Origin` header that does not match the
 ```mermaid
 sequenceDiagram
     participant CC as Claude Code
-    participant MCP as mnemonic-mcp :8081/mcp
+    participant MCP as mcp service :8081/mcp
     participant PG as PostgreSQL + pgvector
     participant NEO as Neo4j
     participant OAI as OpenAI
@@ -148,7 +148,7 @@ Retrieve a specific pattern by ID.
 
 ## Response Formats
 
-MCP tools return markdown-formatted text. Structured data such as similarity scores and metadata is embedded in the prose because Claude Code consumes tool results as text content during conversation. Markdown makes results readable in context without additional parsing. Exact formats are in [MCP Server Design](../../design/mcp-server.md#tool-handler-signatures).
+MCP tools return markdown-formatted text. Structured data such as similarity scores and metadata is embedded in the prose because Claude Code consumes tool results as text content during conversation. Markdown makes results readable in context without additional parsing. Exact formats are in [MCP Server Design](../../mcp-server.md#tool-handler-signatures).
 
 Results are delivered as MCP tool results with:
 
@@ -187,8 +187,8 @@ Arguments that do not match a tool's input schema (for example a number where `i
 
 ## References
 
-- [MCP Server Design](../../design/mcp-server.md) — implementation: server setup, handlers, formats, observability
-- [Service Layer Design](../../design/service-layer.md) — the services behind the tools
+- [MCP Server Design](../../mcp-server.md) — implementation: server setup, handlers, formats, observability
+- [Service Layer Design](../../service-layer.md) — the services behind the tools
 - [Communication Patterns](../system/03-communication-patterns.md) — protocol overview and request flow
 
 **Next:** Return to [Architecture Overview](README.md)

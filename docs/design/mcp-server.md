@@ -1,6 +1,8 @@
 # MCP Server Implementation Design
 
-> Back to [Design Documents](README.md) | [Project README](../../README.md)
+> Back to [Design Documents](README.md)
+
+**Code paths:** a path written as `internal/<dir>/...` is relative to the service's source directory, `src/internal/<service>/`. For example, `internal/metrics/tools.go` in the mcp service is `src/internal/mcp/metrics/tools.go`.
 
 ## Table of Contents
 
@@ -31,19 +33,19 @@
 
 ## Overview
 
-> **Architecture Reference:** [System Architecture - Mnemonic MCP Server](../architecture/system/02-system-architecture.md#mnemonic-mcp-server) | [MCP Tools](../architecture/mnemonic/08-mcp-tools.md) | [Communication Patterns - Claude Code to MCP Server](../architecture/system/03-communication-patterns.md#claude-code-to-mcp-server-communication)
+> **Architecture Reference:** [System Architecture - Mnemonic MCP Server](architecture/system/02-system-architecture.md#mnemonic-mcp-server) | [MCP Tools](architecture/mnemonic/08-mcp-tools.md) | [Communication Patterns - Claude Code to MCP Server](architecture/system/03-communication-patterns.md#claude-code-to-mcp-server-communication)
 
-The `mnemonic-mcp` service exposes 3 read-only pattern search tools over the Model Context Protocol (MCP). The MCP server listens on port 8081 (`mcp.port`) and serves JSON-RPC 2.0 over Streamable HTTP at `/mcp`. Claude Code discovers tools via `tools/list` and invokes them via `tools/call`.
+The mcp service exposes 3 read-only pattern search tools over the Model Context Protocol (MCP). The MCP server listens on port 8081 (`mcp.port`) and serves JSON-RPC 2.0 over Streamable HTTP at `/mcp`. Claude Code discovers tools via `tools/list` and invokes them via `tools/call`.
 
 All 3 tools are stateless: each invocation is a standalone request/response with no session state carried between calls. The tools return markdown-formatted text content.
 
-The server speaks MCP protocol version 2026-07-28 (sessionless, no `initialize`, per-request `_meta`), and 2025-11-25 and earlier for older clients. The SDK handles `server/discover`, header validation and version negotiation; see [MCP Tools: Tool Discovery](../architecture/mnemonic/08-mcp-tools.md#tool-discovery) for the wire format.
+The server speaks MCP protocol version 2026-07-28 (sessionless, no `initialize`, per-request `_meta`), and 2025-11-25 and earlier for older clients. The SDK handles `server/discover`, header validation and version negotiation; see [MCP Tools: Tool Discovery](architecture/mnemonic/08-mcp-tools.md#tool-discovery) for the wire format.
 
 **Authentication:** none. The MCP endpoint is unauthenticated in the current local, single-user phase. Do not expose port 8081 beyond localhost.
 
 **SDK:** `github.com/modelcontextprotocol/go-sdk/mcp` v1.8.0 (see `src/go.mod`). The Go module path of the service is `github.com/twistingmercury/librarian-mcp`.
 
-**Scope:** There are only 3 MCP tools, all for pattern search. The MCP service has no write paths: patterns are created, updated and deleted through the REST API (`mnemonic-api`) and enriched by `mnemonic-enricher`.
+**Scope:** There are only 3 MCP tools, all for pattern search. The MCP service has no write paths: patterns are created, updated and deleted through the REST API (the api service) and enriched by the enricher service.
 
 **Tools:**
 
@@ -57,7 +59,7 @@ The service also runs the operations server on `server.port` (8080: `GET /health
 
 ## Server Setup
 
-All server construction lives in `src/internal/mcpserver/server.go`; `src/internal/server/server.go` wires it.
+All server construction lives in `src/internal/mcp/mcpserver/server.go`; `src/internal/mcp/server/server.go` wires it.
 
 ### MCP Server Creation
 
@@ -436,7 +438,7 @@ Handlers never return `*jsonrpc.Error`; protocol-level JSON-RPC errors are left 
 
 ### Application Error Types
 
-`errors.go` defines 3 sentinels, matching [08-mcp-tools.md](../architecture/mnemonic/08-mcp-tools.md#application-level-errors):
+`errors.go` defines 3 sentinels, matching [08-mcp-tools.md](architecture/mnemonic/08-mcp-tools.md#application-level-errors):
 
 ```go
 var ErrPatternNotFound = errors.New("pattern not found")       // get_pattern, find_related_patterns
@@ -459,7 +461,7 @@ So every non-not-found service failure (OpenAI embedding failure, Postgres or Ne
 
 ### Transport-Level Errors
 
-Transport-level errors are produced by the MCP SDK and the HTTP server, not by tool handlers. They use standard JSON-RPC 2.0 error codes, as documented in [08-mcp-tools.md](../architecture/mnemonic/08-mcp-tools.md#transport-level-errors):
+Transport-level errors are produced by the MCP SDK and the HTTP server, not by tool handlers. They use standard JSON-RPC 2.0 error codes, as documented in [08-mcp-tools.md](architecture/mnemonic/08-mcp-tools.md#transport-level-errors):
 
 | Code   | Meaning          | Handled By |
 | ------ | ---------------- | ---------- |
@@ -473,7 +475,7 @@ No custom implementation exists for transport-level errors.
 
 ## Observability Integration
 
-> **Architecture Reference:** [Observability Implementation](observability-implementation.md) | [Observability Architecture](../architecture/system/07-observability-architecture.md)
+> **Architecture Reference:** [Observability Implementation](observability-implementation.md) | [Observability Architecture](architecture/system/07-observability-architecture.md)
 
 ### Receiving Middleware
 
@@ -510,7 +512,7 @@ The 2026-07-28 spec also lets a client put `traceparent`, `tracestate` and `bagg
 | `mnemonic.patterns.query_latency`, `mnemonic.patterns.returned` | Histogram      |                   | Recorded for every pgvector search                                        |
 | `http.server.*`                                                 | otelhttp       |                   | Standard HTTP server metrics for `/mcp`                                   |
 
-There are no session metrics (stateless mode). See `src/internal/metrics/tools.go` and [Observability Implementation](observability-implementation.md#mcp-server-metrics).
+There are no session metrics (stateless mode). See `src/internal/mcp/metrics/tools.go` and [Observability Implementation](observability-implementation.md#mcp-server-metrics).
 
 ### Logging
 
@@ -533,10 +535,10 @@ There are no per-call "completed" or "error" log lines; outcomes and latency are
 
 ## Package Structure
 
-MCP server code lives in `src/internal/mcpserver/`. The name `mcpserver` avoids colliding with the SDK's `mcp` package.
+MCP server code lives in `src/internal/mcp/mcpserver/`. The name `mcpserver` avoids colliding with the SDK's `mcp` package.
 
 ```text
-src/internal/mcpserver/
+src/internal/mcp/mcpserver/
     server.go       -- NewMCPServer, NewMCPHTTPHandler, NewMCPHTTPServer
     tools.go        -- Tool definitions with input schema bounds and defaults
     handlers.go     -- Handlers for all 3 tools, mapServiceError
@@ -568,9 +570,9 @@ The SDK infers the input schema from Go struct tags, and the inferred schema car
 
 ## Architecture References
 
-- [MCP Tools](../architecture/mnemonic/08-mcp-tools.md) -- tool definitions, parameters, response formats, error handling
-- [System Architecture](../architecture/system/02-system-architecture.md) -- component breakdown and data flow
-- [Communication Patterns](../architecture/system/03-communication-patterns.md) -- MCP protocol overview and request flow
+- [MCP Tools](architecture/mnemonic/08-mcp-tools.md) -- tool definitions, parameters, response formats, error handling
+- [System Architecture](architecture/system/02-system-architecture.md) -- component breakdown and data flow
+- [Communication Patterns](architecture/system/03-communication-patterns.md) -- MCP protocol overview and request flow
 - [Configuration Design](configuration.md) -- `mcp.*` settings and defaults
 - [Observability Implementation](observability-implementation.md) -- span naming, MCP metrics, structured logging
 

@@ -1,13 +1,13 @@
 # Glossary
 
-> Back to [Project README](../../README.md)
+> Back to [Design Index](../README.md)
 
 Definitions of key terms used throughout the Mnemonic documentation. Terms are listed alphabetically.
 
 ---
 
 <a id="agent"></a>**Agent**
-A Claude Code agent role (e.g., `go-engineer`, `devops-engineer`). Associating patterns with agents by relevance score is **planned, not implemented**: the design documents describe agent tables, but mnemonic-dbs has no agent schema, no Mnemonic service has agent code, the pattern API has no agent field, and search has no agent filter.
+A Claude Code agent role (e.g., `go-engineer`, `devops-engineer`). Associating patterns with agents by relevance score is **planned, not implemented**: the design documents describe agent tables, but the `db/` component has no agent schema, no Mnemonic service has agent code, the pattern API has no agent field, and search has no agent filter.
 See also: [Pattern](#pattern), [Knowledge Graph](#knowledge-graph)
 
 <a id="chunk"></a>**Chunk**
@@ -43,7 +43,7 @@ The YAML metadata block at the top of a pattern file, delimited by `---`. Its fi
 See also: [Pattern File](#pattern-file)
 
 <a id="hnsw"></a>**HNSW**
-Hierarchical Navigable Small World. A vector index algorithm used by PGVector for approximate nearest-neighbor search on chunk embeddings. Chosen over IVFFlat for chunk-level search because it provides better recall without requiring periodic retraining. The index itself is defined in the mnemonic-dbs migrations.
+Hierarchical Navigable Small World. A vector index algorithm used by PGVector for approximate nearest-neighbor search on chunk embeddings. Chosen over IVFFlat for chunk-level search because it provides better recall without requiring periodic retraining. The index itself is defined in the `db/` migrations.
 See also: [IVFFlat](#ivfflat), [PGVector](#pgvector), [Chunk](#chunk)
 
 <a id="ivfflat"></a>**IVFFlat**
@@ -55,7 +55,7 @@ The combination of Neo4j graph relationships and PostgreSQL vector data that rep
 See also: [Agent](#agent), [Pattern](#pattern), [Enrichment](#enrichment)
 
 <a id="mcp-model-context-protocol"></a>**MCP (Model Context Protocol)**
-The protocol Claude Code uses to communicate with external tool servers. Mnemonic exposes three read-only MCP tools (`search_patterns`, `find_related_patterns`, `get_pattern`) via Streamable HTTP at `/mcp` on port 8081, served by mnemonic-mcp, with no authentication. Claude Code discovers and invokes these tools automatically during conversation.
+The protocol Claude Code uses to communicate with external tool servers. Mnemonic exposes three read-only MCP tools (`search_patterns`, `find_related_patterns`, `get_pattern`) via Streamable HTTP at `/mcp` on port 8081, served by the mcp service, with no authentication. Claude Code discovers and invokes these tools automatically during conversation.
 See also: [Streamable HTTP](#streamable-http)
 
 <a id="pattern"></a>**Pattern**

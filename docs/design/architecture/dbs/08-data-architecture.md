@@ -1,6 +1,6 @@
-# mnemonic-dbs — Data Architecture
+# Database Images — Data Architecture
 
-> Back to [Database Architecture](README.md) | [Project README](../../../README.md)
+> Back to [Database Architecture](README.md) | [Design Index](../../README.md)
 
 ## Table of Contents
 
@@ -14,7 +14,7 @@
 
 ### PostgreSQL (`pgvector/pgvector:pg16`)
 
-**Purpose:** Relational store for patterns, their semantic search chunks, and enrichment jobs. PGVector provides the `vector` extension for embedding storage and HNSW similarity search. There are no agent or skill tables: `agents`, `pattern_agent_associations`, `skills` and `skill_files` are planned (see [Data Storage Implementation](../../design/data-storage.md#jsonb-document-model)) but have no migrations.
+**Purpose:** Relational store for patterns, their semantic search chunks, and enrichment jobs. PGVector provides the `vector` extension for embedding storage and HNSW similarity search. There are no agent or skill tables: `agents`, `pattern_agent_associations`, `skills` and `skill_files` are planned (see [Data Storage Implementation](../../data-storage.md#jsonb-document-model)) but have no migrations.
 
 | Criterion | Requirement | How It Is Met |
 | --- | --- | --- |
@@ -89,12 +89,12 @@ erDiagram
     pattern_chunks ||--o{ enrichment_jobs : "queued for"
 ```
 
-`patterns`, `pattern_chunks` and `enrichment_jobs` are the only tables in the schema; the columns above are all of their columns (see [Data Storage Implementation](../../design/data-storage.md#postgresql-migrations) for the DDL).
+`patterns`, `pattern_chunks` and `enrichment_jobs` are the only tables in the schema; the columns above are all of their columns (see [Data Storage Implementation](../../data-storage.md#postgresql-migrations) for the DDL).
 
 Notes from the migrations and the services' queries:
 
 - Deleting a pattern cascades to its `pattern_chunks` and `enrichment_jobs` rows (FK `ON DELETE CASCADE`); deleting a chunk cascades to its jobs.
-- `enrichment_jobs_target_exclusive` requires each job to target exactly one of `pattern_id` or `chunk_id`. `mnemonic-api` only creates chunk jobs (`chunk_id` set, `pattern_id` NULL); the enricher still processes legacy pattern jobs.
+- `enrichment_jobs_target_exclusive` requires each job to target exactly one of `pattern_id` or `chunk_id`. The api service only creates chunk jobs (`chunk_id` set, `pattern_id` NULL); the enricher still processes legacy pattern jobs.
 - `pattern_chunks.embedding` stays NULL until the enricher embeds the chunk; search only considers rows where it is set and `enrichment_status = 'enriched'`.
 
 ### Tables
@@ -177,19 +177,19 @@ Current version: **3** (set by `003_create_indexes.cypher`; the image skips 002,
 
 ## Which Service Uses What
 
-The schema is shared by three services with different access. This is what their repository code (`src/internal/repository/**`) actually does:
+The schema is shared by three services with different access. This is what their repository code (`src/internal/<service>/repository/`) actually does:
 
-| Service | PostgreSQL | Neo4j |
-| --- | --- | --- |
-| `mnemonic-api` | Reads and writes `patterns`; inserts and deletes `pattern_chunks`; inserts `enrichment_jobs` (one pending job per chunk, in the same transaction as the pattern and chunks); chunk similarity search | Reads `RELATED_TO` and `MENTIONED_IN` for pattern detail; on pattern delete, removes the `Pattern` node and any of its concepts no other pattern mentions. Creates nothing. |
-| `mnemonic-enricher` | Reads patterns and chunks; writes chunk embeddings and status, pattern enrichment status; claims, updates and deletes `enrichment_jobs` | Writes: merges the `Pattern` node, its `Concept` nodes and `MENTIONED_IN` edges, and recomputes `RELATED_TO`, all in one write transaction |
-| `mnemonic-mcp` | Read-only: chunk similarity search, pattern lookups | Read-only: concepts and `RELATED_TO` lookups |
+| Service          | PostgreSQL                                                                                                                                                                                           | Neo4j                                                                                                                                                                       |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| api service      | Reads and writes `patterns`; inserts and deletes `pattern_chunks`; inserts `enrichment_jobs` (one pending job per chunk, in the same transaction as the pattern and chunks); chunk similarity search | Reads `RELATED_TO` and `MENTIONED_IN` for pattern detail; on pattern delete, removes the `Pattern` node and any of its concepts no other pattern mentions. Creates nothing. |
+| enricher service | Reads patterns and chunks; writes chunk embeddings and status, pattern enrichment status; claims, updates and deletes `enrichment_jobs`                                                              | Writes: merges the `Pattern` node, its `Concept` nodes and `MENTIONED_IN` edges, and recomputes `RELATED_TO`, all in one write transaction                                  |
+| mcp service      | Read-only: chunk similarity search, pattern lookups                                                                                                                                                  | Read-only: concepts and `RELATED_TO` lookups                                                                                                                                |
 
 ```mermaid
 flowchart LR
-    API["mnemonic-api"]
-    ENR["mnemonic-enricher"]
-    MCP["mnemonic-mcp<br/>(read-only)"]
+    API["api service"]
+    ENR["enricher service"]
+    MCP["mcp service<br/>(read-only)"]
     MQ[("RabbitMQ<br/>enrichment-jobs")]
     subgraph PG["PostgreSQL + pgvector"]
         T1["patterns"]
@@ -220,7 +220,7 @@ flowchart LR
 - **Postgres:** SQL files named `000001_description.up.sql` … `000006_description.up.sql`, copied into the image and executed in order by `docker-entrypoint-initdb.d` on first container start.
 - **Neo4j:** Cypher files named `001_description.cypher` … `003_description.cypher`, applied via `cypher-shell` during image build (002 is skipped: Enterprise only).
 - **Rollback:** Pull a prior image tag. No down migration files are maintained.
-- **Testing:** BATS test suites in `src/tests/bats/` verify schema state after initialization. CI gates image pushes on passing tests.
+- **Testing:** BATS test suites in `db/tests/bats/` verify schema state after initialization. CI gates image pushes on passing tests.
 - **Adding migrations:** Add new SQL/Cypher files with the next sequence number, add corresponding BATS assertions, open a PR.
 
 ---

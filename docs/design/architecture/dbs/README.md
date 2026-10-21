@@ -1,6 +1,6 @@
-# mnemonic-dbs Architecture
+# Database Images Architecture
 
-> Back to [Project README](../../../README.md)
+> Back to [Design Index](../../README.md)
 
 Start here: [Architecture Overview](00-overview.md)
 

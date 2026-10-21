@@ -1,6 +1,6 @@
 # Architecture
 
-> Back to [Project README](../../../README.md)
+> Back to [Design Index](../../README.md)
 
 Start here:
 
@@ -24,9 +24,9 @@ Start here:
 
 ## Design Documents
 
-Architecture docs describe **what** and **why**. Design docs describe **how** and remain in each component repo.
+Architecture docs describe **what** and **why**. Design docs describe **how** and live in `docs/design/`.
 
-<!-- design docs remain in each component repo's docs/design/ -->
+<!-- design docs live in docs/design/ -->
 
 ---
 

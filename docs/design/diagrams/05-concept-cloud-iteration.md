@@ -1,6 +1,6 @@
 # MVP 5
 
-> Back to [Project README](../../README.md)
+> Back to [Design Index](../README.md)
 
 Iteration 5 is the cloud end state for runtime deployment and infrastructure automation:
 

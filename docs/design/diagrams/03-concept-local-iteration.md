@@ -1,6 +1,6 @@
 # MVP 3
 
-> Back to [Project README](../../README.md)
+> Back to [Design Index](../README.md)
 
 Iteration 3 moves stateful infrastructure to managed AWS services while keeping application runtime local:
 

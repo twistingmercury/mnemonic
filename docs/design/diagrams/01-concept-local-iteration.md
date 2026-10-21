@@ -1,6 +1,6 @@
 # MVP 1
 
-> Back to [Project README](../../README.md)
+> Back to [Design Index](../README.md)
 
 Iteration 1 establishes the local baseline:
 

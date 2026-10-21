@@ -1,6 +1,8 @@
 # Data Storage Implementation
 
-> Back to [Design Documents](README.md) | [Project README](../../README.md)
+> Back to [Design Documents](README.md)
+
+**Code paths:** a path written as `internal/<dir>/...` is relative to the service's source directory, `src/internal/<service>/`. For example, `internal/metrics/tools.go` in the mcp service is `src/internal/mcp/metrics/tools.go`.
 
 ## Table of Contents
 
@@ -48,9 +50,9 @@
 
 [Table of Contents](#table-of-contents)
 
-> **Architecture Reference:** [Data Architecture](../architecture/system/04-data-architecture.md) | [System Architecture - Mnemonic](../architecture/system/02-system-architecture.md#mnemonic-server)
+> **Architecture Reference:** [Data Architecture](architecture/system/04-data-architecture.md) | [System Architecture - Mnemonic](architecture/system/02-system-architecture.md#mnemonic-server)
 
-This document provides implementation details for the Mnemonic data storage layer. It translates the architectural specifications from [Data Architecture](../architecture/system/04-data-architecture.md) into concrete SQL migrations, Cypher queries, and Go interface definitions.
+This document provides implementation details for the Mnemonic data storage layer. It translates the architectural specifications from [Data Architecture](architecture/system/04-data-architecture.md) into concrete SQL migrations, Cypher queries, and Go interface definitions.
 
 **Implementation Scope:**
 
@@ -72,17 +74,17 @@ This document provides implementation details for the Mnemonic data storage laye
 | Neo4j | `Pattern`, `Concept`, `MENTIONED_IN`, `RELATED_TO` | Implemented | api, mcp | enricher (`SyncPattern`); api deletes on pattern delete |
 | Neo4j | `Agent`, `RELEVANT_FOR` | Planned (no schema yet) | none | none |
 
-The `mnemonic-mcp` server is read-only against both databases. The sections below on the JSONB document model, agents and skills describe the planned design for tables that do not exist yet; the pattern, chunk, job and graph sections describe what the services do today.
+The mcp service is read-only against both databases. The sections below on the JSONB document model, agents and skills describe the planned design for tables that do not exist yet; the pattern, chunk, job and graph sections describe what the services do today.
 
 ```mermaid
 flowchart LR
-    API["mnemonic-api"] -->|"patterns, pattern_chunks,<br/>enrichment_jobs (one tx)"| PG[("PostgreSQL<br/>+ pgvector")]
+    API["api service"] -->|"patterns, pattern_chunks,<br/>enrichment_jobs (one tx)"| PG[("PostgreSQL<br/>+ pgvector")]
     API -->|"job id"| MQ[("RabbitMQ")]
-    MQ --> ENR["mnemonic-enricher"]
+    MQ --> ENR["enricher service"]
     ENR -->|"embeddings, statuses,<br/>job lifecycle"| PG
     ENR -->|"SyncPattern<br/>(one write tx)"| NEO[("Neo4j")]
     API -.->|"read; DeletePattern"| NEO
-    MCP["mnemonic-mcp"] -.->|read| PG
+    MCP["mcp service"] -.->|read| PG
     MCP -.->|read| NEO
 ```
 
@@ -98,7 +100,7 @@ flowchart LR
 
 **Deployment Independence:**
 
-Database migrations and application code are versioned and deployed independently. Migrations live in the separate `mnemonic-dbs` repository, whose CI builds the `mnemonic-postgres` and `mnemonic-neo4j` images; the services pin an image tag (currently `v1.0.0-dev`). This enables:
+Database migrations and application code are versioned and deployed independently. Migrations live in `db/`, whose build scripts produce the `librarian-postgres` and `librarian-neo4j` images; the services pin an image tag (currently `v1.0.0-dev`). This enables:
 
 - Logic bug fixes in Go without database deployment
 - Schema changes without rebuilding application containers
@@ -110,7 +112,7 @@ Database migrations and application code are versioned and deployed independentl
 
 ### Design Rationale
 
-> **Status:** Planned. There are no `agents`, `skills` or `skill_files` tables in `mnemonic-dbs`, no service code for them, and no agent/skill API or sync protocol yet. This section is the design for that work; the table shapes and indexes below have no migrations.
+> **Status:** Planned. There are no `agents`, `skills` or `skill_files` tables in `db/`, no service code for them, and no agent/skill API or sync protocol yet. This section is the design for that work; the table shapes and indexes below have no migrations.
 
 Agents, skills, and skill files are markdown documents synced to disk. Their field sets evolve as the Claude Code Agent Skills spec evolves. Storing each field as an individual relational column creates migration churn every time a field is added, renamed, or removed.
 
@@ -291,14 +293,14 @@ For database-level JSONB schema validation, consider the [pg_jsonschema](https:/
 
 [Table of Contents](#table-of-contents)
 
-> **Architecture Reference:** [Data Architecture - Migration Strategy](../architecture/system/04-data-architecture.md#migration-strategy)
+> **Architecture Reference:** [Data Architecture - Migration Strategy](architecture/system/04-data-architecture.md#migration-strategy)
 
 ### Migration File Structure
 
-All PostgreSQL migrations are `.up.sql` files copied into the `mnemonic-postgres` image and applied by `docker-entrypoint-initdb.d` when the container first starts with an empty data directory. Mnemonic does not run or manage migrations at runtime. There are no `.down.sql` files — rollback is accomplished by pulling a prior image tag (see [dbs ADR-001](../architecture/dbs/02-architectural-decisions.md)).
+All PostgreSQL migrations are `.up.sql` files copied into the `librarian-postgres` image and applied by `docker-entrypoint-initdb.d` when the container first starts with an empty data directory. Mnemonic does not run or manage migrations at runtime. There are no `.down.sql` files — rollback is accomplished by pulling a prior image tag (see [dbs ADR-001](architecture/dbs/02-architectural-decisions.md)).
 
 ```text
-mnemonic-dbs/src/
+db/
 ├── postgres/
 │   ├── 000001_extensions.up.sql
 │   ├── 000002_create_patterns.up.sql
@@ -316,7 +318,7 @@ PostgreSQL migration files use a 6-digit zero-padded prefix (e.g., `000001`) to 
 
 Neo4j migrations are numbered `.cypher` files applied via `cypher-shell` during Docker image build (see [Manual Constraint Creation](#startup-constraint-validation)).
 
-The SQL below is copied from `mnemonic-dbs` (`develop`). The header comments still name the files' old `src/migrations/...` location; the files live in `src/postgres/`.
+The SQL below is copied from `db/` (`develop`). The header comments still name the files' old `src/migrations/...` location; the files live in `db/postgres/`.
 
 > **No agent or skill schema:** There are no `agents`, `skills`, `skill_files` or `pattern_agent_associations` tables. The [JSONB Document Model](#jsonb-document-model) section is the planned design for them; it will need new migrations when that work starts.
 
@@ -552,7 +554,7 @@ comment on index idx_enrichment_jobs_pending is
 
 **Purpose:** Introduce chunk-based semantic search by creating the `pattern_chunks` table, moving embeddings from patterns to per-chunk rows, adding structured metadata columns to patterns, and updating enrichment jobs to support chunk-level processing.
 
-> **Architecture Reference:** [Data Architecture - Pattern Chunks](../architecture/dbs/08-data-architecture.md#tables) | [Pattern Enrichment - Generate Embeddings](pattern-processing.md#step-2-generate-embeddings)
+> **Architecture Reference:** [Data Architecture - Pattern Chunks](architecture/dbs/08-data-architecture.md#tables) | [Pattern Enrichment - Generate Embeddings](pattern-processing.md#step-2-generate-embeddings)
 
 ```sql
 -- src/migrations/postgres/000005_pattern_schema_chunks.up.sql
@@ -666,7 +668,7 @@ Key changes in this migration:
 
 **Purpose:** Update `pattern_chunks.embedding` from `vector(1536)` to `vector(2000)` to support `text-embedding-3-large` with Matryoshka truncation at 2000 dimensions.
 
-> **Architecture Reference:** [Data Architecture - Embedding Dimensions](../architecture/dbs/08-data-architecture.md#embedding-dimensions) | [Pattern Enrichment - OpenAI Embeddings](pattern-processing.md#openai-api-embeddings)
+> **Architecture Reference:** [Data Architecture - Embedding Dimensions](architecture/dbs/08-data-architecture.md#embedding-dimensions) | [Pattern Enrichment - OpenAI Embeddings](pattern-processing.md#openai-api-embeddings)
 
 ```sql
 -- src/migrations/postgres/000006_update_embedding_dimensions.up.sql
@@ -700,7 +702,7 @@ This migration is separated from 000005 because the embedding dimension is a dep
 
 [Table of Contents](#table-of-contents)
 
-> **Architecture Reference:** [Data Architecture - PGVector Configuration](../architecture/system/04-data-architecture.md#pgvector-configuration)
+> **Architecture Reference:** [Data Architecture - PGVector Configuration](architecture/system/04-data-architecture.md#pgvector-configuration)
 
 ### Index Selection Guidelines
 
@@ -805,7 +807,7 @@ analyze patterns;
 
 [Table of Contents](#table-of-contents)
 
-> **Architecture Reference:** [Data Architecture - Neo4j Graph Model](../architecture/system/04-data-architecture.md#neo4j-graph-model)
+> **Architecture Reference:** [Data Architecture - Neo4j Graph Model](architecture/system/04-data-architecture.md#neo4j-graph-model)
 
 What the services use: `Pattern` and `Concept` nodes, `MENTIONED_IN` (Concept to Pattern) and `RELATED_TO` (Pattern to Pattern). The Cypher files define constraints and indexes only for `Pattern` and `Concept`; the planned `Agent` node and `RELEVANT_FOR` relationship have no schema. The image applies 001 and 003 at build time and skips 002 (Enterprise only); each file also records its number on a `SchemaVersion {name: 'mnemonic'}` node.
 
@@ -821,7 +823,7 @@ Create these constraints during initial Neo4j setup.
 
 **Uniqueness Constraints (Community Edition + Enterprise Edition):**
 
-These constraints are compatible with all Neo4j editions and are created by `001_create_constraints.cypher` (copied from `mnemonic-dbs`):
+These constraints are compatible with all Neo4j editions and are created by `001_create_constraints.cypher` (copied from `db/`):
 
 ```cypher
 // src/migrations/neo4j/001_create_constraints.cypher
@@ -884,7 +886,7 @@ The file's header comment about validating constraints at startup describes a pl
 
 **Existence Constraints (Enterprise Edition Only):**
 
-These constraints require Neo4j Enterprise Edition and are created by `002_create_existence_constraints.cypher`. The Community Edition image skips this migration (see [dbs ADR-004](../architecture/dbs/02-architectural-decisions.md)). The enricher rejects a nil pattern ID or an empty pattern name before writing, regardless of whether these constraints are present.
+These constraints require Neo4j Enterprise Edition and are created by `002_create_existence_constraints.cypher`. The Community Edition image skips this migration (see [dbs ADR-004](architecture/dbs/02-architectural-decisions.md)). The enricher rejects a nil pattern ID or an empty pattern name before writing, regardless of whether these constraints are present.
 
 ```cypher
 // src/migrations/neo4j/002_create_existence_constraints.cypher
@@ -938,13 +940,13 @@ SET v.version = 2, v.migratedAt = datetime(), v.migration = '002_create_existenc
 
 ### Startup Constraint Validation
 
-Neo4j is required. Each service creates its driver at startup and calls `VerifyConnectivity`; if that fails, startup fails. The services do **not** check that constraints or indexes exist: they rely on the `mnemonic-neo4j` image having them baked in. A constraint check that logs missing constraints at startup is not implemented.
+Neo4j is required. Each service creates its driver at startup and calls `VerifyConnectivity`; if that fails, startup fails. The services do **not** check that constraints or indexes exist: they rely on the `librarian-neo4j` image having them baked in. A constraint check that logs missing constraints at startup is not implemented.
 
 Neo4j reachability is also part of every service's `GET /health` check.
 
 **Manual Constraint Creation:**
 
-If you run against a Neo4j that was not started from the `mnemonic-neo4j` image, apply the migration scripts manually:
+If you run against a Neo4j that was not started from the `librarian-neo4j` image, apply the migration scripts manually:
 
 ```bash
 # Using cypher-shell (Community + Enterprise)
@@ -1196,29 +1198,29 @@ RETURN count(c) AS deletedCount;
 
 Each service has its own `internal/repository` packages containing only what it needs; there is no shared repository module. The interfaces below are copied from the code (doc comments trimmed).
 
-| Service | Packages | PostgreSQL access | Neo4j access |
-| --------- | ---------- | ------------------- | -------------- |
-| `mnemonic-api` | `pattern`, `chunk`, `enrichmentjob`, `graph` | Pattern CRUD, chunk insert/list/delete/search, job insert | Read; `DeletePattern` only write |
-| `mnemonic-enricher` | `pattern`, `chunk`, `enrichmentjob`, `graph` | Pattern read + status, chunk read + embedding/status, full job lifecycle | `SyncPattern` only |
-| `mnemonic-mcp` | `pattern`, `chunk`, `graph` | Read-only | Read-only |
+| Service          | Packages                                     | PostgreSQL access                                                        | Neo4j access                     |
+| ---------------- | -------------------------------------------- | ------------------------------------------------------------------------ | -------------------------------- |
+| api service      | `pattern`, `chunk`, `enrichmentjob`, `graph` | Pattern CRUD, chunk insert/list/delete/search, job insert                | Read; `DeletePattern` only write |
+| enricher service | `pattern`, `chunk`, `enrichmentjob`, `graph` | Pattern read + status, chunk read + embedding/status, full job lifecycle | `SyncPattern` only               |
+| mcp service      | `pattern`, `chunk`, `graph`                  | Read-only                                                                | Read-only                        |
 
-All Postgres repositories take a `repository.DBTX` (the `Exec`/`Query`/`QueryRow` subset of `pgxpool.Pool` and `pgx.Tx`). In `mnemonic-api`, `WithTx` enlists a repository in a caller-owned transaction; pattern create/update use it to write the pattern, chunks and jobs atomically.
+All Postgres repositories take a `repository.DBTX` (the `Exec`/`Query`/`QueryRow` subset of `pgxpool.Pool` and `pgx.Tx`). In the api service, `WithTx` enlists a repository in a caller-owned transaction; pattern create/update use it to write the pattern, chunks and jobs atomically.
 
 ```mermaid
 flowchart LR
-    subgraph API["mnemonic-api"]
+    subgraph API["api service"]
         AP["pattern.Repository"]
         AC["chunk.Repository"]
         AJ["enrichmentjob.Repository"]
         AG["graph.Repository"]
     end
-    subgraph ENR["mnemonic-enricher"]
+    subgraph ENR["enricher service"]
         EP["pattern.Repository"]
         EC["chunk.Repository"]
         EJ["enrichmentjob.Repository"]
         EG["graph.Repository"]
     end
-    subgraph MCP["mnemonic-mcp"]
+    subgraph MCP["mcp service"]
         MP["pattern.Repository"]
         MC["chunk.Repository"]
         MG["graph.Repository"]
@@ -1291,7 +1293,7 @@ type ManifestEntry struct {
 
 ### PatternRepository
 
-**mnemonic-api** (`internal/repository/pattern`): full CRUD. `Create` inserts with `enrichment_status = 'pending'`; `Update` resets `enrichment_status` to `pending` and clears `enrichment_error` and `enriched_at`; a unique violation on `name` returns `ErrNameExists`.
+**The api service** (`src/internal/api/repository/pattern`): full CRUD. `Create` inserts with `enrichment_status = 'pending'`; `Update` resets `enrichment_status` to `pending` and clears `enrichment_error` and `enriched_at`; a unique violation on `name` returns `ErrNameExists`.
 
 ```go
 type Repository interface {
@@ -1332,7 +1334,7 @@ type Filter struct {
 }
 ```
 
-**mnemonic-enricher** (`internal/repository/pattern`):
+**The enricher service** (`src/internal/enricher/repository/pattern`):
 
 ```go
 type Repository interface {
@@ -1343,7 +1345,7 @@ type Repository interface {
 }
 ```
 
-**mnemonic-mcp** (`internal/repository/pattern`, read-only):
+**The mcp service** (`src/internal/mcp/repository/pattern`, read-only):
 
 ```go
 type Repository interface {
@@ -1357,7 +1359,7 @@ There is no pattern-level `FindSimilar`, `UpdateEmbedding` or agent-association 
 
 ### ChunkRepository
 
-**mnemonic-api** (`internal/repository/chunk`):
+**The api service** (`src/internal/api/repository/chunk`):
 
 ```go
 type Repository interface {
@@ -1380,7 +1382,7 @@ type SimilarityOptions struct {
 }
 ```
 
-**mnemonic-enricher** (`internal/repository/chunk`):
+**The enricher service** (`src/internal/enricher/repository/chunk`):
 
 ```go
 type Repository interface {
@@ -1394,7 +1396,7 @@ type Repository interface {
 }
 ```
 
-**mnemonic-mcp** (`internal/repository/chunk`, read-only): `FindSimilar(ctx, embedding, opts)` with `MinSimilarity`, `MaxResults`, `Language`, `Domain` and `Tags`.
+**The mcp service** (`src/internal/mcp/repository/chunk`, read-only): `FindSimilar(ctx, embedding, opts)` with `MinSimilarity`, `MaxResults`, `Language`, `Domain` and `Tags`.
 
 ### SkillRepository
 
@@ -1455,7 +1457,7 @@ type SkillFile struct {
 
 ### EnrichmentJob Repository
 
-**mnemonic-api** (`internal/repository/enrichmentjob`): creates jobs only.
+**The api service** (`src/internal/api/repository/enrichmentjob`): creates jobs only.
 
 ```go
 type Repository interface {
@@ -1467,7 +1469,7 @@ type Repository interface {
 }
 ```
 
-**mnemonic-enricher** (`internal/repository/enrichmentjob`): the whole lifecycle.
+**The enricher service** (`src/internal/enricher/repository/enrichmentjob`): the whole lifecycle.
 
 ```go
 type Repository interface {
@@ -1525,7 +1527,7 @@ returning id, pattern_id, chunk_id;
 
 ### GraphRepository
 
-**mnemonic-api** (`internal/repository/graph`):
+**The api service** (`src/internal/api/repository/graph`):
 
 ```go
 // Writing concepts and RELATED_TO edges is the enricher's job.
@@ -1539,7 +1541,7 @@ type Repository interface {
 }
 ```
 
-**mnemonic-enricher** (`internal/repository/graph`):
+**The enricher service** (`src/internal/enricher/repository/graph`):
 
 ```go
 type Repository interface {
@@ -1556,7 +1558,7 @@ type Pattern struct {
 }
 ```
 
-**mnemonic-mcp** (`internal/repository/graph`, read-only; each query runs through `neo4j.ExecuteQuery` with reader routing):
+**The mcp service** (`src/internal/mcp/repository/graph`, read-only; each query runs through `neo4j.ExecuteQuery` with reader routing):
 
 ```go
 type Repository interface {
@@ -1588,7 +1590,7 @@ Graph health is checked by the `/health` handler through the driver's `VerifyCon
 
 ### Common Types
 
-`ListOptions` (in `mnemonic-api`'s `internal/repository` package) is the pagination type for pattern listing.
+`ListOptions` (in the api service's `src/internal/api/repository` package) is the pagination type for pattern listing.
 
 `Filter` types are **not** shared -- each repository package defines its own `Filter` struct with fields specific to that entity. See the Filter definition in [PatternRepository](#patternrepository).
 
@@ -1716,9 +1718,9 @@ export LIBRARIAN_DATABASE_NEO4J_DATABASE="neo4j"
 
 **Architecture Documents:**
 
-- [Data Architecture](../architecture/system/04-data-architecture.md) - Data model design and storage decisions
-- [System Architecture](../architecture/system/02-system-architecture.md) - Component overview
-- [Deployment Architecture](../architecture/system/06-deployment-architecture.md) - Deployment patterns
+- [Data Architecture](architecture/system/04-data-architecture.md) - Data model design and storage decisions
+- [System Architecture](architecture/system/02-system-architecture.md) - Component overview
+- [Deployment Architecture](architecture/system/06-deployment-architecture.md) - Deployment patterns
 
 **Design Documents:**
 

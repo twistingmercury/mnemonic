@@ -1,6 +1,6 @@
 # Database Integration Flow
 
-> Back to [System Architecture](README.md) | [Project README](../../../README.md)
+> Back to [System Architecture](README.md) | [Design Index](../../README.md)
 
 ## Table of Contents
 
@@ -33,7 +33,7 @@ Each database serves a distinct purpose in the Mnemonic architecture:
 - Pattern chunks (section title, chunk text, per-chunk embedding and enrichment status)
 - Enrichment jobs (durable job state; RabbitMQ only carries the job ID)
 
-These are the only tables. `agents`, `skills`, `skill_files` (JSONB definitions with `crc64` change detection) and `pattern_agent_associations` are planned for agent/skill features but have no schema in `mnemonic-dbs` yet.
+These are the only tables. `agents`, `skills`, `skill_files` (JSONB definitions with `crc64` change detection) and `pattern_agent_associations` are planned for agent/skill features but have no schema in `db/` yet.
 
 **Why PostgreSQL:** Mature ecosystem, excellent Go driver support, JSONB for flexible storage, and transactional consistency across entities.
 
@@ -626,7 +626,7 @@ mnemonic admin patterns list --status failed
 mnemonic admin patterns re-enrich <id>
 ```
 
-**Potential admin UI features:**
+**Potential admin UI features** (the admin UI is not part of this repository for now):
 
 - Browse patterns with search/filter
 - View enrichment status and errors
