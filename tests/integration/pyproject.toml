@@ -1,0 +1,43 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mnemonic-e2e"
+version = "0.0.1"
+description = "Black-box end-to-end suite for the Mnemonic stack"
+requires-python = ">=3.13"
+dependencies = [
+    "httpx",
+    "mcp",
+    "pika",
+    "psycopg[binary]",
+    "neo4j",
+]
+
+[dependency-groups]
+dev = ["bandit", "mypy", "pytest", "ruff"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mnemonic_e2e"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM"]
+
+[tool.mypy]
+strict = true
+files = ["src", "tests"]
+
+# pika ships no type information.
+[[tool.mypy.overrides]]
+module = "pika"
+ignore_missing_imports = true
+
+# Bandit reads this with `bandit -c pyproject.toml`. pytest assertions are the
+# tests' whole job, so B101 is skipped; the virtualenv is not ours to scan.
+[tool.bandit]
+exclude_dirs = [".venv"]
+skips = ["B101"]
