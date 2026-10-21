@@ -24,7 +24,7 @@ const testPatternPrefix = "test-integration-chunk-"
 func setupTestDB(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 
-	connStr := os.Getenv("TEST_DATABASE_URL")
+	connStr := os.Getenv("MNEMONIC_TEST_DATABASE_URL")
 	if connStr == "" {
 		connStr = "postgres://mnemonic:mnemonic_dev@localhost:15433/mnemonic?sslmode=disable"
 	}

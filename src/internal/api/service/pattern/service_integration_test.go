@@ -44,9 +44,9 @@ var _ queue.Publisher = (*recordingPublisher)(nil)
 
 func integrationPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	connStr := os.Getenv("TEST_DATABASE_URL")
+	connStr := os.Getenv("MNEMONIC_TEST_DATABASE_URL")
 	if connStr == "" {
-		t.Skip("skipping integration test: TEST_DATABASE_URL not set (run make tests-integration)")
+		t.Skip("skipping integration test: MNEMONIC_TEST_DATABASE_URL not set (run make tests-integration)")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
