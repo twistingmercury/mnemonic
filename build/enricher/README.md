@@ -17,7 +17,8 @@ make build
 `make build` sets `LOCAL=1` and invokes `src/build/build.sh`. The script performs
 these stages in order:
 
-1. Builds the final image with no Docker layer cache. The Dockerfile runs
+1. Builds the final image with no Docker layer cache and a freshly pulled base
+   image (`--no-cache --pull`, always on). The Dockerfile runs
    `goimports`, `golangci-lint`, `govulncheck`, `gosec`, and Go unit tests before
    compiling the binary.
 2. Tags the image as both
@@ -47,7 +48,7 @@ To build only the image from the repository root, without running the end-to-end
 stack or cleanup, use:
 
 ```bash
-docker build --rm --no-cache \
+docker build --rm --no-cache --pull \
   --file src/build/Dockerfile \
   --build-arg BUILD_VER=dev \
   --build-arg BUILD_COMMIT="$(git rev-parse --short HEAD)" \

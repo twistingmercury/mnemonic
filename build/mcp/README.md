@@ -47,8 +47,8 @@ The build runs in this order:
 7. The test runner's exit code determines success, after which the E2E stack
    and its volumes are removed.
 
-The Docker build uses `--no-cache`, so every run executes all quality gates and
-tests.
+The Docker build always uses `--no-cache` and `--pull`, so every run executes all
+quality gates and tests and starts from a fresh base image.
 
 ## Build inputs
 

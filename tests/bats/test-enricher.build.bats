@@ -28,32 +28,31 @@ teardown() {
         "$(expected_build "${COMPONENT}" 0.5.1 "${BUILD_DATE}" abc1234 v0.5.1)"
 }
 
-@test "${COMPONENT} build - does not pass --no-cache by default" {
+@test "${COMPONENT} build - always passes --no-cache" {
     run "${SCRIPT_PATH}"
 
     assert_success
-    run grep -c -e '--no-cache' "${DOCKER_LOG}"
-    assert_output "0"
+    run build_invocation
+    assert_output --partial " --no-cache "
 }
 
-@test "${COMPONENT} build with NO_CACHE=1 - passes --no-cache" {
-    export NO_CACHE=1
-
+@test "${COMPONENT} build - always passes --pull" {
     run "${SCRIPT_PATH}"
 
     assert_success
-    assert_equal "$(build_invocation)" \
-        "$(expected_build "${COMPONENT}" 0.5.1 "${BUILD_DATE}" abc1234 v0.5.1 '--no-cache ')"
+    run build_invocation
+    assert_output --partial " --pull "
 }
 
-@test "${COMPONENT} build with NO_CACHE=0 - does not pass --no-cache" {
+@test "${COMPONENT} build with the retired NO_CACHE=0 and PULL=0 set - still passes both" {
     export NO_CACHE=0
+    export PULL=0
 
     run "${SCRIPT_PATH}"
 
     assert_success
-    run grep -c -e '--no-cache' "${DOCKER_LOG}"
-    assert_output "0"
+    run build_invocation
+    assert_output --partial " --no-cache --pull "
 }
 
 @test "${COMPONENT} build - enables BuildKit for the docker call" {
@@ -92,16 +91,6 @@ teardown() {
 
     assert_failure
     assert [ -n "$(log_line_of 'down -v --remove-orphans')" ]
-}
-
-@test "${COMPONENT} build with PULL=1 - passes --pull" {
-    export PULL=1
-
-    run "${SCRIPT_PATH}"
-
-    assert_success
-    assert_equal "$(build_invocation)" \
-        "$(expected_build "${COMPONENT}" 0.5.1 "${BUILD_DATE}" abc1234 v0.5.1 '--pull ')"
 }
 
 @test "${COMPONENT} build - uses the legacy compose file unless E2E_COMPOSE_FILE is set" {
@@ -223,8 +212,10 @@ teardown() {
     run "${SCRIPT_PATH}"
 
     assert_success
-    # The checkout directory may itself be named after the placeholder, and the
-    # parked compose services keep their old names until the compose side moves.
+    # Only the docker build line is inspected: the compose lines are out of
+    # scope because the parked services keep their old names until the compose
+    # files move. The checkout directory may itself carry the placeholder name,
+    # so the repo root is stripped first.
     local logged
     logged="$(build_invocation | sed "s#${REPO_ROOT}##g")"
     refute_regex_placeholder "${logged}"
@@ -248,4 +239,116 @@ teardown() {
     run grep -F -e 'org.opencontainers.image.source="https://github.com/twistingmercury/mnemonic"' "${dockerfile}"
 
     assert_success
+}
+
+@test "${COMPONENT} e2e - every docker compose call carries the same mnemonic-e2e project name" {
+    run "${SCRIPT_PATH}"
+
+    assert_success
+    run compose_calls_without_project "${COMPONENT}"
+    assert_output ""
+    run compose_project_names
+    assert_output --regexp "^mnemonic-e2e-${COMPONENT}-[0-9]+\$"
+}
+
+@test "${COMPONENT} e2e - tears the project down with volumes, orphans and local images" {
+    run "${SCRIPT_PATH}"
+
+    assert_success
+    run compose_calls
+    assert_line --regexp "^compose -p mnemonic-e2e-${COMPONENT}-[0-9]+ -f .* down -v --remove-orphans --rmi local\$"
+}
+
+@test "${COMPONENT} e2e - tears down only after the tests finish" {
+    run "${SCRIPT_PATH}"
+
+    assert_success
+    local last_line total
+    total="$(wc -l < "${DOCKER_LOG}" | tr -d ' ')"
+    last_line="$(log_line_of 'down -v --remove-orphans --rmi local')"
+    assert [ "${last_line}" = "${total}" ]
+}
+
+@test "${COMPONENT} e2e - reports the cleaned project after a pass" {
+    run "${SCRIPT_PATH}"
+
+    assert_success
+    assert_output --regexp "cleaned up mnemonic-e2e-${COMPONENT}-[0-9]+"
+}
+
+@test "${COMPONENT} e2e - tears down and fails when bringing up the infrastructure fails" {
+    export STUB_DOCKER_FAIL_ON=" up -d "
+
+    run "${SCRIPT_PATH}"
+
+    assert_failure
+    assert_output --partial "end-to-end tests failed"
+    assert [ -n "$(log_line_of 'down -v --remove-orphans --rmi local')" ]
+}
+
+@test "${COMPONENT} e2e - tears down when interrupted with INT" {
+    export STUB_DOCKER_SIGNAL_ON="--abort-on-container-exit"
+    export STUB_DOCKER_SIGNAL="INT"
+
+    run "${SCRIPT_PATH}"
+
+    assert_failure 130
+    assert [ -n "$(log_line_of 'down -v --remove-orphans --rmi local')" ]
+    assert_output --regexp "cleaned up mnemonic-e2e-${COMPONENT}-[0-9]+"
+}
+
+@test "${COMPONENT} e2e - tears down when terminated with TERM" {
+    export STUB_DOCKER_SIGNAL_ON="--abort-on-container-exit"
+    export STUB_DOCKER_SIGNAL="TERM"
+
+    run "${SCRIPT_PATH}"
+
+    assert_failure 143
+    assert [ -n "$(log_line_of 'down -v --remove-orphans --rmi local')" ]
+}
+
+@test "${COMPONENT} e2e - tears down once when interrupted" {
+    export STUB_DOCKER_SIGNAL_ON="--abort-on-container-exit"
+    export STUB_DOCKER_SIGNAL="INT"
+
+    run "${SCRIPT_PATH}"
+
+    run grep -c -e ' down ' "${DOCKER_LOG}"
+    assert_output "1"
+}
+
+@test "${COMPONENT} e2e - keeps the failing exit status after teardown" {
+    export STUB_DOCKER_FAIL_ON="--abort-on-container-exit"
+
+    run "${SCRIPT_PATH}"
+
+    assert_failure 1
+}
+
+@test "${COMPONENT} e2e - never prunes anything" {
+    export STUB_DOCKER_FAIL_ON="--abort-on-container-exit"
+    "${SCRIPT_PATH}" || true
+
+    run grep -c -e 'prune' "${DOCKER_LOG}"
+    assert_output "0"
+}
+
+@test "${COMPONENT} e2e - never removes the image it built" {
+    run "${SCRIPT_PATH}"
+
+    assert_success
+    run grep -c -E -e '^(rmi|image rm|image remove|rm) ' "${DOCKER_LOG}"
+    assert_output "0"
+    run grep -c -e "ghcr.io/twistingmercury/mnemonic-${COMPONENT}" <(grep -e ' down ' "${DOCKER_LOG}")
+    assert_output "0"
+}
+
+@test "${COMPONENT} e2e - a repeated run gets a project name of its own" {
+    run "${SCRIPT_PATH}"
+    assert_success
+    run "${SCRIPT_PATH}"
+    assert_success
+
+    run down_project_names
+    assert_equal "${#lines[@]}" "2"
 }

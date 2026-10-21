@@ -26,6 +26,21 @@ if [ -n "${STUB_DOCKER_FAIL_ON:-}" ]; then
         *"${STUB_DOCKER_FAIL_ON}"*) exit 1 ;;
     esac
 fi
+# Plays an interrupt: for an argv containing STUB_DOCKER_SIGNAL_ON, signals the
+# calling script (INT or TERM, named by STUB_DOCKER_SIGNAL) and exits the way a
+# child killed by that signal would. Done from inside the shim because a
+# background job cannot trap INT, and this keeps the test free of timing.
+if [ -n "${STUB_DOCKER_SIGNAL_ON:-}" ]; then
+    case "$*" in
+        *"${STUB_DOCKER_SIGNAL_ON}"*)
+            kill -s "${STUB_DOCKER_SIGNAL}" "${PPID}"
+            case "${STUB_DOCKER_SIGNAL}" in
+                INT) exit 130 ;;
+                *) exit 143 ;;
+            esac
+            ;;
+    esac
+fi
 exit 0
 STUB
 
@@ -66,18 +81,17 @@ log_line_of() {
 }
 
 # The exact `docker build` line expected for <component>, given the version,
-# date, commit and image tag, plus any extra leading flags (such as --no-cache).
+# date, commit and image tag. Every build carries --no-cache and --pull.
 expected_build() {
     local component="${1}"
     local version="${2}"
     local build_date="${3}"
     local commit="${4}"
     local image_tag="${5}"
-    local extra_flags="${6:-}"
     local image="ghcr.io/twistingmercury/mnemonic-${component}"
 
-    printf "build --rm %s--progress=plain --file %s/build/%s/%s.Dockerfile --build-arg BUILD_VER=%s --build-arg BUILD_DATE=%s --build-arg BUILD_COMMIT=%s --target final --tag %s:%s --tag %s:latest %s" \
-        "${extra_flags}" "${REPO_ROOT}" "${component}" "${component}" \
+    printf "build --rm --no-cache --pull --progress=plain --file %s/build/%s/%s.Dockerfile --build-arg BUILD_VER=%s --build-arg BUILD_DATE=%s --build-arg BUILD_COMMIT=%s --target final --tag %s:%s --tag %s:latest %s" \
+        "${REPO_ROOT}" "${component}" "${component}" \
         "${version}" "${build_date}" "${commit}" \
         "${image}" "${image_tag}" "${image}" "${REPO_ROOT}"
 }
@@ -92,4 +106,26 @@ refute_regex_placeholder() {
     fi
 
     return 0
+}
+
+# Every `docker compose` line the shim logged.
+compose_calls() {
+    grep -e '^compose ' "${DOCKER_LOG}"
+}
+
+# The distinct project names (the argument after -p) across all compose lines.
+compose_project_names() {
+    compose_calls | awk '{print $3}' | sort -u
+}
+
+# Compose lines that do not start with `compose -p mnemonic-e2e-<component>-<pid> `.
+compose_calls_without_project() {
+    local component="${1}"
+
+    compose_calls | grep -v -E -e "^compose -p mnemonic-e2e-${component}-[0-9]+ " || true
+}
+
+# The distinct project names on the `down` lines only.
+down_project_names() {
+    grep -e ' down ' "${DOCKER_LOG}" | awk '{print $3}' | sort -u
 }

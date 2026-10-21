@@ -14,6 +14,8 @@ IMAGE_TAG="${IMAGE_TAG:-v${BUILD_VER}}"
 
 # The e2e suite is still parked under tests/legacy until it is re-homed.
 E2E_COMPOSE_FILE="${E2E_COMPOSE_FILE:-${PROJ_ROOT}/tests/legacy/api/docker-compose.yaml}"
+# The librarian_* service names must change together with the compose files
+# under tests/legacy (the rename tasks for those files).
 E2E_INFRA_SERVICES=(postgres neo4j rabbitmq)
 E2E_UP_SERVICES=(librarian_api librarian_tests)
 E2E_EXIT_CODE_FROM="librarian_tests"
