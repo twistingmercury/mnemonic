@@ -1,7 +1,5 @@
 # Mnemonic
 
-[![Mnemonic MCP CI](https://github.com/twistingmercury/librarian-mcp/actions/workflows/mnemonic-ci.yaml/badge.svg)](https://github.com/twistingmercury/librarian-mcp/actions/workflows/mnemonic-ci.yaml)
-
 > **Maturity Level**: Emerging — MCP search server functional, Admin REST API in a separate service (`mnemonic-api`)
 > **Version**: v0.6.0
 >
@@ -29,7 +27,7 @@
 
 ## Usage
 
-Mnemonic exposes Streamable HTTP MCP at <http://localhost:18081/mcp>, speaking MCP protocol version 2026-07-28 (and 2025-11-25 and earlier for older clients).
+Mnemonic exposes Streamable HTTP MCP at <http://localhost:8081/mcp> through the gateway, speaking MCP protocol version 2026-07-28 (and 2025-11-25 and earlier for older clients).
 
 Example MCP tool invocation:
 
@@ -42,7 +40,7 @@ Example MCP tool invocation:
 
 MCP tools available: `search_patterns`, `find_related_patterns`, `get_pattern`.
 
-Pattern data is managed via the companion [mnemonic-api](https://github.com/twistingmercury/librarian-api) service.
+Pattern data is managed via the companion [mnemonic-api](../api/README.md) service.
 
 ## How it works
 
@@ -51,26 +49,18 @@ embeddings) and Neo4j (for concept relationships). This service exposes MCP
 search tools over that data. The companion Admin API publishes enrichment jobs
 to RabbitMQ, and the separate `mnemonic-enricher` service consumes them.
 
-**Local dev stack (Docker Compose):**
+**Local stack (Docker Compose):** [deploy/docker-compose.yaml](../deploy/docker-compose.yaml)
+runs this service as `mnemonic-mcp` (image `ghcr.io/twistingmercury/mnemonic-mcp`)
+next to `mnemonic-api`, `mnemonic-enricher`, `mnemonic-postgres`,
+`mnemonic-neo4j` and RabbitMQ, behind an Envoy gateway. Only Envoy and
+Keycloak publish host ports: the MCP endpoint is `:8081/mcp`, the API is
+`:8080` and Keycloak is `:8180`. The service itself listens on port 8081
+inside the Compose network and is not published directly. Both database images
+are pre-configured with the required schema, so no migration step is needed.
+The gateway checks a Keycloak token on each request; see the
+[gateway README](../gateway/README.md).
 
-| Service        | Image                                       | Host access                                     |
-| -------------- | ------------------------------------------- | ----------------------------------------------- |
-| `dev_mcp`      | `ghcr.io/twistingmercury/librarian-mcp`          | MCP `:8081/mcp`; metrics `:9090/metrics`        |
-| `dev_api`      | `ghcr.io/twistingmercury/librarian-api`      | Admin REST API on `:8080`                       |
-| `dev_postgres` | `ghcr.io/twistingmercury/librarian-postgres` | Postgres + PGVector on `:15433`                  |
-| `dev_neo4j`    | `ghcr.io/twistingmercury/librarian-neo4j`    | Neo4j HTTP on `:17475`; Bolt on `:17688`          |
-| `dev_rabbitmq` | `rabbitmq:4-management-alpine`              | AMQP on `:15673`; management console on `:25673` |
-
-Both database images are pre-configured with the required schema, so no
-migration step is needed. From the host, MCP is available at
-<http://localhost:18081/mcp> and metrics at <http://localhost:19090/metrics>.
-Within the Compose network, the MCP service exposes operations at
-`http://dev_mcp:8080/health` and `http://dev_mcp:8080/version`. Its operations
-port is not published to the host; host port 8080 routes to `dev_api`. The stack
-does not include `mnemonic-enricher`, so queued content will not become
-searchable unless that service is run separately.
-
-To run the add the mcp server to Claude: `claude mcp add --transport http --scope user mnemonic http://localhost:18081/mcp`
+To run the add the mcp server to Claude: `claude mcp add --transport http --scope user mnemonic http://localhost:8081/mcp`
 
 ## Key Considerations
 
@@ -85,36 +75,29 @@ To run the add the mcp server to Claude: `claude mcp add --transport http --scop
 
 ### Quick Start
 
-Requires Go 1.27.2+, Docker 27+, and Docker Compose 2.32+.
+Requires Go 1.27.3+, Docker 27+, and Docker Compose 2.32+.
 
 ```bash
-git clone https://github.com/twistingmercury/librarian-mcp.git
-cd mnemonic-mcp
+git clone https://github.com/twistingmercury/mnemonic.git
+cd mnemonic
 make tests-unit
 ```
 
 ### Building & running
 
-`make build` builds `ghcr.io/twistingmercury/librarian-mcp` with the current version
-and `latest` tags, then runs the end-to-end suite. The suite also requires the
-`ghcr.io/twistingmercury/librarian-api:latest-dev` image to be available to
-Docker. It points `openai.base_url` (`LIBRARIAN_OPENAI_BASE_URL`, default
-`https://api.openai.com/v1`) at a local stub in `src/tests/openai-stub`, so no
-E2E test calls OpenAI.
+`make build-mcp` runs `build/mcp/mcp.build.sh`: it builds
+`ghcr.io/twistingmercury/mnemonic-mcp` with the current version and `latest`
+tags, then runs the end-to-end suite in containers. It never pushes; CI does.
+The suite is still parked under `tests/legacy/mcp` and the E2E step fails until
+it is re-homed. It points `openai.base_url` (`MNEMONIC_OPENAI_BASE_URL`, default
+`https://api.openai.com/v1`) at the local stub in `tests/openai-stub`, so no
+E2E test calls OpenAI. See the [build guide](../build/mcp/README.md).
 
-The local Compose stack is a separate workflow. Before `make start`, provide
-`LIBRARIAN_OPENAI_API_KEY` and ensure these development images already exist
-locally because their services use `pull_policy: never`:
-
-- `ghcr.io/twistingmercury/librarian-mcp:latest-dev`
-- `ghcr.io/twistingmercury/librarian-api:latest-dev`
-
-```bash
-export LIBRARIAN_OPENAI_API_KEY="your-api-key"
-make start
-```
-
-`make start` does not build or retag images.
+To run the whole local stack, export `MNEMONIC_OPENAI_API_EMBEDDINGS_KEY` in
+your shell (only the egress proxy reads it) and run `make up`; `make down` stops
+it. The stack uses the images named by `MNEMONIC_API_IMAGE`,
+`MNEMONIC_MCP_IMAGE` and `MNEMONIC_ENRICHER_IMAGE`, defaulting to the
+`latest-dev` images on ghcr.io, and `make up` does not build or retag images.
 
 ### Testing
 
@@ -127,17 +110,18 @@ not implement the `Rows.TypeMap()` method required by pgx v5.11.0.
 make tests-unit
 
 # Image build and end-to-end tests
-make build
+make build-mcp
 ```
 
 ### Versioning
 
 This project follows [Semantic Versioning 2.0.0](https://semver.org/).
 
-Version is determined from git tags:
+Each component has its own tag (`mcp/vX.Y.Z`); the version comes from the
+latest one:
 
 ```bash
-git describe --tags --abbrev=0
+build/version.sh mcp
 ```
 
 See [CHANGELOG.md](CHANGELOG.md) for development progress.
@@ -146,8 +130,8 @@ See [CHANGELOG.md](CHANGELOG.md) for development progress.
 
 ### Architecture
 
-Architecture and related decisions can be found here: [Mnemonic Docs](https://github.com/twistingmercury/librarian-docs/blob/develop/docs/architecture/system/README.md)
+Architecture and related decisions can be found here: [Architecture](../docs/design/architecture/system/README.md)
 
 ### Design
 
-Design documents are here: [Design Documents](https://github.com/twistingmercury/librarian-docs/blob/develop/docs/design/README.md)
+Design documents are here: [Design Documents](../docs/design/README.md)

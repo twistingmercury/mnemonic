@@ -11,10 +11,10 @@ Run the commands in this guide from the repository root.
 The canonical local workflow is:
 
 ```bash
-make build
+make build-enricher
 ```
 
-`make build` invokes `build/enricher/enricher.build.sh`. The script performs
+`make build-enricher` invokes `build/enricher/enricher.build.sh`. The script performs
 these stages in order:
 
 1. Builds the final image with no Docker layer cache and a freshly pulled base
@@ -24,18 +24,17 @@ these stages in order:
 2. Tags the image as both
    `ghcr.io/twistingmercury/mnemonic-enricher:<version>` and
    `ghcr.io/twistingmercury/mnemonic-enricher:latest`. The version defaults to
-   the most recent Git tag, or `dev` when no tag is available.
-3. Starts the isolated stack in `src/tests/docker-compose.yaml` and runs the
-   end-to-end tests against the newly built `latest` image.
+   the most recent `enricher/vX.Y.Z` Git tag (`build/version.sh enricher`), or
+   `0.0.0-dev` when there is none.
+3. Starts the isolated stack in `tests/legacy/enricher/docker-compose.yaml` and
+   runs the end-to-end tests against the newly built `latest` image.
 
-The end-to-end stack requires Docker to pull these dependency images:
-
-- `ghcr.io/twistingmercury/librarian-postgres:v1.0.0-dev`
-- `ghcr.io/twistingmercury/librarian-neo4j:v1.0.0-dev`
-- `rabbitmq:4.0-management`
-
-It builds and uses a local OpenAI stub; a live OpenAI key is not required for these
-tests.
+The script never pushes an image; CI does. The end-to-end suite is still parked
+under `tests/legacy` and its Compose file still uses the fork's image and
+service names, so this step fails until the suite is re-homed. The stack
+needs Docker to pull the pre-migrated PostgreSQL and Neo4j images and RabbitMQ
+(`rabbitmq:4.0-management`). It builds and uses a local OpenAI stub; a live
+OpenAI key is not required for these tests.
 
 > **Cleanup:** The script removes only its own `mnemonic-e2e-enricher-<pid>`
 > compose project (containers, networks, volumes, orphans and compose-built
@@ -70,125 +69,99 @@ investigating runtime issues.
 
 ## CI publication
 
-The GitHub Actions workflow runs `build/enricher/enricher.build.sh`, so publication occurs only
-after the image build gates and end-to-end tests pass. It publishes these tags:
+The CI workflows are not written yet, so nothing is published from this
+repository today. The build script is the gate they will run: publication
+should happen only after the image build gates and end-to-end tests pass.
+Registry publication is distinct from deployment; this repository does not
+define a production rollout.
 
-| Git ref | Published tags |
-| --- | --- |
-| `main` | `latest`, `<version>` |
-| Other configured branches and pull-request refs | `latest-dev`, `<version>-dev` |
+## Full local stack
 
-The workflow currently runs for pushes and pull requests targeting `main` or
-`develop`, plus manual dispatches. Registry publication is distinct from deployment;
-this repository does not define a production rollout.
+[`deploy/docker-compose.yaml`](../../deploy/docker-compose.yaml) runs the
+enricher with the other services behind the gateway. Provide the following:
 
-## Broader Mnemonic Compose stack
-
-The root `docker-compose.yaml` is an integration contract for development with the
-broader Mnemonic stack. It is not a standalone quick start from this repository.
-Before using it, provide all of the following:
-
-- PostgreSQL migration files at `src/migrations/postgres`, supplied by the
-  companion Mnemonic API project.
-- Registry access to pull `ghcr.io/twistingmercury/mnemonic-mcp:latest-dev` for
-  `dev_api`.
-- A local
-  `ghcr.io/twistingmercury/mnemonic-enricher:latest-dev` image for
-  `dev_enricher`. The local build script creates `latest`, not `latest-dev`, so tag
-  it explicitly when appropriate:
+- Registry access to pull the `latest-dev` images on ghcr.io, or local images.
+  The build script tags `latest`, not `latest-dev`, so point the stack at your
+  build with `MNEMONIC_ENRICHER_IMAGE`:
 
   ```bash
-  docker tag \
-    ghcr.io/twistingmercury/mnemonic-enricher:latest \
-    ghcr.io/twistingmercury/mnemonic-enricher:latest-dev
+  export MNEMONIC_ENRICHER_IMAGE=ghcr.io/twistingmercury/mnemonic-enricher:latest
   ```
 
-- A repository-root `.env` file containing a valid `MNEMONIC_OPENAI_API_KEY`.
-  Start with `cp src/.env.example .env`, then edit the copy. Do not commit `.env`.
+- The OpenAI key in the host variable `MNEMONIC_OPENAI_API_EMBEDDINGS_KEY`,
+  exported in your own shell. Only the `egress` service reads it; the enricher
+  gets the placeholder `MNEMONIC_OPENAI_API_KEY=proxy-managed` and reaches
+  OpenAI through that proxy. `.env.example` at the repository root leaves the
+  key empty on purpose; do not put a real key in any file.
 
-After supplying those external assets, validate the service names and start the
-stack:
-
-```bash
-docker compose config --services
-docker compose up -d
-docker compose ps
-```
-
-The Compose services are `dev_postgres`, `migrate`, `dev_neo4j`, `dev_rabbitmq`,
-`dev_api`, and `dev_enricher`. The API and enricher wait for their declared healthy
-database dependencies; the enricher also waits for `dev_rabbitmq` to become healthy.
-
-Stop the stack with `docker compose down`. Adding `--volumes` also deletes the local
-PostgreSQL and Neo4j development data:
+Then start and stop the stack from the repository root:
 
 ```bash
-docker compose down --volumes
+make up
+make down
 ```
+
+The enricher waits for healthy `postgres`, `neo4j` and `rabbitmq` services.
+`make down` keeps the named volumes; remove them with
+`docker compose -f deploy/docker-compose.yaml down --volumes`, which also
+deletes the local PostgreSQL and Neo4j development data.
 
 ## Services and endpoints
 
-The host-published endpoints in the root Compose stack are:
+Only Envoy and Keycloak publish host ports:
 
 | Service | Host endpoint | Purpose |
 | --- | --- | --- |
-| `dev_api` | <http://localhost:18080> | Mnemonic REST API |
-| `dev_api` | <http://localhost:18081> | Mnemonic MCP endpoint |
-| `dev_api` | <http://localhost:19090> | Mnemonic API metrics |
-| `dev_postgres` | `postgresql://localhost:15433` | PostgreSQL |
-| `dev_neo4j` | <http://localhost:17475> | Neo4j Browser |
-| `dev_neo4j` | `bolt://localhost:17688` | Neo4j Bolt protocol |
-| `dev_rabbitmq` | `amqp://localhost:15672` | RabbitMQ AMQP |
-| `dev_rabbitmq` | <http://localhost:25672> | RabbitMQ management UI |
+| `envoy` | <http://localhost:8080> | Mnemonic REST API |
+| `envoy` | <http://localhost:8081> | Mnemonic MCP endpoint |
+| `keycloak` | <http://localhost:8180> | Keycloak (token issuer) |
 
-`dev_enricher` is a worker, not the Mnemonic API. Its health and version server on
-port 8080 and metrics server on port 9090 are available only on the Compose network;
-the root Compose file does not publish them to the host. Probe the container with:
+`mnemonic-enricher` is a worker, not the Mnemonic API. Its health and version
+server on port 8080 and metrics server on port 9090 are available only on the
+Compose network. Probe the container with:
 
 ```bash
-docker compose exec dev_enricher /mnemonic-enricher --health
-docker compose exec dev_enricher /mnemonic-enricher --version
+docker compose -f deploy/docker-compose.yaml exec mnemonic-enricher /mnemonic-enricher --health
+docker compose -f deploy/docker-compose.yaml exec mnemonic-enricher /mnemonic-enricher --version
 ```
 
 ## Local dependency credentials
 
-These credentials are for the root development Compose stack only. Never use them
-in production.
+These credentials are for the local development Compose stack only. Never use
+them in production.
 
 | Dependency | Username | Password | Additional configuration |
 | --- | --- | --- | --- |
 | PostgreSQL | `mnemonic` | `mnemonic_dev` | Database `mnemonic` |
 | Neo4j | `neo4j` | `mnemonic_dev` | Default database |
-| RabbitMQ | `guest` | `guest` | Queue `enrichment-jobs` |
+| RabbitMQ | `mnemonic` | `mnemonic_dev` | Queue `enrichment-jobs` |
 
-RabbitMQ is required by `dev_enricher`: the worker connects to the
-`dev_rabbitmq:5672` Compose address, consumes from `enrichment-jobs`, and does not
-start until the RabbitMQ health check passes. From the host, use
-`localhost:15672` for AMQP clients and <http://localhost:25672> for the management
-UI.
+RabbitMQ is required by `mnemonic-enricher`: the worker connects to the
+`rabbitmq:5672` Compose address, consumes from `enrichment-jobs`, and does not
+start until the RabbitMQ health check passes. RabbitMQ publishes no host port in
+this stack.
 
 ## Troubleshooting
 
 Inspect service and dependency state without rendering secrets:
 
 ```bash
-docker compose config --services
-docker compose ps
-docker compose logs dev_enricher
-docker compose logs dev_postgres dev_neo4j dev_rabbitmq
-docker compose exec dev_postgres pg_isready -U mnemonic
-docker compose exec dev_neo4j cypher-shell \
+docker compose -f deploy/docker-compose.yaml ps
+docker compose -f deploy/docker-compose.yaml logs mnemonic-enricher
+docker compose -f deploy/docker-compose.yaml logs postgres neo4j rabbitmq
+docker compose -f deploy/docker-compose.yaml exec postgres pg_isready -U mnemonic
+docker compose -f deploy/docker-compose.yaml exec neo4j cypher-shell \
   -u neo4j -p mnemonic_dev "RETURN 1"
-docker compose exec dev_rabbitmq rabbitmq-diagnostics ping
-docker compose exec dev_rabbitmq rabbitmqctl list_queues name messages consumers
+docker compose -f deploy/docker-compose.yaml exec rabbitmq rabbitmq-diagnostics ping
+docker compose -f deploy/docker-compose.yaml exec rabbitmq rabbitmqctl list_queues name messages consumers
 ```
 
 For queue-specific startup or delivery problems, inspect
-`docker compose logs dev_rabbitmq dev_enricher` and confirm that `dev_rabbitmq` is
-healthy in `docker compose ps`. The management UI can also confirm whether the
-`enrichment-jobs` queue exists and has an active consumer.
+`docker compose -f deploy/docker-compose.yaml logs rabbitmq mnemonic-enricher`
+and confirm that `rabbitmq` is healthy in `ps`. `rabbitmqctl list_queues`
+shows whether the `enrichment-jobs` queue exists and has an active consumer.
 
-Avoid sharing unrestricted `docker compose config` output: interpolation can expose
-the OpenAI key and plaintext development credentials. If rendered configuration is
-needed for diagnosis, limit it to the relevant service and redact secrets before
-sharing it.
+Avoid sharing unrestricted `docker compose config` output: interpolation can
+expose plaintext development credentials and, when it is set in your shell, the
+OpenAI key. If rendered configuration is needed for diagnosis, limit it to the
+relevant service and redact secrets before sharing it.

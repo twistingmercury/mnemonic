@@ -34,13 +34,13 @@ Both images are self-initializing — the schema is applied by the container its
 
 **Neo4j image** (`ghcr.io/twistingmercury/mnemonic-neo4j`): built `FROM neo4j:5` with APOC enabled. The Cypher constraint and index files ship inside the image, and a wrapper entrypoint applies them with `cypher-shell` every time the container starts, then writes `/tmp/schema_ready`. The schema cannot be baked into the image because `/data` is a Docker VOLUME. Health checks should test for `/tmp/schema_ready` (the image's built-in `HEALTHCHECK` does).
 
-**CI**: a GitHub Actions workflow triggers on any change to `src/postgres/**` or `src/neo4j/**`, runs the BATS test suites for both databases, then builds and pushes both images to GHCR.
+**CI**: the workflows are not written yet. When they exist, they are meant to run the BATS suites for both databases on any change under `db/postgres/` or `db/neo4j/`, then build and push both images to GHCR. Nothing is pushed from a local build.
 
 ## Key Considerations
 
 - `002_create_existence_constraints.cypher` is skipped at startup on Community Edition — existence constraints require Neo4j Enterprise Edition
 - `.down.sql` files are not included; rollback is handled by rebuilding from a prior image tag
-- Images are tagged `latest` + version on `main`, `latest-dev` + version-dev on `develop`
+- The build scripts tag each image with the version and `latest`; which tags CI publishes is decided when its workflows are written
 
 ## Development Considerations
 
@@ -51,8 +51,9 @@ Requires Docker 27+, Docker Compose 2.32+, `bats-core`, and `psql`.
 Build the images locally from the repository root (each script tags the image with the version and `latest`):
 
 ```bash
-bash db/postgres/build.sh
-bash db/neo4j/build.sh
+make db-build            # both images
+make db-build-postgres   # or one at a time
+make db-build-neo4j
 ```
 
 Set `MNEMONIC_VERSION` to override the git-derived version tag.
@@ -62,8 +63,8 @@ Set `MNEMONIC_VERSION` to override the git-derived version tag.
 BATS tests verify the schema state after all migrations have been applied.
 
 ```bash
-db/tests/postgres-test-runner.sh   # PostgreSQL migrations
-db/tests/neo4j-test-runner.sh      # Neo4j migrations and the Neo4j image
+make db-test-postgres   # PostgreSQL migrations (db/tests/postgres-test-runner.sh)
+make db-test-neo4j      # Neo4j migrations and the Neo4j image (db/tests/neo4j-test-runner.sh)
 bats db/tests/bats/schema-entrypoint.bats db/tests/bats/build-scripts.bats   # scripts, no Docker stack needed
 ```
 
@@ -73,7 +74,7 @@ Environment variables (all optional):
 
 | Variable | Default | Used by |
 | --- | --- | --- |
-| `MNEMONIC_VERSION` | latest git tag, else `dev` | `build.sh` scripts: image tag |
+| `MNEMONIC_VERSION` | latest git tag (any component), else `dev` | `build.sh` scripts: image tag |
 | `MNEMONIC_MAX_RETRIES` | `30` | test runners: readiness attempts |
 | `MNEMONIC_RETRY_INTERVAL` | `1` | test runners: seconds between attempts |
 | `MNEMONIC_NEO4J_USER` / `MNEMONIC_NEO4J_PASSWORD` | `neo4j` / `mnemonic_dev` | Neo4j test runner and BATS |
@@ -90,7 +91,7 @@ Variables defined by the third-party tools keep their names: `NEO4J_AUTH`, `POST
 
 This project follows [Semantic Versioning 2.0.0](https://semver.org/).
 
-Version is determined from git tags:
+The `build.sh` scripts derive the image version from the latest git tag of the repository (any component's tag), or take `MNEMONIC_VERSION`:
 
 ```bash
 git describe --tags --always

@@ -46,14 +46,14 @@ Each request goes through two checks:
 
 ## Layout
 
-| Path | What it is |
+| Path (from the repository root) | What it is |
 | --- | --- |
-| `envoy/envoy.yaml` | Both edges: JWT verification, ext_authz, the MCP 401/403 challenges and protected resource metadata |
-| `opa/policy/` | Rego policies (`api.rego`, `mcp.rego`, entry point `main.rego`) and their tests |
-| `keycloak/realm-mnemonic.json` | Dev realm: audiences, scopes, test clients and a dev user |
-| `docker-compose.yaml` | Full local stack: gateway, Keycloak, both services and their data stores |
-| `test/compose.stub.yaml` | The gateway with stub services, for CI and quick runs |
-| `test/e2e/` | Go tests of every allow/deny case, run against either stack |
+| `gateway/envoy/envoy.yaml` | Both edges: JWT verification, ext_authz, the MCP 401/403 challenges and protected resource metadata |
+| `gateway/opa/policy/` | Rego policies (`api.rego`, `mcp.rego`, entry point `main.rego`) and their tests |
+| `gateway/keycloak/realm-mnemonic.json` | Dev realm: audiences, scopes, test clients and a dev user |
+| `deploy/docker-compose.yaml` | Full local stack: gateway, Keycloak, both services and their data stores |
+| `gateway/test/compose.stub.yaml` | The gateway with stub services, for CI and quick runs |
+| `gateway/test/e2e/` | Go tests of every allow/deny case, run against either stack |
 
 ## Access rules
 
@@ -80,13 +80,13 @@ Scopes nest: `patterns:admin` includes `patterns:write`, which includes `pattern
 | `GET` / `DELETE /mcp` | any valid token |
 | any other method, tool or path | denied |
 
-Every `POST /mcp` must send `MCP-Protocol-Version: 2026-07-28`. The MCP server only checks that the `Mcp-Method` and `Mcp-Name` headers match the JSON-RPC body from that version on, so for older versions those headers can't be trusted and OPA denies the request. To allow a newer version, add it to `supported_versions` in `opa/policy/mcp.rego` once the server validates headers for it.
+Every `POST /mcp` must send `MCP-Protocol-Version: 2026-07-28`. The MCP server only checks that the `Mcp-Method` and `Mcp-Name` headers match the JSON-RPC body from that version on, so for older versions those headers can't be trusted and OPA denies the request. To allow a newer version, add it to `supported_versions` in `gateway/opa/policy/mcp.rego` once the server validates headers for it.
 
 Unauthenticated MCP requests get `401` with `WWW-Authenticate: Bearer resource_metadata=...`, and Envoy serves the metadata at `/.well-known/oauth-protected-resource/mcp` (RFC 9728), so MCP clients can discover Keycloak and start OAuth on their own.
 
 ## Running it
 
-Requirements: Docker, Go 1.24, and [OPA](https://www.openpolicyagent.org/docs/latest/#running-opa) for the policy tests.
+Run these from the repository root. Requirements: Docker, Go 1.24, and [OPA](https://www.openpolicyagent.org/docs/latest/#running-opa) for the policy tests.
 
 ```sh
 make test-policy     # opa fmt, check and test
@@ -102,12 +102,23 @@ make up
 make e2e
 ```
 
-To use images you built with `make build` in those repos, point the stack at them:
+To use images you built with `make build` (`make build-api`, `make build-mcp`, `make build-enricher`), point the stack at them:
 
 ```sh
 MNEMONIC_API_IMAGE=ghcr.io/twistingmercury/mnemonic-api:latest \
-MNEMONIC_MCP_IMAGE=ghcr.io/twistingmercury/mnemonic-mcp:latest make up
+MNEMONIC_MCP_IMAGE=ghcr.io/twistingmercury/mnemonic-mcp:latest \
+MNEMONIC_ENRICHER_IMAGE=ghcr.io/twistingmercury/mnemonic-enricher:latest make up
 ```
+
+The e2e tests in `gateway/test/e2e` read these optional variables, so they can also target a stack that is not on the default ports:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `MNEMONIC_GATEWAY_API_URL` | `http://localhost:8080` | API edge the tests call |
+| `MNEMONIC_GATEWAY_MCP_URL` | `http://localhost:8081` | MCP edge the tests call |
+| `MNEMONIC_KEYCLOAK_URL` | `http://localhost:8180` | Keycloak that issues the test tokens |
+
+The stub services of `make e2e-stub` (`gateway/test/stub`) read `MNEMONIC_STUB_NAME`, the name they answer with, and `MNEMONIC_STUB_LISTEN`, a comma-separated list of listen addresses. `gateway/test/compose.stub.yaml` sets both.
 
 ### Getting a token
 
@@ -133,7 +144,7 @@ For interactive MCP clients, the public client `mnemonic-mcp-client` uses author
 
 The same stack also runs on a local minikube cluster, from the Helm chart in `deploy/helm/mnemonic/`. It gets its own minikube profile, `mnemonic`, and every `kubectl` and `helm` call names that context, so your current context and other clusters are left alone.
 
-Requirements: Docker, minikube, kubectl, Helm 4, `jq`, the locally built `mnemonic-*` images (`latest-dev` for the services, `v1.0.0-dev` for Postgres and Neo4j), and the OpenAI key in `MNEMONIC_OPENAI_API_EMBEDDINGS_KEY`. On Linux, set `fs.inotify.max_user_instances` to at least 512, or kube-proxy can fail with `too many open files`.
+Requirements: Docker, minikube, kubectl, Helm 4, `jq`, the OpenAI key in `MNEMONIC_OPENAI_API_EMBEDDINGS_KEY`. On Linux, set `fs.inotify.max_user_instances` to at least 512, or kube-proxy can fail with `too many open files`.
 
 ```sh
 make k8s-up            # profile (Calico CNI), image load, ConfigMaps, Secret, helm upgrade --install --wait
@@ -144,7 +155,7 @@ make k8s-down          # uninstall the chart and delete the namespace
 make k8s-delete        # delete the whole mnemonic profile
 ```
 
-`make k8s-up` runs `k8s-cluster`, `k8s-images`, `k8s-config` and `k8s-secret` first. You can also run each one on its own.
+The `mnemonic-*` images (`latest-dev` for the services, `v1.0.0-dev` for Postgres and Neo4j) are loaded from the host's Docker cache when you have built them; any image the host does not have is pulled by the node. `make k8s-up` runs `k8s-cluster`, `k8s-images`, `k8s-config` and `k8s-secret` first. You can also run each one on its own.
 
 `k8s-images` compares each image's build time on the host with the copy in the cluster. If you rebuilt an image under the same tag, it replaces the stale copy and restarts only the workloads that use it; otherwise it reports "up to date". (Plain `minikube image load` keeps the old copy when the tag already exists.)
 
@@ -179,6 +190,6 @@ The admin UI (`mnemonic-admin`) isn't part of this deployment.
 
 These values are only for local use and need replacing before any shared deployment:
 
-- The issuer and public URLs in `envoy/envoy.yaml` assume `localhost`. Plain HTTP is used throughout.
+- The issuer and public URLs in `gateway/envoy/envoy.yaml` assume `localhost`. Plain HTTP is used throughout.
 - The Keycloak realm uses fixed client secrets, a dev user, a broad loopback redirect pattern, and `start-dev` with no persistent database.
 - Envoy's admin interface listens on `127.0.0.1:9901` inside the container only.

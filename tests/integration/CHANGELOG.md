@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- 2026-10-21: Renamed the project back to Mnemonic in the monorepo, dropping the placeholder
+  name "Librarian": images are `ghcr.io/twistingmercury/mnemonic-*`, services read
+  `MNEMONIC_*` environment variables, and the stub moved to `tests/openai-stub`.
+  The Compose file still has the fork's names until it is re-homed.
 - MCP tool calls are sent as MCP protocol version 2026-07-28 requests: the
   protocol version, client info and capabilities in `_meta`, with the
   `MCP-Protocol-Version`, `Mcp-Method` and `Mcp-Name` headers.

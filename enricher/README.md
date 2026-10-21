@@ -7,8 +7,6 @@
 > - **Basic**: Production-ready but actively evolving, expect minor version changes
 > - **Mature**: Stable, battle-tested, changes are rare
 
-[![Build Status](https://github.com/twistingmercury/librarian-enricher/actions/workflows/mnemonic-enrichment-ci.yaml/badge.svg)](https://github.com/twistingmercury/librarian-enricher/actions/workflows/mnemonic-enrichment-ci.yaml)
-
 ---
 
 ## Table of Contents
@@ -42,9 +40,9 @@ Publish a job that already exists in PostgreSQL to the configured RabbitMQ queue
 The service exposes operational endpoints on ports `8080` and `9090` by default:
 
 ```bash
-curl http://localhost:18080/health
-curl http://localhost:18080/version
-curl http://localhost:19090/metrics
+curl http://localhost:8080/health
+curl http://localhost:8080/version
+curl http://localhost:9090/metrics
 ```
 
 ## How it works
@@ -69,18 +67,18 @@ interface.
   version, and metrics endpoints.
 - PostgreSQL, Neo4j, RabbitMQ, and OpenAI are required runtime dependencies.
 - The PostgreSQL schema and the producers that create enrichment jobs are maintained
-  outside this repository and must be available before the worker starts.
-- `LIBRARIAN_OPENAI_EMBEDDING_DIMENSIONS` must match the PostgreSQL vector column.
+  outside this service (the schema lives in [db](../db/README.md), the producer is the api) and must be available before the worker starts.
+- `MNEMONIC_OPENAI_EMBEDDING_DIMENSIONS` must match the PostgreSQL vector column.
 - OpenAI embedding and concept-extraction requests can incur usage and cost.
-- Configuration precedence is compiled defaults, YAML, then `LIBRARIAN_` environment
+- Configuration precedence is compiled defaults, YAML, then `MNEMONIC_` environment
   variables. See
-  [`src/internal/config/defaults.go`](src/internal/config/defaults.go) for defaults.
+  [`src/internal/enricher/config/defaults.go`](../src/internal/enricher/config/defaults.go) for defaults.
 
 ## Development Considerations
 
 ### Quick Start
 
-Requirements are Go 1.27.2 or newer, Docker with the Compose plugin for container
+Requirements are Go 1.27.3 or newer, Docker with the Compose plugin for container
 builds and end-to-end tests, accessible PostgreSQL, Neo4j, and RabbitMQ instances
 with the Mnemonic schema, and an OpenAI API key for live enrichment.
 
@@ -89,21 +87,23 @@ with the Mnemonic schema, and an OpenAI API key for live enrichment.
 Build and run a local binary:
 
 ```bash
-git clone https://github.com/twistingmercury/librarian-enricher.git
-cd mnemonic-enricher
-mkdir -p .bin
+git clone https://github.com/twistingmercury/mnemonic.git
+cd mnemonic
 make local
-export LIBRARIAN_DATABASE_POSTGRES_PASSWORD=mnemonic_dev
-export LIBRARIAN_DATABASE_NEO4J_PASSWORD=mnemonic_dev
-export LIBRARIAN_QUEUE_RABBITMQ_PASSWORD=guest
-export LIBRARIAN_OPENAI_API_KEY=your-api-key
-./.bin/mnemonic-enricher
+export MNEMONIC_DATABASE_POSTGRES_PASSWORD=mnemonic_dev
+export MNEMONIC_DATABASE_NEO4J_PASSWORD=mnemonic_dev
+export MNEMONIC_QUEUE_RABBITMQ_PASSWORD=guest
+export MNEMONIC_OPENAI_API_KEY=your-api-key
+./src/.bin/mnemonic-enricher
 ```
 
-The [E2E Compose file](src/tests/docker-compose.yaml) provides test infrastructure
-using published Mnemonic PostgreSQL and Neo4j images, RabbitMQ, and an OpenAI stub.
-See the [build and development guide](src/build/README.md) for image builds,
-Compose services, endpoints, and troubleshooting.
+`.env.example` at the repository root lists every setting for local runs. In the
+full stack the services never hold the real OpenAI key; see the
+[deploy Compose file](../deploy/docker-compose.yaml).
+
+The end-to-end Compose file is still parked under `tests/legacy/enricher`.
+See the [build and development guide](../build/enricher/README.md) for image
+builds, Compose services, endpoints, and troubleshooting.
 
 ### Testing
 
@@ -113,8 +113,7 @@ Upgrading to pgx v5.11.0 requires a mock implementation of `pgx.Rows.TypeMap`.
 Run unit tests:
 
 ```bash
-cd src
-go test ./...
+make tests-unit
 ```
 
 From the repository root, run benchmarks or the Docker-first build and end-to-end
@@ -122,7 +121,7 @@ pipeline used by CI:
 
 ```bash
 make tests-bench
-make build
+make build-enricher
 ```
 
 Run formatting, linting, vulnerability analysis, and security scanning with
@@ -132,10 +131,11 @@ Run formatting, linting, vulnerability analysis, and security scanning with
 
 This project follows [Semantic Versioning 2.0.0](https://semver.org/).
 
-Version is determined from Git tags:
+Each component has its own tag (`enricher/vX.Y.Z`); the version comes from the
+latest one:
 
 ```bash
-git describe --tags --abbrev=0
+build/version.sh enricher
 ```
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.

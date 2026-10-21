@@ -1,4 +1,4 @@
-# mnemonic-integration-tests
+# Mnemonic integration tests
 
 > **Maturity Level**: Emerging — black-box smoke tests for the complete
 > Mnemonic stack.
@@ -17,20 +17,18 @@
 
 ## Usage
 
-Run the complete suite in a self-contained Docker Compose stack. No OpenAI key
-is needed:
+The suite runs in a self-contained Docker Compose stack, defined by
+[docker-compose.yaml](docker-compose.yaml) in this directory. No OpenAI key is
+needed.
 
-```bash
-make test
-```
-
-Available targets:
-
-- `make test` — start the stack, run the suite, then tear it down
-- `make start` — start the stack without running tests
-- `make stop` — remove this Compose stack and its volumes
-- `make analyze` — lint all tracked Markdown files
-- `make help` — list targets (default)
+The monorepo has no Make targets for this suite yet, and the Compose file is
+not re-homed: it still uses the fork's service and image names, mounts a
+`./src` directory that no longer exists (the tests now sit next to the Compose
+file) and builds a stub from `./openai-stub`, which now lives in
+[tests/openai-stub](../openai-stub). Until that is fixed the stack does not
+start as written. The tests themselves read the service URLs from the
+environment, so they can also be pointed at a running stack with
+`go test -count=1 ./...` from this directory.
 
 ## How it works
 
@@ -63,8 +61,8 @@ enriched by the enricher, and read back through the MCP server.
 
 ### OpenAI stub
 
-`openai-stub/` replaces OpenAI for all three services through
-`LIBRARIAN_OPENAI_BASE_URL`, so runs are deterministic and free:
+The stub in [tests/openai-stub](../openai-stub) replaces OpenAI for all three
+services through `MNEMONIC_OPENAI_BASE_URL`, so runs are deterministic and free:
 
 - **Embeddings** hash each distinct word of the input into the vector, so
   cosine similarity tracks shared words. Tests search for a random word only
@@ -74,56 +72,43 @@ enriched by the enricher, and read back through the MCP server.
 - **`POST /control/fail?match=X&n=N`** fails the next N embedding requests
   whose input contains X.
 
-The enricher runs with `LIBRARIAN_OPENAI_RETRY_ATTEMPTS=0` and
-`LIBRARIAN_ENRICHMENT_RETRY_DELAY=1s` so one forced failure reaches its retry
+The enricher runs with `MNEMONIC_OPENAI_RETRY_ATTEMPTS=0` and
+`MNEMONIC_ENRICHMENT_RETRY_DELAY=1s` so one forced failure reaches its retry
 sweep quickly.
 
 ## Key Considerations
 
 - **Prerequisites:** Docker Compose and pull access to the service images on
-  ghcr.io. The tests run in the stock `golang:1.27.2-alpine` image with `src/`
-  mounted read-only; only the small stub image is built.
-- **Images under test:** the `latest-dev` tags of `mnemonic-api`, `mnemonic`
-  (MCP) and `mnemonic-enrichment`, published by each service's CI on merge to
-  `develop`.
-- **Isolation:** the stack publishes no host ports. Compose scopes its
-  containers, network and volumes under the `mnemonic-integration-tests`
-  project name, so it can run alongside other Mnemonic stacks.
+  ghcr.io. The tests run in the stock `golang:1.27.2-alpine` image with the suite
+  directory mounted read-only; only the small stub image is built.
+- **Images under test:** the `latest-dev` tags of `mnemonic-api`,
+  `mnemonic-mcp` and `mnemonic-enricher`, which CI is meant to publish.
+- **Isolation:** the stack publishes no host ports, so it can run alongside
+  other Mnemonic stacks.
 
 ## Continuous Integration
 
-GitHub Actions runs the suite on pull requests to `develop` and `main`, on
-every push to `develop`, daily at midnight UTC, and on demand. On failure it
-prints Compose service status and logs before tearing the stack down.
+The CI workflows are not written yet. The fork ran this suite on pull
+requests, on pushes, daily and on demand, and printed Compose service status and
+logs on failure; the workflow for the monorepo has to be written.
 
 ## Development Considerations
 
-Run a standing stack, inspect it, then stop it:
+Once the Compose file is re-homed, run a standing stack, inspect it, then stop
+it with `docker compose -f tests/integration/docker-compose.yaml up -d --wait`,
+`docker compose -f tests/integration/docker-compose.yaml run --rm <tests service> go test -count=1 -run TestUpdate ./...`
+and `docker compose -f tests/integration/docker-compose.yaml down --volumes`.
 
-```bash
-make start
-docker compose -f docker-compose.yaml run --rm librarian_tests go test -count=1 -run TestUpdate ./...
-docker compose -f docker-compose.yaml logs librarian_enricher
-make stop
-```
-
-All tests live in one package under `src/`; `client_test.go` holds the HTTP,
-MCP and polling helpers. Add a test here only when it needs more than one
+All tests live in one package in this directory; `client_test.go` holds the
+HTTP, MCP and polling helpers. Add a test here only when it needs more than one
 service; single-service behaviour belongs in that service's E2E suite.
 
 ### Versioning
 
-This project follows [Semantic Versioning 2.0.0](https://semver.org/). Version
-is determined from Git tags:
-
-```bash
-git describe --tags --always
-```
-
-The current release tag is `v0.0.3`.
+This project follows [Semantic Versioning 2.0.0](https://semver.org/). The last
+release of this suite, made before it joined the monorepo, was `v0.0.3`.
 
 ---
 
-Part of the Mnemonic multi-repository workspace. See
-[mnemonic-docs](https://github.com/twistingmercury/librarian-docs) for
-architecture and design documentation.
+Part of the Mnemonic monorepo. See the [design documents](../../docs/design/README.md)
+for architecture and design documentation.
