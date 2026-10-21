@@ -6,20 +6,20 @@
 # pods. Every isolation check has a positive control, so a probe that cannot
 # reach anything never passes as "blocked".
 #
-# Usage: make k8s-test, or KUBE_CONTEXT=mnemonic deploy/test/k8s-e2e.sh
+# Usage: make k8s-test, or MNEMONIC_KUBE_CONTEXT=mnemonic deploy/test/k8s-e2e.sh
 
 set -euo pipefail
 
-KUBE_CONTEXT="${KUBE_CONTEXT:-mnemonic}"
-NAMESPACE="${NAMESPACE:-mnemonic}"
-RELEASE="${RELEASE:-mnemonic}"
-API_URL="${API_URL:-http://localhost:8080}"
-MCP_URL="${MCP_URL:-http://localhost:8081}"
-KEYCLOAK_URL="${KEYCLOAK_URL:-http://localhost:8180}"
-PROBE_IMAGE="${PROBE_IMAGE:-curlimages/curl:8.10.1}"
-OPENAI_SECRET="${OPENAI_SECRET:-mnemonic-openai}"
-ENRICH_ATTEMPTS="${ENRICH_ATTEMPTS:-45}"
-EXPECTED_PODS="${EXPECTED_PODS:-10}"
+MNEMONIC_KUBE_CONTEXT="${MNEMONIC_KUBE_CONTEXT:-mnemonic}"
+MNEMONIC_NAMESPACE="${MNEMONIC_NAMESPACE:-mnemonic}"
+MNEMONIC_RELEASE="${MNEMONIC_RELEASE:-mnemonic}"
+MNEMONIC_API_URL="${MNEMONIC_API_URL:-http://localhost:8080}"
+MNEMONIC_MCP_URL="${MNEMONIC_MCP_URL:-http://localhost:8081}"
+MNEMONIC_KEYCLOAK_URL="${MNEMONIC_KEYCLOAK_URL:-http://localhost:8180}"
+MNEMONIC_PROBE_IMAGE="${MNEMONIC_PROBE_IMAGE:-curlimages/curl:8.10.1}"
+MNEMONIC_OPENAI_SECRET="${MNEMONIC_OPENAI_SECRET:-mnemonic-openai}"
+MNEMONIC_ENRICH_ATTEMPTS="${MNEMONIC_ENRICH_ATTEMPTS:-45}"
+MNEMONIC_EXPECTED_PODS="${MNEMONIC_EXPECTED_PODS:-10}"
 
 readonly MCP_PROTOCOL="2026-07-28"
 readonly PROBE_LABEL="mnemonic-e2e=probe"
@@ -105,7 +105,7 @@ section() {
 # ------------------------------------------------------------------ helpers
 
 kube() {
-    kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" "$@"
+    kubectl --context "${MNEMONIC_KUBE_CONTEXT}" -n "${MNEMONIC_NAMESPACE}" "$@"
 }
 
 validate_args() {
@@ -119,13 +119,13 @@ validate_args() {
 
     done
 
-    if ! kubectl config get-contexts "${KUBE_CONTEXT}" >/dev/null 2>&1; then
-        printf "ERROR: kubectl context %s not found; run make k8s-up\n" "${KUBE_CONTEXT}" >&2
+    if ! kubectl config get-contexts "${MNEMONIC_KUBE_CONTEXT}" >/dev/null 2>&1; then
+        printf "ERROR: kubectl context %s not found; run make k8s-up\n" "${MNEMONIC_KUBE_CONTEXT}" >&2
         return 1
     fi
 
-    if ! curl -fs -m 5 -o /dev/null "${API_URL}/version"; then
-        printf "ERROR: gateway not reachable at %s; run make k8s-forward\n" "${API_URL}" >&2
+    if ! curl -fs -m 5 -o /dev/null "${MNEMONIC_API_URL}/version"; then
+        printf "ERROR: gateway not reachable at %s; run make k8s-forward\n" "${MNEMONIC_API_URL}" >&2
         return 1
     fi
 
@@ -139,7 +139,7 @@ http_code() {
 token() {
     local client="${1}"
 
-    curl -s -m 10 "${KEYCLOAK_URL}/realms/mnemonic/protocol/openid-connect/token" \
+    curl -s -m 10 "${MNEMONIC_KEYCLOAK_URL}/realms/mnemonic/protocol/openid-connect/token" \
         -d grant_type=client_credentials -d client_id="${client}" -d client_secret="${client}-secret" \
         | jq -r .access_token
 }
@@ -157,7 +157,7 @@ mcp_call() {
                    "io.modelcontextprotocol/clientCapabilities":{}},
             name:$tool,arguments:$args}}')
 
-    curl -s -m 40 -X POST "${MCP_URL}/mcp" -H "Authorization: Bearer $(token mcp-agent)" \
+    curl -s -m 40 -X POST "${MNEMONIC_MCP_URL}/mcp" -H "Authorization: Bearer $(token mcp-agent)" \
         -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
         -H "MCP-Protocol-Version: ${MCP_PROTOCOL}" -H 'Mcp-Method: tools/call' -H "Mcp-Name: ${tool}" \
         -d "${body}" \
@@ -173,7 +173,7 @@ post_pattern() {
 
     jq -n --arg n "${name}" --arg d "${domain}" --arg desc "${description}" --argjson t "${tags}" --arg c "${content}" \
         '{name:$n,entity_type:"coding-pattern",language:"go",domain:$d,description:$desc,tags:$t,content:$c}' \
-        | http_code -X POST "${API_URL}/v1/api/patterns" -H "Authorization: Bearer $(token api-writer)" \
+        | http_code -X POST "${MNEMONIC_API_URL}/v1/api/patterns" -H "Authorization: Bearer $(token api-writer)" \
             -H 'Content-Type: application/json' -d @-
 }
 
@@ -182,7 +182,7 @@ list_test_patterns() {
     local names_json
 
     names_json=$(jq -cn --arg names "${TEST_PATTERNS} bad-one" '$names | split(" ")')
-    curl -s -m 20 -H "Authorization: Bearer $(token api-reader)" "${API_URL}/v1/api/patterns?limit=100" \
+    curl -s -m 20 -H "Authorization: Bearer $(token api-reader)" "${MNEMONIC_API_URL}/v1/api/patterns?limit=100" \
         | jq -r --argjson names "${names_json}" \
             '.data[] | select(.name as $n | $names | index($n)) | [.name, .id, .enrichment_status] | @tsv'
 }
@@ -194,7 +194,7 @@ delete_test_patterns() {
     admin_token=$(token api-admin)
     for pattern_id in $(list_test_patterns | cut -f2); do
         curl -s -m 20 -o /dev/null -X DELETE -H "Authorization: Bearer ${admin_token}" \
-            "${API_URL}/v1/api/patterns/${pattern_id}" || true
+            "${MNEMONIC_API_URL}/v1/api/patterns/${pattern_id}" || true
     done
 
     return 0
@@ -216,7 +216,7 @@ cypher_rows() {
 pod_for() {
     local component="${1}"
 
-    kube get pod -l "app.kubernetes.io/instance=${RELEASE},app.kubernetes.io/component=${component}" \
+    kube get pod -l "app.kubernetes.io/instance=${MNEMONIC_RELEASE},app.kubernetes.io/component=${component}" \
         -o jsonpath='{.items[0].metadata.name}'
 }
 
@@ -245,7 +245,7 @@ run_probe() {
         all_labels="${PROBE_LABEL},${labels}"
     fi
 
-    kube run "${pod_name}" --image="${PROBE_IMAGE}" --image-pull-policy=IfNotPresent \
+    kube run "${pod_name}" --image="${MNEMONIC_PROBE_IMAGE}" --image-pull-policy=IfNotPresent \
         --restart=Never --labels="${all_labels}" --command -- sh -c "${PROBE_SCRIPT}" probe "$@" >/dev/null
 
     if ! kube wait --for=jsonpath='{.status.phase}'=Succeeded "pod/${pod_name}" --timeout=180s >/dev/null 2>&1; then
@@ -263,7 +263,7 @@ run_probe() {
 labels_for() {
     local component="${1}"
 
-    printf "%s" "app.kubernetes.io/instance=${RELEASE},app.kubernetes.io/component=${component}"
+    printf "%s" "app.kubernetes.io/instance=${MNEMONIC_RELEASE},app.kubernetes.io/component=${component}"
 }
 
 # Classifies one probe line: "blocked" when the TCP connect timed out (curl
@@ -324,9 +324,9 @@ check_stack() {
     local policy
 
     section "1. stack ready"
-    ready_count=$(kube get pods -l "app.kubernetes.io/instance=${RELEASE},app.kubernetes.io/name=mnemonic" -o json \
+    ready_count=$(kube get pods -l "app.kubernetes.io/instance=${MNEMONIC_RELEASE},app.kubernetes.io/name=mnemonic" -o json \
         | jq '[.items[] | select(.status.conditions[]? | .type == "Ready" and .status == "True")] | length')
-    check_equal "${EXPECTED_PODS} pods Ready" "${ready_count}" "${EXPECTED_PODS}"
+    check_equal "${MNEMONIC_EXPECTED_PODS} pods Ready" "${ready_count}" "${MNEMONIC_EXPECTED_PODS}"
 
     policy=$(kube get networkpolicy default-deny-all -o jsonpath='{.spec.policyTypes}' 2>/dev/null || true)
     check_equal "default-deny NetworkPolicy installed" "${policy}" '["Ingress","Egress"]'
@@ -336,12 +336,12 @@ check_stack() {
 
 check_auth() {
     section "2. auth at the gateway"
-    check_equal "no token -> 401" "$(http_code "${API_URL}/v1/api/patterns")" "401"
+    check_equal "no token -> 401" "$(http_code "${MNEMONIC_API_URL}/v1/api/patterns")" "401"
     check_equal "reader token GET -> 200" \
-        "$(http_code -H "Authorization: Bearer $(token api-reader)" "${API_URL}/v1/api/patterns")" "200"
+        "$(http_code -H "Authorization: Bearer $(token api-reader)" "${MNEMONIC_API_URL}/v1/api/patterns")" "200"
     check_equal "reader token POST -> 403" \
-        "$(http_code -X POST -H "Authorization: Bearer $(token api-reader)" -H 'Content-Type: application/json' -d '{}' "${API_URL}/v1/api/patterns")" "403"
-    check_equal "mcp without token -> 401" "$(http_code -X POST "${MCP_URL}/mcp")" "401"
+        "$(http_code -X POST -H "Authorization: Bearer $(token api-reader)" -H 'Content-Type: application/json' -d '{}' "${MNEMONIC_API_URL}/v1/api/patterns")" "403"
+    check_equal "mcp without token -> 401" "$(http_code -X POST "${MNEMONIC_MCP_URL}/mcp")" "401"
 
     return 0
 }
@@ -375,7 +375,7 @@ check_enrichment() {
     local states=""
 
     section "4. enrichment (real embeddings and extraction through the egress proxy)"
-    while [ "${attempt}" -le "${ENRICH_ATTEMPTS}" ]; do
+    while [ "${attempt}" -le "${MNEMONIC_ENRICH_ATTEMPTS}" ]; do
         states=$(enrichment_states)
         if [ "${states}" = "enriched,enriched,enriched,enriched" ]; then
             break
@@ -437,7 +437,7 @@ check_mcp() {
 related_threshold() {
     local value
 
-    value=$(kube get deploy -l "app.kubernetes.io/instance=${RELEASE},app.kubernetes.io/component=enricher" \
+    value=$(kube get deploy -l "app.kubernetes.io/instance=${MNEMONIC_RELEASE},app.kubernetes.io/component=enricher" \
         -o jsonpath='{.items[0].spec.template.spec.containers[0].env[?(@.name=="MNEMONIC_ENRICHMENT_RELATED_TO_MIN_SIMILARITY")].value}')
 
     printf '%s' "${value:-0.3}"
@@ -523,16 +523,16 @@ check_key_handling() {
     done
 
     for pod in $(kube get pods -o jsonpath='{.items[*].metadata.name}'); do
-        if pod_secret_refs "${pod}" | grep -qx "${OPENAI_SECRET}"; then
+        if pod_secret_refs "${pod}" | grep -qx "${MNEMONIC_OPENAI_SECRET}"; then
             holders="${holders}$(kube get pod "${pod}" -o jsonpath='{.metadata.labels.app\.kubernetes\.io/component}') "
         fi
 
     done
-    check_equal "only the egress pod references Secret ${OPENAI_SECRET}" "${holders% }" "egress"
+    check_equal "only the egress pod references Secret ${MNEMONIC_OPENAI_SECRET}" "${holders% }" "egress"
 
     egress_ref=$(kube get pod "$(pod_for egress)" \
         -o jsonpath='{.spec.containers[0].env[?(@.name=="MNEMONIC_OPENAI_API_EMBEDDINGS_KEY")].valueFrom.secretKeyRef.name}')
-    check_equal "egress reads the key from the Secret" "${egress_ref}" "${OPENAI_SECRET}"
+    check_equal "egress reads the key from the Secret" "${egress_ref}" "${MNEMONIC_OPENAI_SECRET}"
 
     return 0
 }
@@ -548,7 +548,7 @@ check_egress_proxy() {
     check_equal "egress refuses GET on embeddings" "$(http_status_of "${results}" "${embeddings_url}")" "403"
 
     # A POST needs its own pod: run_probe only issues GETs.
-    results=$(kube run "e2e-probe-$$-post" --image="${PROBE_IMAGE}" --image-pull-policy=IfNotPresent \
+    results=$(kube run "e2e-probe-$$-post" --image="${MNEMONIC_PROBE_IMAGE}" --image-pull-policy=IfNotPresent \
         --restart=Never --labels="${PROBE_LABEL},$(labels_for enricher)" --rm -i --quiet --command -- \
         curl -s -o /dev/null -w '%{http_code}' -m 30 -X POST "${embeddings_url}" \
         -H 'Authorization: Bearer sk-bogus' -H 'Content-Type: application/json' \

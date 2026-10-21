@@ -194,7 +194,7 @@ k8s-forward-stop: ## Stop the background port-forwards
 	done
 
 k8s-test: k8s-forward ## Run the end-to-end and isolation checks against the cluster (real OpenAI)
-	KUBE_CONTEXT=$(K8S_PROFILE) NAMESPACE=$(K8S_NAMESPACE) RELEASE=$(K8S_RELEASE) deploy/test/k8s-e2e.sh
+	MNEMONIC_KUBE_CONTEXT=$(K8S_PROFILE) MNEMONIC_NAMESPACE=$(K8S_NAMESPACE) MNEMONIC_RELEASE=$(K8S_RELEASE) deploy/test/k8s-e2e.sh
 
 k8s-down: k8s-forward-stop ## Uninstall the chart and delete the namespace (keeps the cluster)
 	-$(HELM) uninstall $(K8S_RELEASE) --namespace $(K8S_NAMESPACE) --wait

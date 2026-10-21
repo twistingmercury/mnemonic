@@ -19,9 +19,9 @@ import (
 )
 
 var (
-	apiURL      = env("GATEWAY_API_URL", "http://localhost:8080")
-	mcpURL      = env("GATEWAY_MCP_URL", "http://localhost:8081")
-	keycloakURL = env("KEYCLOAK_URL", "http://localhost:8180")
+	apiURL      = env("MNEMONIC_GATEWAY_API_URL", "http://localhost:8080")
+	mcpURL      = env("MNEMONIC_GATEWAY_MCP_URL", "http://localhost:8081")
+	keycloakURL = env("MNEMONIC_KEYCLOAK_URL", "http://localhost:8180")
 	client      = &http.Client{Timeout: 10 * time.Second}
 )
 

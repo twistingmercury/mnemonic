@@ -8,6 +8,8 @@
 # builds instead, set MNEMONIC_API_IMAGE and MNEMONIC_MCP_IMAGE (make build in
 # those repos tags them ghcr.io/twistingmercury/<name>:latest).
 
+name: mnemonic
+
 services:
   envoy:
     image: envoyproxy/envoy:v1.34.1

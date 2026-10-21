@@ -12,12 +12,12 @@ services:
 
   mnemonic-api:
     build: ./stub
-    environment: { STUB_NAME: mnemonic-api, STUB_LISTEN: ":8080" }
+    environment: { MNEMONIC_STUB_NAME: mnemonic-api, MNEMONIC_STUB_LISTEN: ":8080" }
     networks: [internal]
 
   mnemonic-mcp:
     build: ./stub
-    environment: { STUB_NAME: mnemonic-mcp, STUB_LISTEN: ":8081" }
+    environment: { MNEMONIC_STUB_NAME: mnemonic-mcp, MNEMONIC_STUB_LISTEN: ":8081" }
     networks: [internal]
 
 networks:

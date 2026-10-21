@@ -21,8 +21,8 @@ type echo struct {
 }
 
 func main() {
-	name := os.Getenv("STUB_NAME")
-	addrs := strings.Split(os.Getenv("STUB_LISTEN"), ",")
+	name := os.Getenv("MNEMONIC_STUB_NAME")
+	addrs := strings.Split(os.Getenv("MNEMONIC_STUB_LISTEN"), ",")
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		headers := make(map[string]string, len(r.Header))
