@@ -8,7 +8,7 @@ notes: "Renamed to Mnemonic (environment variables, image names, ports, links); 
 
 > Back to [Design Index](../../README.md)
 
-This subdirectory documents the MCP service component of the mnemonic system (the mcp service). The MCP service exposes 3 read-only pattern search tools to Claude Code over Streamable HTTP (stateless, unauthenticated) at `http://localhost:18081/mcp`.
+This subdirectory documents the MCP service component of the mnemonic system (the mcp service). The MCP service exposes 3 read-only pattern search tools to Claude Code over Streamable HTTP (stateless, unauthenticated) at `http://localhost:8081/mcp`.
 
 ## Contents
 
