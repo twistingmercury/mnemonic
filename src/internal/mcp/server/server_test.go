@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/twistingmercury/librarian-mcp/internal/config"
+	"github.com/twistingmercury/librarian/internal/mcp/config"
 )
 
 // listening returns a server bound to a free local port and its listen call.

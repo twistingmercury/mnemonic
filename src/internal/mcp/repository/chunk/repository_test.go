@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/twistingmercury/librarian-mcp/internal/repository/chunk"
+	"github.com/twistingmercury/librarian/internal/mcp/repository/chunk"
 )
 
 // testEmbedding returns a sample embedding vector for testing.

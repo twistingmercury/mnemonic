@@ -19,11 +19,11 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/twistingmercury/librarian-enricher/internal/enricher"
-	"github.com/twistingmercury/librarian-enricher/internal/metrics"
-	queue "github.com/twistingmercury/librarian-enricher/internal/queue"
-	enrichmentjob "github.com/twistingmercury/librarian-enricher/internal/repository/enrichmentjob"
-	enrichmentsvc "github.com/twistingmercury/librarian-enricher/internal/service/enrichment"
+	"github.com/twistingmercury/librarian/internal/enricher/enricher"
+	"github.com/twistingmercury/librarian/internal/enricher/metrics"
+	queue "github.com/twistingmercury/librarian/internal/enricher/queue"
+	enrichmentjob "github.com/twistingmercury/librarian/internal/enricher/repository/enrichmentjob"
+	enrichmentsvc "github.com/twistingmercury/librarian/internal/enricher/service/enrichment"
 )
 
 // runOne runs a worker over a single delivery whose ProcessJob returns

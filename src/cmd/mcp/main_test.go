@@ -10,7 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/twistingmercury/librarian-mcp/internal/config"
+	"github.com/twistingmercury/librarian/internal/mcp/config"
 )
 
 func TestResolveServerPort_Default(t *testing.T) {

@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/twistingmercury/heartbeat/v2"
-	"github.com/twistingmercury/librarian-enricher/internal/config"
-	"github.com/twistingmercury/librarian-enricher/internal/health"
+	"github.com/twistingmercury/librarian/internal/enricher/config"
+	"github.com/twistingmercury/librarian/internal/enricher/health"
 )
 
 // embeddingModelCheck returns the embedding-model check for an OpenAI API at

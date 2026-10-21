@@ -5,7 +5,7 @@ import (
 
 	"go.opentelemetry.io/otel/metric"
 
-	"github.com/twistingmercury/librarian-api/internal/config"
+	"github.com/twistingmercury/librarian/internal/api/config"
 )
 
 // HeaderCarrier exposes headerCarrier for unit testing.

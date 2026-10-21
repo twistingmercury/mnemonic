@@ -15,11 +15,11 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/twistingmercury/librarian-enricher/internal/config"
-	"github.com/twistingmercury/librarian-enricher/internal/metrics"
-	queue "github.com/twistingmercury/librarian-enricher/internal/queue"
-	"github.com/twistingmercury/librarian-enricher/internal/repository/enrichmentjob"
-	enrichmentsvc "github.com/twistingmercury/librarian-enricher/internal/service/enrichment"
+	"github.com/twistingmercury/librarian/internal/enricher/config"
+	"github.com/twistingmercury/librarian/internal/enricher/metrics"
+	queue "github.com/twistingmercury/librarian/internal/enricher/queue"
+	"github.com/twistingmercury/librarian/internal/enricher/repository/enrichmentjob"
+	enrichmentsvc "github.com/twistingmercury/librarian/internal/enricher/service/enrichment"
 )
 
 // defaultMaintenanceInterval is the interval between maintenance loop iterations.

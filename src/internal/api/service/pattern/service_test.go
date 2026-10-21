@@ -13,13 +13,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"github.com/twistingmercury/librarian-api/internal/repository"
-	chunkrepo "github.com/twistingmercury/librarian-api/internal/repository/chunk"
-	enrichmentrepo "github.com/twistingmercury/librarian-api/internal/repository/enrichmentjob"
-	graphrepo "github.com/twistingmercury/librarian-api/internal/repository/graph"
-	patternrepo "github.com/twistingmercury/librarian-api/internal/repository/pattern"
-	"github.com/twistingmercury/librarian-api/internal/service"
-	patternsvc "github.com/twistingmercury/librarian-api/internal/service/pattern"
+	"github.com/twistingmercury/librarian/internal/api/repository"
+	chunkrepo "github.com/twistingmercury/librarian/internal/api/repository/chunk"
+	enrichmentrepo "github.com/twistingmercury/librarian/internal/api/repository/enrichmentjob"
+	graphrepo "github.com/twistingmercury/librarian/internal/api/repository/graph"
+	patternrepo "github.com/twistingmercury/librarian/internal/api/repository/pattern"
+	"github.com/twistingmercury/librarian/internal/api/service"
+	patternsvc "github.com/twistingmercury/librarian/internal/api/service/pattern"
 )
 
 // ---------- Mock: patternrepo.Repository ----------

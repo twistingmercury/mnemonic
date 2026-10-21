@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/pgvector/pgvector-go"
-	"github.com/twistingmercury/librarian-mcp/internal/repository"
+	"github.com/twistingmercury/librarian/internal/mcp/repository"
 )
 
 // Repository defines the chunk reads the MCP tools need.

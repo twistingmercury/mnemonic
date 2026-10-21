@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/twistingmercury/librarian-api/internal/repository/enrichmentjob"
+	"github.com/twistingmercury/librarian/internal/api/repository/enrichmentjob"
 )
 
 func TestRepository_CreatePendingForChunks(t *testing.T) {

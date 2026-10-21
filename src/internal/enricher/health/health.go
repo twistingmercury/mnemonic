@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/twistingmercury/heartbeat/v2"
-	"github.com/twistingmercury/librarian-enricher/internal/config"
+	"github.com/twistingmercury/librarian/internal/enricher/config"
 )
 
 // checkTimeout is the per-check timeout used when probing dependencies.

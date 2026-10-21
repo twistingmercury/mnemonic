@@ -12,12 +12,12 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/twistingmercury/librarian-mcp/internal/config"
-	"github.com/twistingmercury/librarian-mcp/internal/metrics"
-	patternrepo "github.com/twistingmercury/librarian-mcp/internal/repository/pattern"
-	patternsvc "github.com/twistingmercury/librarian-mcp/internal/service/pattern"
-	searchsvc "github.com/twistingmercury/librarian-mcp/internal/service/search"
-	"github.com/twistingmercury/librarian-mcp/internal/version"
+	"github.com/twistingmercury/librarian/internal/mcp/config"
+	"github.com/twistingmercury/librarian/internal/mcp/metrics"
+	patternrepo "github.com/twistingmercury/librarian/internal/mcp/repository/pattern"
+	patternsvc "github.com/twistingmercury/librarian/internal/mcp/service/pattern"
+	searchsvc "github.com/twistingmercury/librarian/internal/mcp/service/search"
+	"github.com/twistingmercury/librarian/internal/mcp/version"
 )
 
 // toolListTTL is the cache hint sent on tools/list and server/discover. The

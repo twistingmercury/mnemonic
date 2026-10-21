@@ -12,12 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/metric/noop"
 
-	"github.com/twistingmercury/librarian-mcp/internal/metrics"
-	chunkrepo "github.com/twistingmercury/librarian-mcp/internal/repository/chunk"
-	graphrepo "github.com/twistingmercury/librarian-mcp/internal/repository/graph"
-	"github.com/twistingmercury/librarian-mcp/internal/repository/pattern"
-	openaisvc "github.com/twistingmercury/librarian-mcp/internal/service/openai"
-	"github.com/twistingmercury/librarian-mcp/internal/service/search"
+	"github.com/twistingmercury/librarian/internal/mcp/metrics"
+	chunkrepo "github.com/twistingmercury/librarian/internal/mcp/repository/chunk"
+	graphrepo "github.com/twistingmercury/librarian/internal/mcp/repository/graph"
+	"github.com/twistingmercury/librarian/internal/mcp/repository/pattern"
+	openaisvc "github.com/twistingmercury/librarian/internal/mcp/service/openai"
+	"github.com/twistingmercury/librarian/internal/mcp/service/search"
 )
 
 // --- Mock: openaisvc.EmbeddingService ---

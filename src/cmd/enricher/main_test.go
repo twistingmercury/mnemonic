@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/twistingmercury/librarian-enricher/internal/config"
+	"github.com/twistingmercury/librarian/internal/enricher/config"
 )
 
 // mustParseFlags parses args with the production flag set.

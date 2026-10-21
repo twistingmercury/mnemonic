@@ -11,7 +11,7 @@ import (
 	"github.com/pashagolub/pgxmock/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/twistingmercury/librarian-mcp/internal/repository/pattern"
+	"github.com/twistingmercury/librarian/internal/mcp/repository/pattern"
 )
 
 func TestRepository_Get(t *testing.T) {

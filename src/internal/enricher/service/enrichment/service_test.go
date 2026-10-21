@@ -11,13 +11,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"github.com/twistingmercury/librarian-enricher/internal/config"
-	chunkrepo "github.com/twistingmercury/librarian-enricher/internal/repository/chunk"
-	enrichmentjob "github.com/twistingmercury/librarian-enricher/internal/repository/enrichmentjob"
-	graphrepo "github.com/twistingmercury/librarian-enricher/internal/repository/graph"
-	patternrepo "github.com/twistingmercury/librarian-enricher/internal/repository/pattern"
-	"github.com/twistingmercury/librarian-enricher/internal/service/enrichment"
-	openaisvc "github.com/twistingmercury/librarian-enricher/internal/service/openai"
+	"github.com/twistingmercury/librarian/internal/enricher/config"
+	chunkrepo "github.com/twistingmercury/librarian/internal/enricher/repository/chunk"
+	enrichmentjob "github.com/twistingmercury/librarian/internal/enricher/repository/enrichmentjob"
+	graphrepo "github.com/twistingmercury/librarian/internal/enricher/repository/graph"
+	patternrepo "github.com/twistingmercury/librarian/internal/enricher/repository/pattern"
+	"github.com/twistingmercury/librarian/internal/enricher/service/enrichment"
+	openaisvc "github.com/twistingmercury/librarian/internal/enricher/service/openai"
 )
 
 // --- Mock: enrichmentjob.Repository ---

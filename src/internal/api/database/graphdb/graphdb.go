@@ -6,7 +6,7 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	neo4jcfg "github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
-	"github.com/twistingmercury/librarian-api/internal/config"
+	"github.com/twistingmercury/librarian/internal/api/config"
 )
 
 // NewNeo4jDriver creates a neo4j.DriverWithContext configured from the provided Neo4jConfig.

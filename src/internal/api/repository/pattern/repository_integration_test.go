@@ -15,8 +15,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/twistingmercury/librarian-api/internal/repository"
-	"github.com/twistingmercury/librarian-api/internal/repository/pattern"
+	"github.com/twistingmercury/librarian/internal/api/repository"
+	"github.com/twistingmercury/librarian/internal/api/repository/pattern"
 )
 
 const (

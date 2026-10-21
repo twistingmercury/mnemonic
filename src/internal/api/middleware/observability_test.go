@@ -13,7 +13,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/twistingmercury/librarian-api/internal/middleware"
+	"github.com/twistingmercury/librarian/internal/api/middleware"
 )
 
 func init() { gin.SetMode(gin.TestMode) }

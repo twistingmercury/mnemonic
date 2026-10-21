@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/twistingmercury/librarian-mcp/internal/repository"
+	"github.com/twistingmercury/librarian/internal/mcp/repository"
 )
 
 // Repository defines the pattern reads the MCP tools need.

@@ -13,10 +13,10 @@ import (
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
-	"github.com/twistingmercury/librarian-mcp/internal/config"
-	"github.com/twistingmercury/librarian-mcp/internal/metrics"
-	patternsvc "github.com/twistingmercury/librarian-mcp/internal/service/pattern"
-	searchsvc "github.com/twistingmercury/librarian-mcp/internal/service/search"
+	"github.com/twistingmercury/librarian/internal/mcp/config"
+	"github.com/twistingmercury/librarian/internal/mcp/metrics"
+	patternsvc "github.com/twistingmercury/librarian/internal/mcp/service/pattern"
+	searchsvc "github.com/twistingmercury/librarian/internal/mcp/service/search"
 )
 
 // connectTools serves svc over in-memory transports, with a configured search

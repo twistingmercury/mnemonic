@@ -7,8 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/twistingmercury/librarian-enricher/internal/config"
-	"github.com/twistingmercury/librarian-enricher/internal/telemetry"
+	"github.com/twistingmercury/librarian/internal/enricher/config"
+	"github.com/twistingmercury/librarian/internal/enricher/telemetry"
 )
 
 // createTestConfig sets the sections telemetry reads, with metrics and

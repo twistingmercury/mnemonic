@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	graphrepo "github.com/twistingmercury/librarian-mcp/internal/repository/graph"
-	patternrepo "github.com/twistingmercury/librarian-mcp/internal/repository/pattern"
-	patternsvc "github.com/twistingmercury/librarian-mcp/internal/service/pattern"
+	graphrepo "github.com/twistingmercury/librarian/internal/mcp/repository/graph"
+	patternrepo "github.com/twistingmercury/librarian/internal/mcp/repository/pattern"
+	patternsvc "github.com/twistingmercury/librarian/internal/mcp/service/pattern"
 )
 
 // ---------- Mock: patternrepo.Repository ----------

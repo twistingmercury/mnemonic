@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/twistingmercury/heartbeat/v2"
-	"github.com/twistingmercury/librarian-api/internal/config"
-	"github.com/twistingmercury/librarian-api/internal/health"
+	"github.com/twistingmercury/librarian/internal/api/config"
+	"github.com/twistingmercury/librarian/internal/api/health"
 )
 
 // --- Mocks ---

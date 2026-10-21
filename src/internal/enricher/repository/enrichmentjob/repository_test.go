@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/twistingmercury/librarian-enricher/internal/repository/enrichmentjob"
+	"github.com/twistingmercury/librarian/internal/enricher/repository/enrichmentjob"
 )
 
 func TestRepository_Start(t *testing.T) {

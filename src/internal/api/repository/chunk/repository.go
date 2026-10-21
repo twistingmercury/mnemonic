@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pgvector/pgvector-go"
-	"github.com/twistingmercury/librarian-api/internal/repository"
+	"github.com/twistingmercury/librarian/internal/api/repository"
 )
 
 // Repository defines data access operations for pattern chunks.

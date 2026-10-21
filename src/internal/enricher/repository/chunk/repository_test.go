@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/twistingmercury/librarian-enricher/internal/repository/chunk"
+	"github.com/twistingmercury/librarian/internal/enricher/repository/chunk"
 )
 
 func newMock(t *testing.T) pgxmock.PgxPoolIface {

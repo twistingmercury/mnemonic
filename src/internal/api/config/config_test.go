@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/twistingmercury/librarian-api/internal/config"
+	"github.com/twistingmercury/librarian/internal/api/config"
 )
 
 // TestDefaultValues verifies that all default values are set correctly.

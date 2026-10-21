@@ -9,9 +9,9 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rs/zerolog"
 
-	patternrepo "github.com/twistingmercury/librarian-mcp/internal/repository/pattern"
-	patternsvc "github.com/twistingmercury/librarian-mcp/internal/service/pattern"
-	searchsvc "github.com/twistingmercury/librarian-mcp/internal/service/search"
+	patternrepo "github.com/twistingmercury/librarian/internal/mcp/repository/pattern"
+	patternsvc "github.com/twistingmercury/librarian/internal/mcp/service/pattern"
+	searchsvc "github.com/twistingmercury/librarian/internal/mcp/service/search"
 )
 
 // handleSearchPatterns returns a handler for the search_patterns tool.

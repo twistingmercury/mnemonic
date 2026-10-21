@@ -13,7 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/twistingmercury/librarian-mcp/internal/repository/pattern"
+	"github.com/twistingmercury/librarian/internal/mcp/repository/pattern"
 )
 
 // testPatternPrefix is used to identify test-created patterns for cleanup.

@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/twistingmercury/librarian-api/internal/repository/graph"
+	"github.com/twistingmercury/librarian/internal/api/repository/graph"
 )
 
 // Nil IDs are rejected before the driver is touched, so a nil driver is fine.

@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/twistingmercury/heartbeat/v2"
-	"github.com/twistingmercury/librarian-mcp/internal/config"
-	"github.com/twistingmercury/librarian-mcp/internal/health"
+	"github.com/twistingmercury/librarian/internal/mcp/config"
+	"github.com/twistingmercury/librarian/internal/mcp/health"
 )
 
 func TestOpenAIModelCheck_OK(t *testing.T) {

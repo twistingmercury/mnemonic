@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/twistingmercury/librarian-enricher/internal/repository/pattern"
+	"github.com/twistingmercury/librarian/internal/enricher/repository/pattern"
 )
 
 func TestRepository_Get(t *testing.T) {

@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	patternrepo "github.com/twistingmercury/librarian-mcp/internal/repository/pattern"
-	patternsvc "github.com/twistingmercury/librarian-mcp/internal/service/pattern"
-	searchsvc "github.com/twistingmercury/librarian-mcp/internal/service/search"
+	patternrepo "github.com/twistingmercury/librarian/internal/mcp/repository/pattern"
+	patternsvc "github.com/twistingmercury/librarian/internal/mcp/service/pattern"
+	searchsvc "github.com/twistingmercury/librarian/internal/mcp/service/search"
 )
 
 // searchStub returns a SearchPatterns func that checks the options it gets

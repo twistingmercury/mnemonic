@@ -14,11 +14,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/metric/noop"
 
-	"github.com/twistingmercury/librarian-enricher/internal/config"
-	"github.com/twistingmercury/librarian-enricher/internal/enricher"
-	"github.com/twistingmercury/librarian-enricher/internal/metrics"
-	queue "github.com/twistingmercury/librarian-enricher/internal/queue"
-	enrichmentjob "github.com/twistingmercury/librarian-enricher/internal/repository/enrichmentjob"
+	"github.com/twistingmercury/librarian/internal/enricher/config"
+	"github.com/twistingmercury/librarian/internal/enricher/enricher"
+	"github.com/twistingmercury/librarian/internal/enricher/metrics"
+	queue "github.com/twistingmercury/librarian/internal/enricher/queue"
+	enrichmentjob "github.com/twistingmercury/librarian/internal/enricher/repository/enrichmentjob"
 )
 
 // ---------------------------------------------------------------------------

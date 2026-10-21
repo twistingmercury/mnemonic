@@ -17,8 +17,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/metric/noop"
 
-	"github.com/twistingmercury/librarian-enricher/internal/metrics"
-	"github.com/twistingmercury/librarian-enricher/internal/repository/graph"
+	"github.com/twistingmercury/librarian/internal/enricher/metrics"
+	"github.com/twistingmercury/librarian/internal/enricher/repository/graph"
 )
 
 const testConceptPrefix = "test-integration-concept-"

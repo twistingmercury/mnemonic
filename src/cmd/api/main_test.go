@@ -18,7 +18,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/twistingmercury/librarian-api/internal/config"
+	"github.com/twistingmercury/librarian/internal/api/config"
 )
 
 func TestFormatHealthStatus_ValidJSON(t *testing.T) {

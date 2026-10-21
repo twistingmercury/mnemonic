@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/twistingmercury/librarian-mcp/internal/config"
-	"github.com/twistingmercury/librarian-mcp/internal/version"
+	"github.com/twistingmercury/librarian/internal/mcp/config"
+	"github.com/twistingmercury/librarian/internal/mcp/version"
 	"github.com/twistingmercury/otelx/v2"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"

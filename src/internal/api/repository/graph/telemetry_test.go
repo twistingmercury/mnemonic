@@ -16,8 +16,8 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
-	"github.com/twistingmercury/librarian-api/internal/metrics"
-	"github.com/twistingmercury/librarian-api/internal/repository/graph"
+	"github.com/twistingmercury/librarian/internal/api/metrics"
+	"github.com/twistingmercury/librarian/internal/api/repository/graph"
 )
 
 // TestRepository_InstrumentsOperations verifies that a failed operation

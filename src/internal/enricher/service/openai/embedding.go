@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/twistingmercury/librarian-enricher/internal/config"
+	"github.com/twistingmercury/librarian/internal/enricher/config"
 )
 
 // ErrEmbeddingFailed is returned when embedding generation fails after all retries.

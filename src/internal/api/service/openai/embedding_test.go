@@ -11,8 +11,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/twistingmercury/librarian-api/internal/config"
-	"github.com/twistingmercury/librarian-api/internal/service/openai"
+	"github.com/twistingmercury/librarian/internal/api/config"
+	"github.com/twistingmercury/librarian/internal/api/service/openai"
 )
 
 func testEmbeddingConfig() config.OpenAIConfig {

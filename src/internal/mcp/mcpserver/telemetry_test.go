@@ -23,10 +23,10 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
-	"github.com/twistingmercury/librarian-mcp/internal/config"
-	"github.com/twistingmercury/librarian-mcp/internal/metrics"
-	patternrepo "github.com/twistingmercury/librarian-mcp/internal/repository/pattern"
-	searchsvc "github.com/twistingmercury/librarian-mcp/internal/service/search"
+	"github.com/twistingmercury/librarian/internal/mcp/config"
+	"github.com/twistingmercury/librarian/internal/mcp/metrics"
+	patternrepo "github.com/twistingmercury/librarian/internal/mcp/repository/pattern"
+	searchsvc "github.com/twistingmercury/librarian/internal/mcp/service/search"
 )
 
 // The package tracer binds to the first global provider set, so every test

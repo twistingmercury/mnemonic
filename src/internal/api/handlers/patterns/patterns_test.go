@@ -15,14 +15,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"github.com/twistingmercury/librarian-api/internal/config"
-	"github.com/twistingmercury/librarian-api/internal/handlers"
-	"github.com/twistingmercury/librarian-api/internal/handlers/patterns"
-	chunkrepo "github.com/twistingmercury/librarian-api/internal/repository/chunk"
-	patternrepo "github.com/twistingmercury/librarian-api/internal/repository/pattern"
-	"github.com/twistingmercury/librarian-api/internal/service"
-	patternsvc "github.com/twistingmercury/librarian-api/internal/service/pattern"
-	searchsvc "github.com/twistingmercury/librarian-api/internal/service/search"
+	"github.com/twistingmercury/librarian/internal/api/config"
+	"github.com/twistingmercury/librarian/internal/api/handlers"
+	"github.com/twistingmercury/librarian/internal/api/handlers/patterns"
+	chunkrepo "github.com/twistingmercury/librarian/internal/api/repository/chunk"
+	patternrepo "github.com/twistingmercury/librarian/internal/api/repository/pattern"
+	"github.com/twistingmercury/librarian/internal/api/service"
+	patternsvc "github.com/twistingmercury/librarian/internal/api/service/pattern"
+	searchsvc "github.com/twistingmercury/librarian/internal/api/service/search"
 )
 
 func init() {

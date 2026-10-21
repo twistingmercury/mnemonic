@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	patternrepo "github.com/twistingmercury/librarian-mcp/internal/repository/pattern"
-	patternsvc "github.com/twistingmercury/librarian-mcp/internal/service/pattern"
-	searchsvc "github.com/twistingmercury/librarian-mcp/internal/service/search"
+	patternrepo "github.com/twistingmercury/librarian/internal/mcp/repository/pattern"
+	patternsvc "github.com/twistingmercury/librarian/internal/mcp/service/pattern"
+	searchsvc "github.com/twistingmercury/librarian/internal/mcp/service/search"
 )
 
 // formatSearchResults formats search results as markdown for LLM consumption.

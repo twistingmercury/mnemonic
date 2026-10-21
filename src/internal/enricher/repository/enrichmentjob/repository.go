@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/twistingmercury/librarian-enricher/internal/repository"
+	"github.com/twistingmercury/librarian/internal/enricher/repository"
 )
 
 // Repository defines the job operations the enrichment worker needs.

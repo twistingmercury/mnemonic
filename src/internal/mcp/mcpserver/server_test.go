@@ -14,9 +14,9 @@ import (
 
 	"go.opentelemetry.io/otel/metric/noop"
 
-	"github.com/twistingmercury/librarian-mcp/internal/config"
-	"github.com/twistingmercury/librarian-mcp/internal/metrics"
-	searchsvc "github.com/twistingmercury/librarian-mcp/internal/service/search"
+	"github.com/twistingmercury/librarian/internal/mcp/config"
+	"github.com/twistingmercury/librarian/internal/mcp/metrics"
+	searchsvc "github.com/twistingmercury/librarian/internal/mcp/service/search"
 )
 
 const protocolVersion = "2026-07-28"

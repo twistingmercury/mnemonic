@@ -14,7 +14,7 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/twistingmercury/librarian-mcp/internal/metrics"
+	"github.com/twistingmercury/librarian/internal/mcp/metrics"
 )
 
 var tracer = otel.Tracer("mnemonic/mcp")

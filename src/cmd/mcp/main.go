@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
-	"github.com/twistingmercury/librarian-mcp/internal/config"
-	"github.com/twistingmercury/librarian-mcp/internal/server"
-	"github.com/twistingmercury/librarian-mcp/internal/version"
+	"github.com/twistingmercury/librarian/internal/mcp/config"
+	"github.com/twistingmercury/librarian/internal/mcp/server"
+	"github.com/twistingmercury/librarian/internal/mcp/version"
 )
 
 var verFlag = pflag.Bool("version", false, "Displays current version information for mnemonic")
