@@ -26,9 +26,9 @@ RUN gosec -quiet -exclude-dir=tests ./...
 RUN go test -v ./cmd/main/... ./internal/...
 
 ARG LD_FLAGS="-s -w \
-    -X 'github.com/twistingmercury/librarian-mcp/internal/version.version=${BUILD_VER}' \
-    -X 'github.com/twistingmercury/librarian-mcp/internal/version.buildDate=${BUILD_DATE}' \
-    -X 'github.com/twistingmercury/librarian-mcp/internal/version.commit=${BUILD_COMMIT}'"
+    -X 'github.com/twistingmercury/librarian/internal/mcp/version.version=${BUILD_VER}' \
+    -X 'github.com/twistingmercury/librarian/internal/mcp/version.buildDate=${BUILD_DATE}' \
+    -X 'github.com/twistingmercury/librarian/internal/mcp/version.commit=${BUILD_COMMIT}'"
 
 RUN go build --ldflags "${LD_FLAGS}" -o /out/mnemonic cmd/main/main.go
 

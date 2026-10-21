@@ -26,9 +26,9 @@ RUN gosec -quiet -exclude-dir=tests ./...
 RUN go test -v ./cmd/main/... ./internal/... -coverprofile=coverage.out
 
 ARG LD_FLAGS="-s -w \
-    -X 'github.com/twistingmercury/librarian-enricher/internal/version.version=${BUILD_VER}' \
-    -X 'github.com/twistingmercury/librarian-enricher/internal/version.buildDate=${BUILD_DATE}' \
-    -X 'github.com/twistingmercury/librarian-enricher/internal/version.commit=${BUILD_COMMIT}'"
+    -X 'github.com/twistingmercury/librarian/internal/enricher/version.version=${BUILD_VER}' \
+    -X 'github.com/twistingmercury/librarian/internal/enricher/version.buildDate=${BUILD_DATE}' \
+    -X 'github.com/twistingmercury/librarian/internal/enricher/version.commit=${BUILD_COMMIT}'"
 
 RUN go build --ldflags "${LD_FLAGS}" -o /out/mnemonic-enricher cmd/main/main.go
 

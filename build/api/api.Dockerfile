@@ -32,9 +32,9 @@ RUN gosec -quiet -exclude-dir=tests ./...
 RUN go test -v ./cmd/main/... ./internal/... -coverprofile=coverage.out
 
 ARG LD_FLAGS="-s -w \
-    -X 'github.com/twistingmercury/librarian-api/internal/version.version=${BUILD_VER}' \
-    -X 'github.com/twistingmercury/librarian-api/internal/version.buildDate=${BUILD_DATE}' \
-    -X 'github.com/twistingmercury/librarian-api/internal/version.commit=${BUILD_COMMIT}'"
+    -X 'github.com/twistingmercury/librarian/internal/api/version.version=${BUILD_VER}' \
+    -X 'github.com/twistingmercury/librarian/internal/api/version.buildDate=${BUILD_DATE}' \
+    -X 'github.com/twistingmercury/librarian/internal/api/version.commit=${BUILD_COMMIT}'"
 
 RUN GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" \
     go build --ldflags "${LD_FLAGS}" -o /out/mnemonic-api ./cmd/main
