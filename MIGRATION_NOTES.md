@@ -124,3 +124,8 @@ Unproven until a remote exists (Phase 3-5): GitHub Actions runs, cache hit rate,
 ## Not checked in Phase 0
 
 I didn't read file contents beyond what's quoted above: the CI workflows, the Dockerfiles, `PULL_POLICY` handling in the other build scripts, the two `.markdownlint.json` differences, and the dependency version spread outside heartbeat/otelx. Those are Phase 2 inputs.
+
+## Tooling notes (2026-10-21)
+
+- hadolint 2.14.0 is installed. The three service Dockerfiles have no errors or warnings; the only finding is `DL3059` (info, consecutive RUN) on the quality-gate steps, which are separate RUNs on purpose (owner decision: leave as is). Phase 3 CI must run hadolint in a way that does not fail on info-level findings (for example a failure threshold), or it will fail on this.
+- Go 1.27.3 and `golang-tooling:go1.27.3` replace 1.27.2 (GO-2026-6809 in crypto/x509). The three service images build with the full gate chain.
