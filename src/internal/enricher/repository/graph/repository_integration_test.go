@@ -30,13 +30,13 @@ func envOr(key, def string) string {
 	return def
 }
 
-// setupNeo4j connects to the Neo4j named by NEO4J_* env vars, or skips.
+// setupNeo4j connects to the Neo4j named by MNEMONIC_NEO4J_* env vars, or skips.
 func setupNeo4j(t *testing.T) (neo4j.DriverWithContext, graph.Repository) {
 	t.Helper()
 
 	driver, err := neo4j.NewDriverWithContext(
-		envOr("NEO4J_URI", "bolt://localhost:17688"),
-		neo4j.BasicAuth(envOr("NEO4J_USER", "neo4j"), envOr("NEO4J_PASSWORD", "mnemonic_dev"), ""))
+		envOr("MNEMONIC_NEO4J_URI", "bolt://localhost:7688"),
+		neo4j.BasicAuth(envOr("MNEMONIC_NEO4J_USER", "neo4j"), envOr("MNEMONIC_NEO4J_PASSWORD", "mnemonic_dev"), ""))
 	if err != nil {
 		t.Skipf("skipping integration test: unable to create Neo4j driver: %v", err)
 	}
@@ -50,7 +50,7 @@ func setupNeo4j(t *testing.T) (neo4j.DriverWithContext, graph.Repository) {
 
 	dbMetrics, err := metrics.NewDatabase(noop.NewMeterProvider().Meter("test"))
 	require.NoError(t, err)
-	return driver, graph.NewRepository(driver, envOr("NEO4J_DATABASE", "neo4j"), dbMetrics)
+	return driver, graph.NewRepository(driver, envOr("MNEMONIC_NEO4J_DATABASE", "neo4j"), dbMetrics)
 }
 
 func query(t *testing.T, driver neo4j.DriverWithContext, cypher string, params map[string]any) []*neo4j.Record {

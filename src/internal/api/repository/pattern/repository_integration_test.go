@@ -31,7 +31,7 @@ func setupTestDB(t *testing.T) *pgxpool.Pool {
 
 	connStr := os.Getenv("MNEMONIC_TEST_DATABASE_URL")
 	if connStr == "" {
-		connStr = "postgres://mnemonic:mnemonic_dev@localhost:15433/mnemonic?sslmode=disable"
+		connStr = "postgres://mnemonic:mnemonic_dev@localhost:5433/mnemonic?sslmode=disable"
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

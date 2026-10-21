@@ -41,13 +41,13 @@ func envOr(key, fallback string) string {
 func setupNeo4j(t *testing.T) (*seeder, graph.Repository) {
 	t.Helper()
 
-	database := envOr("NEO4J_DATABASE", "neo4j")
+	database := envOr("MNEMONIC_NEO4J_DATABASE", "neo4j")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	driver, err := neo4j.NewDriverWithContext(
-		envOr("NEO4J_URI", "bolt://localhost:17688"),
-		neo4j.BasicAuth(envOr("NEO4J_USER", "neo4j"), envOr("NEO4J_PASSWORD", "mnemonic_dev"), ""),
+		envOr("MNEMONIC_NEO4J_URI", "bolt://localhost:7688"),
+		neo4j.BasicAuth(envOr("MNEMONIC_NEO4J_USER", "neo4j"), envOr("MNEMONIC_NEO4J_PASSWORD", "mnemonic_dev"), ""),
 	)
 	if err != nil {
 		t.Skipf("skipping integration test: unable to create Neo4j driver: %v", err)

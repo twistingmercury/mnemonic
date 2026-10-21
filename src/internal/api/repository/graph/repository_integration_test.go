@@ -33,7 +33,7 @@ func envOr(key, def string) string {
 	return def
 }
 
-func neo4jDatabase() string { return envOr("NEO4J_DATABASE", "neo4j") }
+func neo4jDatabase() string { return envOr("MNEMONIC_NEO4J_DATABASE", "neo4j") }
 
 // setupNeo4j connects to the test Neo4j instance and returns the driver and a
 // graph.Repository, skipping the test if Neo4j is unavailable. Test data is
@@ -41,9 +41,9 @@ func neo4jDatabase() string { return envOr("NEO4J_DATABASE", "neo4j") }
 func setupNeo4j(t *testing.T) (neo4j.DriverWithContext, graph.Repository) {
 	t.Helper()
 
-	uri := envOr("NEO4J_URI", "bolt://localhost:17688")
-	user := envOr("NEO4J_USER", "neo4j")
-	password := envOr("NEO4J_PASSWORD", "mnemonic_dev")
+	uri := envOr("MNEMONIC_NEO4J_URI", "bolt://localhost:7688")
+	user := envOr("MNEMONIC_NEO4J_USER", "neo4j")
+	password := envOr("MNEMONIC_NEO4J_PASSWORD", "mnemonic_dev")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
