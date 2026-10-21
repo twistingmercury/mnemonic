@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -129,4 +130,19 @@ func TestToolSchemaBounds(t *testing.T) {
 		"search_patterns/" + outcomeInvalid:       4,
 		"find_related_patterns/" + outcomeInvalid: 2,
 	}, got)
+}
+
+// TestAdvertisedToolsHaveDescriptions verifies that every tool in tools/list
+// carries a description, since agents pick tools by it. It asserts on whatever
+// the server advertises, so a new tool without one fails here.
+func TestAdvertisedToolsHaveDescriptions(t *testing.T) {
+	session := connectTools(t, Services{}, noopToolMetrics(t))
+
+	res, err := session.ListTools(context.Background(), nil)
+	require.NoError(t, err)
+	require.NotEmpty(t, res.Tools, "server advertises no tools")
+
+	for _, tool := range res.Tools {
+		assert.NotEmpty(t, strings.TrimSpace(tool.Description), "tool %q has no description", tool.Name)
+	}
 }

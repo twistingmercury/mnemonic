@@ -165,3 +165,19 @@ func TestLegacyClient(t *testing.T) {
 	require.Equal(t, http.StatusOK, status)
 	assert.NotNil(t, resp["result"])
 }
+
+// TestGetMCPReturns405 verifies that the stateless handler offers no
+// server-to-client stream: a GET on /mcp is refused rather than hanging open.
+func TestGetMCPReturns405(t *testing.T) {
+	svc := Services{SearchPatterns: searchStub(t, nil, &searchsvc.SearchResult{}, nil)}
+	cfg := config.MCPConfig{DefaultSearchThreshold: 0.5}
+	srv := NewMCPHTTPServer(cfg, "localhost", NewMCPHTTPHandler(NewMCPServer(svc, zerolog.Nop(), cfg, noopToolMetrics(t))))
+	req := httptest.NewRequest(http.MethodGet, "/mcp", nil)
+	req.Header.Set("Accept", "text/event-stream")
+	rec := httptest.NewRecorder()
+
+	srv.Handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
+	assert.Equal(t, http.MethodPost, rec.Header().Get("Allow"), "tells the client POST is the only method")
+}
