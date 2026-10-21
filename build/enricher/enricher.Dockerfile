@@ -15,31 +15,24 @@ ARG BUILD_COMMIT=unknown
 WORKDIR /src
 
 COPY src/go.mod src/go.sum ./
-RUN --mount=type=cache,target=/go/pkg/mod \
-    go mod download
+RUN go mod download
 COPY src/.golangci.yml ./
 COPY src/cmd/enricher ./cmd/enricher
 COPY src/internal/enricher ./internal/enricher
 
 # Run linters, formatters, security scanners, etc
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    goimports -w .
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    golangci-lint run
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    govulncheck ./cmd/... ./internal/...
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    gosec -quiet -exclude-dir=tests ./...
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    go test -v ./cmd/enricher/... ./internal/... -coverprofile=coverage.out
+RUN goimports -w .
+RUN golangci-lint run
+RUN govulncheck ./cmd/... ./internal/...
+RUN gosec -quiet -exclude-dir=tests ./...
+RUN go test -v ./cmd/enricher/... ./internal/... -coverprofile=coverage.out
 
 ARG LD_FLAGS="-s -w \
     -X 'github.com/twistingmercury/mnemonic/internal/enricher/version.version=${BUILD_VER}' \
     -X 'github.com/twistingmercury/mnemonic/internal/enricher/version.buildDate=${BUILD_DATE}' \
     -X 'github.com/twistingmercury/mnemonic/internal/enricher/version.commit=${BUILD_COMMIT}'"
 
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    go build --ldflags "${LD_FLAGS}" -o /out/mnemonic-enricher ./cmd/enricher
+RUN go build --ldflags "${LD_FLAGS}" -o /out/mnemonic-enricher ./cmd/enricher
 
 
 #------------------------------------------------------------

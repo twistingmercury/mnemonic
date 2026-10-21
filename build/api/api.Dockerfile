@@ -17,37 +17,29 @@ ARG BUILD_COMMIT=unknown
 WORKDIR /src
 
 COPY src/go.mod src/go.sum ./
-RUN --mount=type=cache,target=/go/pkg/mod \
-    go mod download
+RUN go mod download
 COPY src/.golangci.yml ./
 COPY src/cmd/api ./cmd/api
 COPY src/internal/api ./internal/api
 COPY src/docs/api ./docs/api
 
 # Generate Swagger 2.0 docs (required before linters/build — routes.go imports the generated package)
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    go install github.com/swaggo/swag/cmd/swag@v1.16.6
+RUN go install github.com/swaggo/swag/cmd/swag@v1.16.6
 RUN swag init -g cmd/api/main.go -o docs/api/swagger --parseInternal
 
 # Run linters, formatters, security scanners, etc
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    goimports -w .
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    golangci-lint run
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    govulncheck ./cmd/... ./internal/...
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    gosec -quiet -exclude-dir=tests ./...
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    go test -v ./cmd/api/... ./internal/... -coverprofile=coverage.out
+RUN goimports -w .
+RUN golangci-lint run
+RUN govulncheck ./cmd/... ./internal/...
+RUN gosec -quiet -exclude-dir=tests ./...
+RUN go test -v ./cmd/api/... ./internal/... -coverprofile=coverage.out
 
 ARG LD_FLAGS="-s -w \
     -X 'github.com/twistingmercury/mnemonic/internal/api/version.version=${BUILD_VER}' \
     -X 'github.com/twistingmercury/mnemonic/internal/api/version.buildDate=${BUILD_DATE}' \
     -X 'github.com/twistingmercury/mnemonic/internal/api/version.commit=${BUILD_COMMIT}'"
 
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" \
+RUN GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" \
     go build --ldflags "${LD_FLAGS}" -o /out/mnemonic-api ./cmd/api
 
 

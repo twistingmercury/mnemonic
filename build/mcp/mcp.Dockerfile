@@ -15,31 +15,24 @@ ARG BUILD_COMMIT=unknown
 WORKDIR /src
 
 COPY src/go.mod src/go.sum ./
-RUN --mount=type=cache,target=/go/pkg/mod \
-    go mod download
+RUN go mod download
 COPY src/.golangci.yml ./
 COPY src/cmd/mcp ./cmd/mcp
 COPY src/internal/mcp ./internal/mcp
 
 # Run linters, formatters, security scanners, etc
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    goimports -w .
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    golangci-lint run
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    govulncheck ./cmd/... ./internal/...
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    gosec -quiet -exclude-dir=tests ./...
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    go test -v ./cmd/mcp/... ./internal/...
+RUN goimports -w .
+RUN golangci-lint run
+RUN govulncheck ./cmd/... ./internal/...
+RUN gosec -quiet -exclude-dir=tests ./...
+RUN go test -v ./cmd/mcp/... ./internal/...
 
 ARG LD_FLAGS="-s -w \
     -X 'github.com/twistingmercury/mnemonic/internal/mcp/version.version=${BUILD_VER}' \
     -X 'github.com/twistingmercury/mnemonic/internal/mcp/version.buildDate=${BUILD_DATE}' \
     -X 'github.com/twistingmercury/mnemonic/internal/mcp/version.commit=${BUILD_COMMIT}'"
 
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    go build --ldflags "${LD_FLAGS}" -o /out/mnemonic ./cmd/mcp
+RUN go build --ldflags "${LD_FLAGS}" -o /out/mnemonic ./cmd/mcp
 
 
 #------------------------------------------------------------
