@@ -22,17 +22,17 @@
 Pull the pre-seeded images for use in local development or testing:
 
 ```bash
-docker pull ghcr.io/twistingmercury/librarian-postgres:latest-dev
-docker pull ghcr.io/twistingmercury/librarian-neo4j:latest-dev
+docker pull ghcr.io/twistingmercury/mnemonic-postgres:latest-dev
+docker pull ghcr.io/twistingmercury/mnemonic-neo4j:latest-dev
 ```
 
 Both images are self-initializing — the schema is applied by the container itself on every start (idempotent). No migration tool required.
 
 ## How it works
 
-**PostgreSQL image** (`ghcr.io/twistingmercury/librarian-postgres`): built `FROM pgvector/pgvector:pg16`. All `.up.sql` migration files are copied into `/docker-entrypoint-initdb.d/` and executed automatically in order on first start.
+**PostgreSQL image** (`ghcr.io/twistingmercury/mnemonic-postgres`): built `FROM pgvector/pgvector:pg16`. All `.up.sql` migration files are copied into `/docker-entrypoint-initdb.d/` and executed automatically in order on first start.
 
-**Neo4j image** (`ghcr.io/twistingmercury/librarian-neo4j`): built `FROM neo4j:5` with APOC enabled. The Cypher constraint and index files ship inside the image, and a wrapper entrypoint applies them with `cypher-shell` every time the container starts, then writes `/tmp/schema_ready`. The schema cannot be baked into the image because `/data` is a Docker VOLUME. Health checks should test for `/tmp/schema_ready` (the image's built-in `HEALTHCHECK` does).
+**Neo4j image** (`ghcr.io/twistingmercury/mnemonic-neo4j`): built `FROM neo4j:5` with APOC enabled. The Cypher constraint and index files ship inside the image, and a wrapper entrypoint applies them with `cypher-shell` every time the container starts, then writes `/tmp/schema_ready`. The schema cannot be baked into the image because `/data` is a Docker VOLUME. Health checks should test for `/tmp/schema_ready` (the image's built-in `HEALTHCHECK` does).
 
 **CI**: a GitHub Actions workflow triggers on any change to `src/postgres/**` or `src/neo4j/**`, runs the BATS test suites for both databases, then builds and pushes both images to GHCR.
 
@@ -48,30 +48,43 @@ Both images are self-initializing — the schema is applied by the container its
 
 Requires Docker 27+, Docker Compose 2.32+, `bats-core`, and `psql`.
 
-Build both images locally:
+Build the images locally from the repository root (each script tags the image with the version and `latest`):
 
 ```bash
-make build
+bash db/postgres/build.sh
+bash db/neo4j/build.sh
 ```
 
-Build individually:
-
-```bash
-make build-postgres
-make build-neo4j
-```
+Set `MNEMONIC_VERSION` to override the git-derived version tag.
 
 ### Testing
 
 BATS tests verify the schema state after all migrations have been applied.
 
 ```bash
-make test           # run both test suites
-make test-postgres  # PostgreSQL only
-make test-neo4j     # Neo4j only
+db/tests/postgres-test-runner.sh   # PostgreSQL migrations
+db/tests/neo4j-test-runner.sh      # Neo4j migrations and the Neo4j image
+bats db/tests/bats/schema-entrypoint.bats db/tests/bats/build-scripts.bats   # scripts, no Docker stack needed
 ```
 
-Tests spin up a local Docker Compose stack on isolated ports (Postgres `15435`, Neo4j bolt `17690`) so they do not conflict with other running stacks.
+The runners start `db/docker-compose.yaml` on isolated host ports (Postgres `5435`, Neo4j http `7477` and bolt `7690`) so they do not conflict with other running stacks. Container ports are unchanged.
+
+Environment variables (all optional):
+
+| Variable | Default | Used by |
+| --- | --- | --- |
+| `MNEMONIC_VERSION` | latest git tag, else `dev` | `build.sh` scripts: image tag |
+| `MNEMONIC_MAX_RETRIES` | `30` | test runners: readiness attempts |
+| `MNEMONIC_RETRY_INTERVAL` | `1` | test runners: seconds between attempts |
+| `MNEMONIC_NEO4J_USER` / `MNEMONIC_NEO4J_PASSWORD` | `neo4j` / `mnemonic_dev` | Neo4j test runner and BATS |
+| `MNEMONIC_NEO4J_IMAGE` | built by the runner | Neo4j test runner: test an existing image instead |
+| `MNEMONIC_READY_TIMEOUT` / `MNEMONIC_STOP_TIMEOUT` | `150` / `30` | `neo4j-image.bats`: seconds |
+| `MNEMONIC_SCHEMA_DIR` | `/startup/schema` | in-image entrypoint |
+| `MNEMONIC_SCHEMA_READY_FILE` | `/tmp/schema_ready` | in-image entrypoint |
+| `MNEMONIC_SCHEMA_MAX_RETRIES` / `MNEMONIC_SCHEMA_RETRY_SLEEP` | `60` / `2` | in-image entrypoint |
+| `MNEMONIC_BASE_ENTRYPOINT` | `/startup/docker-entrypoint.sh` | in-image entrypoint |
+
+Variables defined by the third-party tools keep their names: `NEO4J_AUTH`, `POSTGRES_*`, and the libpq `PG*` variables.
 
 ### Versioning
 

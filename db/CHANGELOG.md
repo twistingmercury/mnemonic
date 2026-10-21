@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- 2026-10-21: Renamed the database images to `mnemonic-postgres` and `mnemonic-neo4j`, dropping the placeholder fork name (tags unchanged); the test harness host ports return to Postgres `5435` and Neo4j `7477`/`7690`.
+- 2026-10-21: Prefixed the environment variables defined by this repository's scripts with `MNEMONIC_` (`MNEMONIC_VERSION`, `MNEMONIC_NEO4J_USER`, `MNEMONIC_SCHEMA_DIR`, ...); the old names are no longer read. Variables owned by Neo4j, PostgreSQL and libpq are unchanged.
+
 ### Added
 
 - GitHub Actions CI workflow for Mnemonic service (`mnemonic-ci.yaml`)

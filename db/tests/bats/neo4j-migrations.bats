@@ -2,15 +2,15 @@
 # BATS tests for Neo4j migration verification
 
 # Connection details (exported by test runner)
-# NEO4J_CONTAINER — Docker container ID
-# NEO4J_USER — neo4j
-# NEO4J_PASSWORD — mnemonic_dev
+# MNEMONIC_NEO4J_CONTAINER — Docker container ID
+# MNEMONIC_NEO4J_USER — neo4j
+# MNEMONIC_NEO4J_PASSWORD — mnemonic_dev
 
 # Helper: Run cypher-shell query and capture output
 run_cypher() {
     local query="$1"
-    docker exec "${NEO4J_CONTAINER}" cypher-shell \
-        -u "${NEO4J_USER}" -p "${NEO4J_PASSWORD}" \
+    docker exec "${MNEMONIC_NEO4J_CONTAINER}" cypher-shell \
+        -u "${MNEMONIC_NEO4J_USER}" -p "${MNEMONIC_NEO4J_PASSWORD}" \
         --format plain "$query" 2>&1
 }
 
@@ -122,13 +122,13 @@ run_cypher() {
 
 @test "migrations are idempotent on re-application" {
     # Re-apply migration 001 (already in container from initial run)
-    docker exec "${NEO4J_CONTAINER}" cypher-shell \
-        -u "${NEO4J_USER}" -p "${NEO4J_PASSWORD}" \
+    docker exec "${MNEMONIC_NEO4J_CONTAINER}" cypher-shell \
+        -u "${MNEMONIC_NEO4J_USER}" -p "${MNEMONIC_NEO4J_PASSWORD}" \
         -f /tmp/001_create_constraints.cypher >/dev/null 2>&1
 
     # Re-apply migration 003 (already in container from initial run)
-    docker exec "${NEO4J_CONTAINER}" cypher-shell \
-        -u "${NEO4J_USER}" -p "${NEO4J_PASSWORD}" \
+    docker exec "${MNEMONIC_NEO4J_CONTAINER}" cypher-shell \
+        -u "${MNEMONIC_NEO4J_USER}" -p "${MNEMONIC_NEO4J_PASSWORD}" \
         -f /tmp/003_create_indexes.cypher >/dev/null 2>&1
 
     # Verify constraint count unchanged (still 3)

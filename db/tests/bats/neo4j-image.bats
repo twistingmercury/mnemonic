@@ -1,15 +1,15 @@
 #!/usr/bin/env bats
-# BATS tests for the librarian-neo4j image: the schema must be applied by the
+# BATS tests for the mnemonic-neo4j image: the schema must be applied by the
 # image itself at container start, not baked into /data (a VOLUME).
 #
 # Required environment (exported by neo4j-test-runner.sh):
-#   NEO4J_IMAGE — image under test
-# Optional: NEO4J_USER (neo4j), NEO4J_PASSWORD (mnemonic_dev), READY_TIMEOUT (150)
+#   MNEMONIC_NEO4J_IMAGE — image under test
+# Optional: MNEMONIC_NEO4J_USER (neo4j), MNEMONIC_NEO4J_PASSWORD (mnemonic_dev), MNEMONIC_READY_TIMEOUT (150)
 
-NEO4J_USER="${NEO4J_USER:-neo4j}"
-NEO4J_PASSWORD="${NEO4J_PASSWORD:-mnemonic_dev}"
-READY_TIMEOUT="${READY_TIMEOUT:-150}"
-STOP_TIMEOUT="${STOP_TIMEOUT:-30}"
+MNEMONIC_NEO4J_USER="${MNEMONIC_NEO4J_USER:-neo4j}"
+MNEMONIC_NEO4J_PASSWORD="${MNEMONIC_NEO4J_PASSWORD:-mnemonic_dev}"
+MNEMONIC_READY_TIMEOUT="${MNEMONIC_READY_TIMEOUT:-150}"
+MNEMONIC_STOP_TIMEOUT="${MNEMONIC_STOP_TIMEOUT:-30}"
 
 setup() {
     export CONTAINER_NAME="test-neo4j-$$-${BATS_TEST_NUMBER}"
@@ -32,7 +32,7 @@ start_container() {
     local image="${2}"
 
     docker run -d --name "${name}" \
-        --env NEO4J_AUTH="${NEO4J_USER}/${NEO4J_PASSWORD}" \
+        --env NEO4J_AUTH="${MNEMONIC_NEO4J_USER}/${MNEMONIC_NEO4J_PASSWORD}" \
         --volume "${VOLUME_NAME}:/data" \
         "${image}" >/dev/null
 }
@@ -40,7 +40,7 @@ start_container() {
 # Polls docker inspect until the container is healthy or the timeout expires.
 wait_healthy() {
     local name="${1}"
-    local deadline=$((SECONDS + READY_TIMEOUT))
+    local deadline=$((SECONDS + MNEMONIC_READY_TIMEOUT))
     local health
 
     while [ "${SECONDS}" -lt "${deadline}" ]; do
@@ -51,7 +51,7 @@ wait_healthy() {
         sleep 1
     done
 
-    printf 'container %s not healthy after %ss (last status: %s)\n' "${name}" "${READY_TIMEOUT}" "${health}" >&2
+    printf 'container %s not healthy after %ss (last status: %s)\n' "${name}" "${MNEMONIC_READY_TIMEOUT}" "${health}" >&2
     docker logs "${name}" >&2 || true
     return 1
 }
@@ -59,16 +59,16 @@ wait_healthy() {
 # Waits for bolt only; used for the stock image, which has no health check.
 wait_bolt() {
     local name="${1}"
-    local deadline=$((SECONDS + READY_TIMEOUT))
+    local deadline=$((SECONDS + MNEMONIC_READY_TIMEOUT))
 
     while [ "${SECONDS}" -lt "${deadline}" ]; do
-        if docker exec "${name}" cypher-shell -u "${NEO4J_USER}" -p "${NEO4J_PASSWORD}" "RETURN 1" >/dev/null 2>&1; then
+        if docker exec "${name}" cypher-shell -u "${MNEMONIC_NEO4J_USER}" -p "${MNEMONIC_NEO4J_PASSWORD}" "RETURN 1" >/dev/null 2>&1; then
             return 0
         fi
         sleep 1
     done
 
-    printf 'container %s did not accept bolt after %ss\n' "${name}" "${READY_TIMEOUT}" >&2
+    printf 'container %s did not accept bolt after %ss\n' "${name}" "${MNEMONIC_READY_TIMEOUT}" >&2
     return 1
 }
 
@@ -77,7 +77,7 @@ run_cypher_in() {
     local query="${2}"
 
     docker exec "${name}" cypher-shell \
-        -u "${NEO4J_USER}" -p "${NEO4J_PASSWORD}" \
+        -u "${MNEMONIC_NEO4J_USER}" -p "${MNEMONIC_NEO4J_PASSWORD}" \
         --format plain "${query}" 2>&1
 }
 
@@ -111,7 +111,7 @@ assert_contains() {
 # ---------------------------------------------------------------------------
 
 @test "fresh container - creates all uniqueness constraints" {
-    start_container "${CONTAINER_NAME}" "${NEO4J_IMAGE}"
+    start_container "${CONTAINER_NAME}" "${MNEMONIC_NEO4J_IMAGE}"
     wait_healthy "${CONTAINER_NAME}"
 
     run run_cypher "SHOW CONSTRAINTS YIELD name RETURN name"
@@ -123,7 +123,7 @@ assert_contains() {
 }
 
 @test "fresh container - creates the explicit indexes" {
-    start_container "${CONTAINER_NAME}" "${NEO4J_IMAGE}"
+    start_container "${CONTAINER_NAME}" "${MNEMONIC_NEO4J_IMAGE}"
     wait_healthy "${CONTAINER_NAME}"
 
     run run_cypher "SHOW INDEXES YIELD name RETURN name"
@@ -137,7 +137,7 @@ assert_contains() {
 }
 
 @test "fresh container - records schema version 3 and skips the Enterprise-only migration" {
-    start_container "${CONTAINER_NAME}" "${NEO4J_IMAGE}"
+    start_container "${CONTAINER_NAME}" "${MNEMONIC_NEO4J_IMAGE}"
     wait_healthy "${CONTAINER_NAME}"
 
     run run_cypher "MATCH (v:SchemaVersion {name: 'mnemonic'}) RETURN v.version AS version"
@@ -158,12 +158,12 @@ assert_contains() {
     local indexes_before
     local logs
 
-    start_container "${CONTAINER_NAME}" "${NEO4J_IMAGE}"
+    start_container "${CONTAINER_NAME}" "${MNEMONIC_NEO4J_IMAGE}"
     wait_healthy "${CONTAINER_NAME}"
     constraints_before=$(cypher_count "SHOW CONSTRAINTS YIELD name RETURN count(*) AS count")
     indexes_before=$(cypher_count "SHOW INDEXES YIELD name RETURN count(*) AS count")
 
-    docker restart -t "${STOP_TIMEOUT}" "${CONTAINER_NAME}" >/dev/null
+    docker restart -t "${MNEMONIC_STOP_TIMEOUT}" "${CONTAINER_NAME}" >/dev/null
     wait_healthy "${CONTAINER_NAME}"
 
     [ "$(cypher_count "SHOW CONSTRAINTS YIELD name RETURN count(*) AS count")" -eq "${constraints_before}" ]
@@ -179,13 +179,13 @@ assert_contains() {
 }
 
 @test "new container on a used volume - keeps existing data and schema" {
-    start_container "${CONTAINER_NAME}-seed" "${NEO4J_IMAGE}"
+    start_container "${CONTAINER_NAME}-seed" "${MNEMONIC_NEO4J_IMAGE}"
     wait_healthy "${CONTAINER_NAME}-seed"
     run_cypher_in "${CONTAINER_NAME}-seed" "CREATE (:Concept {name: 'survivor'})" >/dev/null
-    docker stop -t "${STOP_TIMEOUT}" "${CONTAINER_NAME}-seed" >/dev/null
+    docker stop -t "${MNEMONIC_STOP_TIMEOUT}" "${CONTAINER_NAME}-seed" >/dev/null
     docker rm -f -v "${CONTAINER_NAME}-seed" >/dev/null
 
-    start_container "${CONTAINER_NAME}" "${NEO4J_IMAGE}"
+    start_container "${CONTAINER_NAME}" "${MNEMONIC_NEO4J_IMAGE}"
     wait_healthy "${CONTAINER_NAME}"
 
     run run_cypher "MATCH (c:Concept {name: 'survivor'}) RETURN count(c) AS count"
@@ -198,10 +198,10 @@ assert_contains() {
     start_container "${CONTAINER_NAME}-seed" "neo4j:5"
     wait_bolt "${CONTAINER_NAME}-seed"
     run_cypher_in "${CONTAINER_NAME}-seed" "CREATE (:Concept {name: 'legacy'})" >/dev/null
-    docker stop -t "${STOP_TIMEOUT}" "${CONTAINER_NAME}-seed" >/dev/null
+    docker stop -t "${MNEMONIC_STOP_TIMEOUT}" "${CONTAINER_NAME}-seed" >/dev/null
     docker rm -f -v "${CONTAINER_NAME}-seed" >/dev/null
 
-    start_container "${CONTAINER_NAME}" "${NEO4J_IMAGE}"
+    start_container "${CONTAINER_NAME}" "${MNEMONIC_NEO4J_IMAGE}"
     wait_healthy "${CONTAINER_NAME}"
 
     run run_cypher "MATCH (c:Concept {name: 'legacy'}) RETURN count(c) AS count"
@@ -219,12 +219,12 @@ assert_contains() {
 # user cannot, so the root-only tests above would not catch a permission bug.
 @test "unprivileged start (uid 7474, as Kubernetes runs it) - applies the schema" {
     docker run --rm --user 0:0 --volume "${VOLUME_NAME}:/data" --entrypoint chown \
-        "${NEO4J_IMAGE}" -R 7474:7474 /data
+        "${MNEMONIC_NEO4J_IMAGE}" -R 7474:7474 /data
 
     docker run -d --name "${CONTAINER_NAME}" --user 7474:7474 \
-        --env NEO4J_AUTH="${NEO4J_USER}/${NEO4J_PASSWORD}" \
+        --env NEO4J_AUTH="${MNEMONIC_NEO4J_USER}/${MNEMONIC_NEO4J_PASSWORD}" \
         --volume "${VOLUME_NAME}:/data" \
-        "${NEO4J_IMAGE}" >/dev/null
+        "${MNEMONIC_NEO4J_IMAGE}" >/dev/null
     wait_healthy "${CONTAINER_NAME}"
 
     run run_cypher "SHOW CONSTRAINTS YIELD name RETURN name"
@@ -234,7 +234,7 @@ assert_contains() {
 }
 
 @test "concept_name_unique - rejects a second Concept with the same name" {
-    start_container "${CONTAINER_NAME}" "${NEO4J_IMAGE}"
+    start_container "${CONTAINER_NAME}" "${MNEMONIC_NEO4J_IMAGE}"
     wait_healthy "${CONTAINER_NAME}"
 
     run run_cypher "CREATE (:Concept {name: 'dup'})"
@@ -256,11 +256,11 @@ assert_contains() {
     local exit_code
     local logs
 
-    start_container "${CONTAINER_NAME}" "${NEO4J_IMAGE}"
+    start_container "${CONTAINER_NAME}" "${MNEMONIC_NEO4J_IMAGE}"
     wait_healthy "${CONTAINER_NAME}"
 
     started_at="${SECONDS}"
-    docker stop -t "${STOP_TIMEOUT}" "${CONTAINER_NAME}" >/dev/null
+    docker stop -t "${MNEMONIC_STOP_TIMEOUT}" "${CONTAINER_NAME}" >/dev/null
     elapsed=$((SECONDS - started_at))
 
     exit_code=$(docker inspect -f '{{.State.ExitCode}}' "${CONTAINER_NAME}")
@@ -269,7 +269,7 @@ assert_contains() {
     # The stock neo4j image itself takes about 10s to finish stopping, so the
     # bound is the grace period, not 10s; a SIGKILL would give exit code 137.
     [ "${exit_code}" -eq 0 ]
-    [ "${elapsed}" -lt "${STOP_TIMEOUT}" ]
+    [ "${elapsed}" -lt "${MNEMONIC_STOP_TIMEOUT}" ]
     assert_contains "${logs}" "Neo4j Server shutdown initiated by request"
     assert_contains "${logs}" "Stopped."
 }
@@ -280,10 +280,10 @@ assert_contains() {
 
 @test "failed schema job - stops the container instead of leaving a database without a schema" {
     docker run -d --name "${CONTAINER_NAME}" \
-        --env NEO4J_AUTH="${NEO4J_USER}/${NEO4J_PASSWORD}" \
-        --env SCHEMA_MAX_RETRIES=1 --env SCHEMA_RETRY_SLEEP=1 \
+        --env NEO4J_AUTH="${MNEMONIC_NEO4J_USER}/${MNEMONIC_NEO4J_PASSWORD}" \
+        --env MNEMONIC_SCHEMA_MAX_RETRIES=1 --env MNEMONIC_SCHEMA_RETRY_SLEEP=1 \
         --volume "${VOLUME_NAME}:/data" \
-        "${NEO4J_IMAGE}" >/dev/null
+        "${MNEMONIC_NEO4J_IMAGE}" >/dev/null
 
     run timeout 60 docker wait "${CONTAINER_NAME}"
     [ "${status}" -eq 0 ]

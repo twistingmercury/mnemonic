@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # build.sh — Build the mnemonic-postgres pre-seeded Docker image.
 #
-# Usage: bash src/postgres/build.sh
+# Usage: bash db/postgres/build.sh
 #
 # The image is tagged with both the current git version and 'latest'.
-# Set the VERSION environment variable to override the git-derived version.
+# Set the MNEMONIC_VERSION environment variable to override the git-derived version.
 
 set -euo pipefail
 
@@ -28,14 +28,14 @@ log_error() {
 # ---------------------------------------------------------------------------
 # Version
 # ---------------------------------------------------------------------------
-VERSION="${VERSION:-$(git describe --tags --abbrev=0 2>/dev/null || echo 'dev')}"
+MNEMONIC_VERSION="${MNEMONIC_VERSION:-$(git describe --tags --abbrev=0 2>/dev/null || echo 'dev')}"
 
-IMAGE_BASE="ghcr.io/twistingmercury/librarian-postgres"
-IMAGE_VERSIONED="${IMAGE_BASE}:${VERSION}"
+IMAGE_BASE="ghcr.io/twistingmercury/mnemonic-postgres"
+IMAGE_VERSIONED="${IMAGE_BASE}:${MNEMONIC_VERSION}"
 IMAGE_LATEST="${IMAGE_BASE}:latest"
 
 log_info "Building PostgreSQL pre-seeded image"
-log_info "Version : ${VERSION}"
+log_info "Version : ${MNEMONIC_VERSION}"
 log_info "Image   : ${IMAGE_VERSIONED}"
 log_info "Context : ${SCRIPT_DIR}"
 

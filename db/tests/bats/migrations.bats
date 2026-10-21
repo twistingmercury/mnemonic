@@ -10,7 +10,7 @@
 # Connection defaults (overridable by environment)
 # ---------------------------------------------------------------------------
 export PGHOST="${PGHOST:-localhost}"
-export PGPORT="${PGPORT:-15435}"
+export PGPORT="${PGPORT:-5435}"
 export PGDATABASE="${PGDATABASE:-mnemonic}"
 export PGUSER="${PGUSER:-mnemonic}"
 export PGPASSWORD="${PGPASSWORD:-mnemonic_dev}"

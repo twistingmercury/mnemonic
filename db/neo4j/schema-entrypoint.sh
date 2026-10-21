@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# schema-entrypoint.sh — Neo4j entrypoint that applies the Librarian schema on every start.
+# schema-entrypoint.sh — Neo4j entrypoint that applies the Mnemonic schema on every start.
 #
 # Why this exists: the official neo4j image declares /data as a VOLUME, so
 # anything written to /data at build time is never part of the image. The
@@ -10,18 +10,18 @@
 # `exec`s the base image entrypoint, so Neo4j stays the foreground process
 # under tini (PID 1) and receives SIGTERM from `docker stop` directly.
 #
-# Readiness: SCHEMA_READY_FILE is removed at start and created only after every
+# Readiness: MNEMONIC_SCHEMA_READY_FILE is removed at start and created only after every
 # Cypher file applied cleanly. Health checks should test for that file.
 #
 # Usage: ENTRYPOINT ["tini", "-g", "--", "/startup/schema-entrypoint.sh"] with CMD ["neo4j"]
 
 set -euo pipefail
 
-BASE_ENTRYPOINT="${BASE_ENTRYPOINT:-/startup/docker-entrypoint.sh}"
-SCHEMA_DIR="${SCHEMA_DIR:-/startup/schema}"
-SCHEMA_READY_FILE="${SCHEMA_READY_FILE:-/tmp/schema_ready}"
-SCHEMA_MAX_RETRIES="${SCHEMA_MAX_RETRIES:-60}"
-SCHEMA_RETRY_SLEEP="${SCHEMA_RETRY_SLEEP:-2}"
+MNEMONIC_BASE_ENTRYPOINT="${MNEMONIC_BASE_ENTRYPOINT:-/startup/docker-entrypoint.sh}"
+MNEMONIC_SCHEMA_DIR="${MNEMONIC_SCHEMA_DIR:-/startup/schema}"
+MNEMONIC_SCHEMA_READY_FILE="${MNEMONIC_SCHEMA_READY_FILE:-/tmp/schema_ready}"
+MNEMONIC_SCHEMA_MAX_RETRIES="${MNEMONIC_SCHEMA_MAX_RETRIES:-60}"
+MNEMONIC_SCHEMA_RETRY_SLEEP="${MNEMONIC_SCHEMA_RETRY_SLEEP:-2}"
 ENTERPRISE_ONLY_FILE="002_create_existence_constraints.cypher"
 
 log_info() {
@@ -58,18 +58,18 @@ wait_for_neo4j() {
 
     log_info "Waiting for Neo4j to accept bolt connections..."
 
-    while [ "${attempt}" -le "${SCHEMA_MAX_RETRIES}" ]; do
+    while [ "${attempt}" -le "${MNEMONIC_SCHEMA_MAX_RETRIES}" ]; do
         if cypher-shell "RETURN 1" >/dev/null 2>&1; then
             log_info "Neo4j ready after ${attempt} attempt(s)"
             return 0
         fi
 
-        log_info "Attempt ${attempt}/${SCHEMA_MAX_RETRIES} - not ready yet, retrying in ${SCHEMA_RETRY_SLEEP}s..."
-        sleep "${SCHEMA_RETRY_SLEEP}"
+        log_info "Attempt ${attempt}/${MNEMONIC_SCHEMA_MAX_RETRIES} - not ready yet, retrying in ${MNEMONIC_SCHEMA_RETRY_SLEEP}s..."
+        sleep "${MNEMONIC_SCHEMA_RETRY_SLEEP}"
         attempt=$((attempt + 1))
     done
 
-    log_error "Neo4j did not accept connections after $((SCHEMA_MAX_RETRIES * SCHEMA_RETRY_SLEEP))s"
+    log_error "Neo4j did not accept connections after $((MNEMONIC_SCHEMA_MAX_RETRIES * MNEMONIC_SCHEMA_RETRY_SLEEP))s"
     return 1
 }
 
@@ -108,7 +108,7 @@ apply_schema() {
     local cypher_file
 
     # The glob expands in sorted order, which is the migration order.
-    for cypher_file in "${SCHEMA_DIR}"/*.cypher; do
+    for cypher_file in "${MNEMONIC_SCHEMA_DIR}"/*.cypher; do
         if ! apply_file "${cypher_file}"; then
             return 1
         fi
@@ -128,8 +128,8 @@ schema_job() {
         return 1
     fi
 
-    touch "${SCHEMA_READY_FILE}"
-    log_info "Schema applied; wrote ${SCHEMA_READY_FILE}"
+    touch "${MNEMONIC_SCHEMA_READY_FILE}"
+    log_info "Schema applied; wrote ${MNEMONIC_SCHEMA_READY_FILE}"
 
     return 0
 }
@@ -150,14 +150,14 @@ run_schema_job() {
 }
 
 main() {
-    rm -f "${SCHEMA_READY_FILE}"
+    rm -f "${MNEMONIC_SCHEMA_READY_FILE}"
 
     # Only the database server needs a schema, not `neo4j-admin` or a shell.
     if [ "${1:-}" = "neo4j" ]; then
         run_schema_job "$$" &
     fi
 
-    exec "${BASE_ENTRYPOINT}" "$@"
+    exec "${MNEMONIC_BASE_ENTRYPOINT}" "$@"
 }
 
 main "$@"

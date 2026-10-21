@@ -1,0 +1,60 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: mnemonic
+      POSTGRES_USER: mnemonic
+      POSTGRES_PASSWORD: mnemonic_dev
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mnemonic"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mnemonic-network
+
+  migrate:
+    image: migrate/migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./postgres:/migrations:ro
+    command:
+      - "-path=/migrations"
+      - "-database=postgres://mnemonic:mnemonic_dev@postgres:5432/mnemonic?sslmode=disable"
+      - "up"
+    networks:
+      - mnemonic-network
+
+  neo4j:
+    image: neo4j:5
+    environment:
+      NEO4J_AUTH: neo4j/mnemonic_dev
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+      NEO4J_dbms_security_procedures_allowlist: apoc.*
+    ports:
+      - "7477:7474"
+      - "7690:7687"
+    volumes:
+      - neo4j-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p mnemonic_dev 'RETURN 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mnemonic-network
+
+volumes:
+  postgres-data:
+  neo4j-data:
+
+networks:
+  mnemonic-network:
+    driver: bridge

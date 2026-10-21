@@ -8,8 +8,8 @@ BATS_DIR="${THIS_DIR}/bats"
 PG_MIG_DIR="$(cd "${MIG_DIR}/postgres" && pwd)"
 DOCKER_COMPOSE="${MIG_DIR}/docker-compose.yaml"
 
-MAX_RETRIES="${MAX_RETRIES:-30}"
-RETRY_INTERVAL="${RETRY_INTERVAL:-1}"
+MNEMONIC_MAX_RETRIES="${MNEMONIC_MAX_RETRIES:-30}"
+MNEMONIC_RETRY_INTERVAL="${MNEMONIC_RETRY_INTERVAL:-1}"
 
 printf "=== Database Migrations Test Runner ===\n"
 
@@ -55,13 +55,13 @@ stop_infra(){
 
 wait_for_postgres(){
     local retries=0
-    local max_retries="${MAX_RETRIES}"
-    local interval="${RETRY_INTERVAL}"
+    local max_retries="${MNEMONIC_MAX_RETRIES}"
+    local interval="${MNEMONIC_RETRY_INTERVAL}"
 
     printf "Waiting for PostgreSQL to be ready...\n"
 
     while [ "$retries" -lt "$max_retries" ]; do
-        if PGPASSWORD=mnemonic_dev psql -h localhost -p 15435 -U mnemonic -d mnemonic -c '\q' 2>/dev/null; then
+        if PGPASSWORD=mnemonic_dev psql -h localhost -p 5435 -U mnemonic -d mnemonic -c '\q' 2>/dev/null; then
             printf "PostgreSQL is ready\n"
             return 0
         fi

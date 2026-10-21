@@ -11,12 +11,12 @@ BATS_DIR="${THIS_DIR}/bats"
 NEO4J_MIG_DIR="$(cd "${MIG_DIR}/neo4j" && pwd)"
 DOCKER_COMPOSE="${MIG_DIR}/docker-compose.yaml"
 
-MAX_RETRIES="${MAX_RETRIES:-30}"
-RETRY_INTERVAL="${RETRY_INTERVAL:-1}"
-NEO4J_USER="${NEO4J_USER:-neo4j}"
-NEO4J_PASSWORD="${NEO4J_PASSWORD:-mnemonic_dev}"
-# The image under test; set NEO4J_IMAGE to test an existing image instead of building one.
-NEO4J_IMAGE="${NEO4J_IMAGE:-}"
+MNEMONIC_MAX_RETRIES="${MNEMONIC_MAX_RETRIES:-30}"
+MNEMONIC_RETRY_INTERVAL="${MNEMONIC_RETRY_INTERVAL:-1}"
+MNEMONIC_NEO4J_USER="${MNEMONIC_NEO4J_USER:-neo4j}"
+MNEMONIC_NEO4J_PASSWORD="${MNEMONIC_NEO4J_PASSWORD:-mnemonic_dev}"
+# The image under test; set MNEMONIC_NEO4J_IMAGE to test an existing image instead of building one.
+MNEMONIC_NEO4J_IMAGE="${MNEMONIC_NEO4J_IMAGE:-}"
 BUILT_IMAGE=0
 
 printf "=== Neo4j Migrations Test Runner ===\n"
@@ -87,8 +87,8 @@ get_neo4j_container(){
 
 wait_for_neo4j(){
     local retries=0
-    local max_retries="${MAX_RETRIES}"
-    local interval="${RETRY_INTERVAL}"
+    local max_retries="${MNEMONIC_MAX_RETRIES}"
+    local interval="${MNEMONIC_RETRY_INTERVAL}"
     local container_id
 
     if ! container_id=$(get_neo4j_container); then
@@ -98,7 +98,7 @@ wait_for_neo4j(){
     printf "Waiting for Neo4j to be ready...\n"
 
     while [ "${retries}" -lt "${max_retries}" ]; do
-        if docker exec "${container_id}" cypher-shell -u "${NEO4J_USER}" -p "${NEO4J_PASSWORD}" "RETURN 1" 2>/dev/null 1>/dev/null; then
+        if docker exec "${container_id}" cypher-shell -u "${MNEMONIC_NEO4J_USER}" -p "${MNEMONIC_NEO4J_PASSWORD}" "RETURN 1" 2>/dev/null 1>/dev/null; then
             printf "Neo4j is ready\n"
             return 0
         fi
@@ -129,7 +129,7 @@ apply_migrations(){
         return 1
     fi
 
-    if ! docker exec "${container_id}" cypher-shell -u "${NEO4J_USER}" -p "${NEO4J_PASSWORD}" -f /tmp/001_create_constraints.cypher; then
+    if ! docker exec "${container_id}" cypher-shell -u "${MNEMONIC_NEO4J_USER}" -p "${MNEMONIC_NEO4J_PASSWORD}" -f /tmp/001_create_constraints.cypher; then
         printf "ERROR: Failed to apply 001_create_constraints.cypher\n" >&2
         return 1
     fi
@@ -144,7 +144,7 @@ apply_migrations(){
         return 1
     fi
 
-    if ! docker exec "${container_id}" cypher-shell -u "${NEO4J_USER}" -p "${NEO4J_PASSWORD}" -f /tmp/003_create_indexes.cypher; then
+    if ! docker exec "${container_id}" cypher-shell -u "${MNEMONIC_NEO4J_USER}" -p "${MNEMONIC_NEO4J_PASSWORD}" -f /tmp/003_create_indexes.cypher; then
         printf "ERROR: Failed to apply 003_create_indexes.cypher\n" >&2
         return 1
     fi
@@ -169,9 +169,9 @@ run_tests(){
     fi
 
     # Export container ID for BATS tests
-    export NEO4J_CONTAINER="${container_id}"
-    export NEO4J_USER
-    export NEO4J_PASSWORD
+    export MNEMONIC_NEO4J_CONTAINER="${container_id}"
+    export MNEMONIC_NEO4J_USER
+    export MNEMONIC_NEO4J_PASSWORD
 
     printf "\nRunning BATS tests...\n"
     if ! bats "${BATS_DIR}/neo4j-migrations.bats"; then
@@ -188,14 +188,14 @@ run_tests(){
 }
 
 build_image(){
-    if [ -n "${NEO4J_IMAGE}" ]; then
+    if [ -n "${MNEMONIC_NEO4J_IMAGE}" ]; then
         return 0
     fi
 
-    NEO4J_IMAGE="librarian-neo4j:test-$$"
-    printf "\nBuilding image %s...\n" "${NEO4J_IMAGE}"
-    if ! docker build -q -t "${NEO4J_IMAGE}" "${NEO4J_MIG_DIR}" >/dev/null; then
-        printf "ERROR: Failed to build %s\n" "${NEO4J_IMAGE}" >&2
+    MNEMONIC_NEO4J_IMAGE="mnemonic-neo4j:test-$$"
+    printf "\nBuilding image %s...\n" "${MNEMONIC_NEO4J_IMAGE}"
+    if ! docker build -q -t "${MNEMONIC_NEO4J_IMAGE}" "${NEO4J_MIG_DIR}" >/dev/null; then
+        printf "ERROR: Failed to build %s\n" "${MNEMONIC_NEO4J_IMAGE}" >&2
         return 1
     fi
 
@@ -209,9 +209,9 @@ run_image_tests(){
         return 1
     fi
 
-    export NEO4J_IMAGE
-    export NEO4J_USER
-    export NEO4J_PASSWORD
+    export MNEMONIC_NEO4J_IMAGE
+    export MNEMONIC_NEO4J_USER
+    export MNEMONIC_NEO4J_PASSWORD
 
     printf "\nRunning image BATS tests...\n"
     if ! bats "${BATS_DIR}/neo4j-image.bats"; then
@@ -225,7 +225,7 @@ run_image_tests(){
 cleanup(){
     stop_infra
     if [ "${BUILT_IMAGE}" -eq 1 ]; then
-        docker rmi "${NEO4J_IMAGE}" 2>/dev/null || true
+        docker rmi "${MNEMONIC_NEO4J_IMAGE}" 2>/dev/null || true
     fi
 }
 
