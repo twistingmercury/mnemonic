@@ -2,6 +2,7 @@ package telemetry_test
 
 import (
 	"context"
+	"net"
 	"testing"
 	"time"
 
@@ -36,10 +37,23 @@ func TestInitialize(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// freePort returns a port that is free right now. The telemetry packages run in
+// parallel inside one module, so a fixed metrics port collides across them.
+// The metrics server binds all interfaces, so probe the same way.
+func freePort(t *testing.T) int {
+	t.Helper()
+
+	l, err := net.Listen("tcp", ":0")
+	require.NoError(t, err)
+	defer l.Close()
+
+	return l.Addr().(*net.TCPAddr).Port
+}
+
 func TestInitializeWithMetricsEnabled(t *testing.T) {
 	cfg := createTestConfig()
 	cfg.Observability.Metrics.Enabled = true
-	cfg.Observability.Metrics.Port = 19090 // Use a high port to avoid conflicts
+	cfg.Observability.Metrics.Port = freePort(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
