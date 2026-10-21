@@ -6,8 +6,9 @@ from typing import Any
 
 import httpx
 from mcp import Client, types
+from mcp.shared.exceptions import MCPError
 
-from mnemonic_e2e._http import HttpResponse, new_client, send
+from mnemonic_e2e._http import TIMEOUT_S, HttpResponse, new_client, send
 
 PROTOCOL_VERSION = "2026-07-28"
 
@@ -62,8 +63,11 @@ class McpClient:
 
     async def _call_tool(self, name: str, args: dict[str, Any]) -> ToolResult:
         try:
-            async with Client(self._url) as client:
+            async with Client(self._url, read_timeout_seconds=TIMEOUT_S) as client:
                 return text_of(await client.call_tool(name, args))
+        except MCPError as exc:
+            # A JSON-RPC error (unknown tool, bad arguments) is a result, as a tool-level error is.
+            return ToolResult(text=exc.message, is_error=True)
         except httpx.TransportError as exc:
             raise ConnectionError(f"MCP tools/call {name} at {self._url}: {exc}") from exc
 

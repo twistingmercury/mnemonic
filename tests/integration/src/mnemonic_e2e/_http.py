@@ -6,7 +6,7 @@ from typing import Any
 
 import httpx
 
-_TIMEOUT_S = 10.0
+TIMEOUT_S = 10.0
 
 
 @dataclass(frozen=True)
@@ -24,7 +24,7 @@ class HttpResponse:
 
 
 def new_client(transport: httpx.BaseTransport | None) -> httpx.Client:
-    return httpx.Client(transport=transport, timeout=_TIMEOUT_S)
+    return httpx.Client(transport=transport, timeout=TIMEOUT_S)
 
 
 def send(client: httpx.Client, method: str, url: str, **kwargs: Any) -> HttpResponse:

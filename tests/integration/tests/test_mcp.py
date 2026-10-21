@@ -1,8 +1,11 @@
 import json
 
 import httpx
+import pytest
 from mcp import types
+from mcp.shared.exceptions import MCPError
 
+from mnemonic_e2e._http import TIMEOUT_S
 from mnemonic_e2e.mcp import McpClient, ToolResult, text_of, tool_call_request
 
 
@@ -59,3 +62,61 @@ def test_text_of_joins_text_blocks_and_carries_the_error_flag() -> None:
     )
 
     assert text_of(result) == ToolResult(text="a\nb", is_error=True)
+
+
+class FakeSdkClient:
+    """Stands in for mcp.Client: records its constructor call, returns or raises on call_tool."""
+
+    created: list[tuple[str, dict[str, object]]] = []
+    outcome: types.CallToolResult | Exception
+
+    def __init__(self, url: str, **kwargs: object) -> None:
+        FakeSdkClient.created.append((url, kwargs))
+
+    async def __aenter__(self) -> "FakeSdkClient":
+        return self
+
+    async def __aexit__(self, *exc: object) -> None:
+        return None
+
+    async def call_tool(self, name: str, args: dict[str, object]) -> types.CallToolResult:
+        if isinstance(self.outcome, Exception):
+            raise self.outcome
+        return self.outcome
+
+
+@pytest.fixture
+def fake_sdk(monkeypatch: pytest.MonkeyPatch) -> type[FakeSdkClient]:
+    FakeSdkClient.created = []
+    monkeypatch.setattr("mnemonic_e2e.mcp.Client", FakeSdkClient)
+    return FakeSdkClient
+
+
+def test_call_tool_returns_a_normal_result(fake_sdk: type[FakeSdkClient]) -> None:
+    fake_sdk.outcome = types.CallToolResult(content=[types.TextContent(type="text", text="ok")], is_error=False)
+
+    assert McpClient("http://mcp.test:8081").call_tool("t", {}) == ToolResult(text="ok", is_error=False)
+
+
+def test_call_tool_keeps_a_tool_level_error_flag(fake_sdk: type[FakeSdkClient]) -> None:
+    fake_sdk.outcome = types.CallToolResult(content=[types.TextContent(type="text", text="bad")], is_error=True)
+
+    assert McpClient("http://mcp.test:8081").call_tool("t", {}) == ToolResult(text="bad", is_error=True)
+
+
+def test_call_tool_turns_a_json_rpc_error_into_an_error_result(fake_sdk: type[FakeSdkClient]) -> None:
+    fake_sdk.outcome = MCPError(-32602, "unknown tool: nope")
+
+    assert McpClient("http://mcp.test:8081").call_tool("nope", {}) == ToolResult(
+        text="unknown tool: nope", is_error=True
+    )
+
+
+def test_call_tool_gives_the_sdk_client_the_project_timeout(fake_sdk: type[FakeSdkClient]) -> None:
+    fake_sdk.outcome = types.CallToolResult(content=[], is_error=False)
+
+    McpClient("http://mcp.test:8081").call_tool("t", {})
+
+    url, kwargs = fake_sdk.created[0]
+    assert url == "http://mcp.test:8081/mcp"
+    assert kwargs["read_timeout_seconds"] == TIMEOUT_S
