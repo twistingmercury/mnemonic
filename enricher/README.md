@@ -101,7 +101,7 @@ export MNEMONIC_OPENAI_API_KEY=your-api-key
 full stack the services never hold the real OpenAI key; see the
 [deploy Compose file](../deploy/docker-compose.yaml).
 
-The end-to-end Compose file is still parked under `tests/legacy/enricher`.
+The end-to-end suite and its Compose file are in [`tests/integration`](../tests/integration/README.md).
 See the [build and development guide](../build/enricher/README.md) for image
 builds, Compose services, endpoints, and troubleshooting.
 

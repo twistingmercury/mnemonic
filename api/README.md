@@ -78,7 +78,7 @@ cd mnemonic
 make build-api
 ```
 
-`make build-api` runs `build/api/api.build.sh`. It builds `ghcr.io/twistingmercury/mnemonic-api` (runs the unit tests in the Docker build), then runs the Docker Compose E2E suite. It never pushes; CI does. The E2E suite is still parked under `tests/legacy/api` and the E2E step fails until it is re-homed.
+`make build-api` runs `build/api/api.build.sh`. It builds `ghcr.io/twistingmercury/mnemonic-api` (runs the unit tests in the Docker build), then runs the whole Docker Compose E2E suite in [`tests/integration`](../tests/integration/README.md) against it. It never pushes; CI does.
 
 ### Building & running
 

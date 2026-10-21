@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- 2026-10-21: A Python (pytest) suite that replaces the Go suite. It runs in
+  its own runner image against the compose stack and covers the five
+  cross-service flows plus the cases that only the running images can show:
+  stamped version info, the metrics listener, swagger and the api port
+  boundary; MCP edge cases over the real listener; enricher failure paths
+  driven through RabbitMQ and checked in Postgres and Neo4j; and API behavior
+  against a real database (search before enrichment, `enrichment_error`, list
+  filters, pagination, PUT replacement, a failed update).
+- `build/check-e2e-boundary.sh` and a matching test, so the suite cannot
+  reference service source.
+- `MNEMONIC_<N>_IMAGE` and `MNEMONIC_<N>_PULL_POLICY` variables in the Compose
+  file, so a build script tests the image it just built and everything else
+  is pulled the same way locally and in CI.
 - An OpenAI stub (`openai-stub/`) that all three services use through
   `MNEMONIC_OPENAI_BASE_URL`. Runs are deterministic and need no OpenAI key.
 - Cross-service tests for re-enrichment after an update, removal from every
@@ -18,10 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- 2026-10-21: The Compose file uses the Mnemonic service names, runs the Python
+  runner instead of the Go one, and is started by each component's build
+  script (`build/<n>/<n>.build.sh`), which also removes what it created.
 - 2026-10-21: Renamed the project back to Mnemonic in the monorepo, dropping the placeholder
   name "Librarian": images are `ghcr.io/twistingmercury/mnemonic-*`, services read
   `MNEMONIC_*` environment variables, and the stub moved to `tests/openai-stub`.
-  The Compose file still has the fork's names until it is re-homed.
 - MCP tool calls are sent as MCP protocol version 2026-07-28 requests: the
   protocol version, client info and capabilities in `_meta`, with the
   `MCP-Protocol-Version`, `Mcp-Method` and `Mcp-Name` headers.
@@ -41,6 +56,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Removed
 
+- 2026-10-21: The Go test suite in this directory and the per-service Go e2e
+  suites that were kept under `tests/legacy/`, replaced by the Python suite
+  above. Nine legacy tests were dropped on purpose because they did not test
+  our code (auth-header, Content-Type and MCP SDK behavior checks).
 - The `MNEMONIC_OPENAI_API_KEY` secret requirement.
 - Unused request headers (`X-User-ID`, `X-Team-ID`, `X-User-Roles`) and
   helper types.

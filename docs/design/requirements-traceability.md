@@ -1,7 +1,7 @@
 ---
-version: 2
+version: 3
 date: 2026-10-21
-notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
+notes: "The end-to-end suite description now names the Python suite; test citations in the matrix still name the retired Go e2e tests."
 ---
 
 # Requirements Traceability Matrix
@@ -20,8 +20,7 @@ This matrix maps each requirement to the architecture and design documents that 
 Paths are relative to each service repository's `src/` directory. Test suites:
 
 - **Unit/integration** — `*_test.go` next to the code (`make tests-unit`; database-backed `*_integration_test.go` via `make tests-integration` in the api service)
-- **Service E2E** — each service's E2E suite, kept under `tests/legacy/<service>/e2e` and run by `tests/legacy/<service>/run-e2e.sh`, against that service's container
-- **Cross-service** — the five black-box tests in `tests/integration/` (`tests/integration/health_test.go`, `tests/integration/pipeline_test.go`), run against published images and an OpenAI stub
+- **End-to-end** — the Python black-box suite in `tests/integration/tests/` (`test_stack_flows.py`, `test_smoke_images.py`, `test_mcp_edge.py`, `test_enricher_failures.py`, `test_api_behavior.py`), run by each `build/<service>/<service>.build.sh` against the image just built, the other services' `latest-dev` images and an OpenAI stub
 
 Status: **Implemented**, **Partial** (see note), **Not implemented**, or **Post-MVP** (deliberately deferred).
 

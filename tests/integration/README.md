@@ -1,6 +1,6 @@
 # Mnemonic integration tests
 
-> **Maturity Level**: Emerging — black-box smoke tests for the complete
+> **Maturity Level**: Emerging - black-box end-to-end tests for the complete
 > Mnemonic stack.
 > **Version**: v0.0.3
 
@@ -13,22 +13,27 @@
 - [Key Considerations](#key-considerations)
 - [Continuous Integration](#continuous-integration)
 - [Development Considerations](#development-considerations)
-- [Versioning](#versioning)
+  - [Quick Start](#quick-start)
+  - [Building & running](#building--running)
+  - [Testing](#testing)
+  - [Versioning](#versioning)
 
 ## Usage
 
-The suite runs in a self-contained Docker Compose stack, defined by
-[docker-compose.yaml](docker-compose.yaml) in this directory. No OpenAI key is
-needed.
+Run the suite through the build script of the component you changed. Each
+script builds that component's image, then runs this whole suite against it in
+containers, and never pushes:
 
-The monorepo has no Make targets for this suite yet, and the Compose file is
-not re-homed: it still uses the fork's service and image names, mounts a
-`./src` directory that no longer exists (the tests now sit next to the Compose
-file) and builds a stub from `./openai-stub`, which now lives in
-[tests/openai-stub](../openai-stub). Until that is fixed the stack does not
-start as written. The tests themselves read the service URLs from the
-environment, so they can also be pointed at a running stack with
-`go test -count=1 ./...` from this directory.
+```bash
+make build-api        # build/api/api.build.sh
+make build-mcp        # build/mcp/mcp.build.sh
+make build-enricher   # build/enricher/enricher.build.sh
+```
+
+The suite always covers all three services. The component just built runs from
+its fresh local image; the other two come from `ghcr.io` (`latest-dev`) unless
+you point them elsewhere (see [Key Considerations](#key-considerations)). No
+OpenAI key is needed.
 
 ## How it works
 
@@ -47,17 +52,29 @@ environment, so they can also be pointed at a running stack with
    All three services call the OpenAI stub instead of api.openai.com.
 ```
 
-Each service's own E2E suite already covers its endpoints in detail. This
-suite covers only what none of them can: a pattern written through the API,
-enriched by the enricher, and read back through the MCP server.
+[docker-compose.yaml](docker-compose.yaml) defines the stack: Postgres, Neo4j,
+RabbitMQ, the OpenAI stub, the three services and a `mnemonic-tests` runner.
+The runner is the [Dockerfile](Dockerfile) in this directory (Python with
+`uv` and `pytest`). Its exit code is the exit code of the run. The build
+scripts start the stack under their own compose project name and remove only
+what that project created, also when a test fails or the run is interrupted.
 
-| Test | What it proves |
-|---|---|
-| `TestServicesHealthy` | Each service's `/health` lists every dependency it is wired to, all `OK` |
-| `TestPatternFlowsFromAPIToMCP` | Create → enriched → found by API and MCP search → MCP `get_pattern` shows extracted concepts |
-| `TestUpdateReenrichesPattern` | An update is re-enriched; search finds the new text, not the old |
-| `TestRelatedPatternsAndDelete` | Shared concepts link patterns in Neo4j; a delete removes the pattern from every MCP read path |
-| `TestEnricherRetriesFailedJob` | A failed OpenAI call fails the job and the enricher's retry sweep recovers it |
+The suite is black-box. It reaches the services only over HTTP, MCP, AMQP and
+the database wire protocols, by service name on the compose network, and never
+imports or reads service source. `build/check-e2e-boundary.sh` and
+`tests/test_blackbox.py` both enforce that.
+
+| Test file | What it covers |
+| --- | --- |
+| `test_stack_flows.py` | Each service's `/health` lists every dependency as `OK`; a pattern flows from API to enricher to MCP search and `get_pattern`; an update is re-enriched; related patterns and delete; the enricher's retry sweep recovers a failed job |
+| `test_smoke_images.py` | Things only the built images can show: stamped `version`, `build_date` and `commit`, the `/metrics` listener, swagger, and the api serving no `/mcp` |
+| `test_mcp_edge.py` | MCP over the real listener: a pending pattern, a pattern with no graph node, unknown ids, cross-site `POST` returns 403, `GET` returns 405, a client sending no MCP headers |
+| `test_enricher_failures.py` | Jobs seeded in Postgres and published straight to RabbitMQ: a terminal OpenAI failure, a malformed message, an unknown job id |
+| `test_api_behavior.py` | API behavior that needs a real database and a running enricher: search excludes a pattern until it is enriched, `enrichment_error`, list filters, pagination, PUT replacement, a failed update keeps the prior state |
+
+Single-service behavior that needs no other service belongs in that service's
+Go tests, not here. The `src/mnemonic_e2e` package holds the helpers (HTTP,
+MCP, AMQP, Postgres and Neo4j access, the stub client and polling).
 
 ### OpenAI stub
 
@@ -78,30 +95,88 @@ sweep quickly.
 
 ## Key Considerations
 
-- **Prerequisites:** Docker Compose and pull access to the service images on
-  ghcr.io. The tests run in the stock `golang:1.27.2-alpine` image with the suite
-  directory mounted read-only; only the small stub image is built.
-- **Images under test:** the `latest-dev` tags of `mnemonic-api`,
-  `mnemonic-mcp` and `mnemonic-enricher`, which CI is meant to publish.
+- **Prerequisites:** Docker with Compose, and pull access to ghcr.io for the
+  images you do not build locally.
+- **Images under test:** `MNEMONIC_API_IMAGE`, `MNEMONIC_MCP_IMAGE` and
+  `MNEMONIC_ENRICHER_IMAGE` choose the image of each service (default
+  `ghcr.io/twistingmercury/mnemonic-<n>:latest-dev`).
+  `MNEMONIC_API_PULL_POLICY`, `MNEMONIC_MCP_PULL_POLICY` and
+  `MNEMONIC_ENRICHER_PULL_POLICY` set the compose `pull_policy` of each
+  (default `always`, so a clean CI runner and a laptop behave the same). A
+  build script sets the image and `never` for the component it just built and
+  leaves the other two as you set them.
+- **Runner settings:** the runner reads the variables below; the defaults are
+  the service names, ports and development credentials of the compose file, so
+  you only set them to point the suite at a stack you run yourself.
+
+  | Variable | Default |
+  | --- | --- |
+  | `MNEMONIC_API_URL` | `http://mnemonic-api:8080` |
+  | `MNEMONIC_MCP_URL` | `http://mnemonic-mcp:8081` |
+  | `MNEMONIC_MCP_OPS_URL` | `http://mnemonic-mcp:8080` |
+  | `MNEMONIC_ENRICHER_URL` | `http://mnemonic-enricher:8080` |
+  | `MNEMONIC_OPENAI_STUB_URL` | `http://openai_stub:8090` |
+  | `MNEMONIC_METRICS_PORT` | `9090` |
+  | `MNEMONIC_DATABASE_URL` | `postgresql://mnemonic:mnemonic_dev@postgres:5432/mnemonic` |
+  | `MNEMONIC_NEO4J_URI` | `bolt://neo4j:7687` |
+  | `MNEMONIC_NEO4J_USER` | `neo4j` |
+  | `MNEMONIC_NEO4J_PASSWORD` | `mnemonic_dev` |
+  | `MNEMONIC_NEO4J_DATABASE` | `neo4j` |
+  | `MNEMONIC_RABBITMQ_URL` | `amqp://mnemonic:mnemonic_dev@rabbitmq:5672/` |
+
+- **Serial runs only:** failure injection is global to the stub (`stub.reset()`
+  clears every injected failure), so tests that inject one must not run in
+  parallel with each other. Run the suite without a parallelizing plugin.
 - **Isolation:** the stack publishes no host ports, so it can run alongside
-  other Mnemonic stacks.
+  other Mnemonic stacks. Every test makes its own patterns with unique names
+  and search tokens, so the tests share one stack in any order.
 
 ## Continuous Integration
 
-The CI workflows are not written yet. The fork ran this suite on pull
-requests, on pushes, daily and on demand, and printed Compose service status and
-logs on failure; the workflow for the monorepo has to be written.
+The CI workflows are not written yet. When they are, they should run the build
+script of each changed component, the same as a local run.
 
 ## Development Considerations
 
-Once the Compose file is re-homed, run a standing stack, inspect it, then stop
-it with `docker compose -f tests/integration/docker-compose.yaml up -d --wait`,
-`docker compose -f tests/integration/docker-compose.yaml run --rm <tests service> go test -count=1 -run TestUpdate ./...`
-and `docker compose -f tests/integration/docker-compose.yaml down --volumes`.
+### Quick Start
 
-All tests live in one package in this directory; `client_test.go` holds the
-HTTP, MCP and polling helpers. Add a test here only when it needs more than one
-service; single-service behaviour belongs in that service's E2E suite.
+The project uses `uv` and Python 3.14. From this directory:
+
+```bash
+uv sync --frozen
+uv run --frozen pytest -q --ignore=tests/test_stack_flows.py --ignore=tests/test_smoke_images.py --ignore=tests/test_mcp_edge.py --ignore=tests/test_enricher_failures.py --ignore=tests/test_api_behavior.py
+```
+
+### Building & running
+
+To run the stack tests without a build script, start the stack from the
+repository root, then run the runner image on the compose network:
+
+```bash
+docker compose -p mnemonic-it -f tests/integration/docker-compose.yaml up --build --abort-on-container-exit --exit-code-from mnemonic-tests
+docker compose -p mnemonic-it -f tests/integration/docker-compose.yaml down -v --remove-orphans --rmi local
+```
+
+Set the `MNEMONIC_<N>_IMAGE` and `MNEMONIC_<N>_PULL_POLICY` variables on both
+commands to test a local image. To run one test against a standing stack, start
+the services without the runner, then run the runner image with `--network`
+set to the compose network and the test path as its argument.
+
+### Testing
+
+The files above are of two kinds:
+
+- **Unit tests** (`test_config.py`, `test_db.py`, `test_api.py`, `test_mcp.py`,
+  `test_stub.py`, `test_tokens.py`, `test_wait.py`, `test_smoke_scaffold.py`,
+  `test_blackbox.py`) test the helper package and need no stack. Run them with
+  the `--ignore` flags shown under Quick Start.
+- **Stack tests** (the five files in the table above) need the running compose
+  stack and run in the runner container.
+
+Before a change, run the gates: `uv run --frozen ruff format --check .`,
+`uv run --frozen ruff check .`, `uv run --frozen mypy .` and
+`uv run --frozen bandit -c pyproject.toml -r src -q`, then
+`build/check-e2e-boundary.sh` from the repository root.
 
 ### Versioning
 

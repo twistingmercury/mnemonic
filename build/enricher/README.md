@@ -26,15 +26,17 @@ these stages in order:
    `ghcr.io/twistingmercury/mnemonic-enricher:latest`. The version defaults to
    the most recent `enricher/vX.Y.Z` Git tag (`build/version.sh enricher`), or
    `0.0.0-dev` when there is none.
-3. Starts the isolated stack in `tests/legacy/enricher/docker-compose.yaml` and
-   runs the end-to-end tests against the newly built `latest` image.
+3. Starts the isolated stack in `tests/integration/docker-compose.yaml` and
+   runs the whole end-to-end suite (see its
+   [README](../../tests/integration/README.md)) with the enricher taken from the
+   newly built image and never pulled.
 
-The script never pushes an image; CI does. The end-to-end suite is still parked
-under `tests/legacy` and its Compose file still uses the fork's image and
-service names, so this step fails until the suite is re-homed. The stack
-needs Docker to pull the pre-migrated PostgreSQL and Neo4j images and RabbitMQ
-(`rabbitmq:4.0-management`). It builds and uses a local OpenAI stub; a live
-OpenAI key is not required for these tests.
+The script never pushes an image; CI does. The stack needs Docker to pull the
+pre-migrated PostgreSQL and Neo4j images, RabbitMQ
+(`rabbitmq:3-management-alpine`) and the `latest-dev` api and mcp images from
+GHCR, unless you set `MNEMONIC_API_IMAGE`, `MNEMONIC_MCP_IMAGE` or the matching
+`MNEMONIC_<N>_PULL_POLICY` variables. It builds and uses a local OpenAI stub; a
+live OpenAI key is not required for these tests.
 
 > **Cleanup:** The script removes only its own `mnemonic-e2e-enricher-<pid>`
 > compose project (containers, networks, volumes, orphans and compose-built

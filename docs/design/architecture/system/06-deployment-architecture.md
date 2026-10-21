@@ -1,7 +1,7 @@
 ---
-version: 2
+version: 3
 date: 2026-10-21
-notes: "Image tags, RabbitMQ image, host ports and the pipeline table corrected; pipelines marked as not yet existing. License footer corrected."
+notes: "The per-service legacy E2E compose files were retired; the E2E compose row now describes the single Python suite. Earlier: image tags, RabbitMQ image, host ports and the pipeline table corrected; pipelines marked as not yet existing."
 ---
 
 # Deployment Architecture
@@ -30,11 +30,10 @@ Mnemonic deploys as six containers orchestrated by docker-compose. Three applica
 
 The full six-container local stack is defined in `deploy/docker-compose.yaml`. Compose files in the monorepo:
 
-| File                                                              | Contents                                                                                                                                                   |
-| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `deploy/docker-compose.yaml`                                      | Local stack: Envoy edges, OPA, Keycloak, the OpenAI egress proxy, postgres, neo4j, rabbitmq, and the api, mcp and enricher services (see the gateway docs) |
-| `tests/legacy/<service>/docker-compose.yaml` (api, mcp, enricher) | Former per-service E2E suites, kept under `tests/legacy/`, with an OpenAI stub in place of api.openai.com                                                  |
-| `tests/integration/docker-compose.yaml`                           | Cross-service black-box tests: all three published `latest-dev` images, postgres, neo4j, rabbitmq and an OpenAI stub (`MNEMONIC_OPENAI_BASE_URL`)          |
+| File                                    | Contents                                                                                                                                                                                           |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `deploy/docker-compose.yaml`            | Local stack: Envoy edges, OPA, Keycloak, the OpenAI egress proxy, postgres, neo4j, rabbitmq, and the api, mcp and enricher services (see the gateway docs)                                         |
+| `tests/integration/docker-compose.yaml` | End-to-end suite: the three services (the one just built, plus the others' `latest-dev` images), postgres, neo4j, rabbitmq, an OpenAI stub (`MNEMONIC_OPENAI_BASE_URL`) and the Python test runner |
 
 The enricher service has no compose file of its own; it runs from `deploy/docker-compose.yaml`.
 

@@ -87,9 +87,8 @@ make tests-unit
 
 `make build-mcp` runs `build/mcp/mcp.build.sh`: it builds
 `ghcr.io/twistingmercury/mnemonic-mcp` with the current version and `latest`
-tags, then runs the end-to-end suite in containers. It never pushes; CI does.
-The suite is still parked under `tests/legacy/mcp` and the E2E step fails until
-it is re-homed. It points `openai.base_url` (`MNEMONIC_OPENAI_BASE_URL`, default
+tags, then runs the whole end-to-end suite in [`tests/integration`](../tests/integration/README.md)
+in containers. It never pushes; CI does. The suite points `openai.base_url` (`MNEMONIC_OPENAI_BASE_URL`, default
 `https://api.openai.com/v1`) at the local stub in `tests/openai-stub`, so no
 E2E test calls OpenAI. See the [build guide](../build/mcp/README.md).
 
