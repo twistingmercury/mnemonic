@@ -627,3 +627,100 @@ func setEnrichmentStatus(t *testing.T, pool *pgxpool.Pool, id uuid.UUID, status 
 		id, status, errMsg)
 	require.NoError(t, err)
 }
+
+// TestIntegration_ListTagAndSearchFilters runs the tag and full-text filters
+// against the real engine. pgxmock can only show the SQL text; it cannot show
+// that `tags ?& $n` means AND or that the tsvector covers the description.
+// Every tag and search word below is unique to this test, so the exact set of
+// returned names proves which rows each filter kept and which decoys it dropped.
+func TestIntegration_ListTagAndSearchFilters(t *testing.T) {
+	pool := setupTestDB(t)
+	cleanupTestPatterns(t, pool)
+	t.Cleanup(func() { cleanupTestPatterns(t, pool) })
+
+	repo := pattern.NewRepository(pool)
+	ctx := context.Background()
+
+	const (
+		tagA = "flt-tag-a"
+		tagB = "flt-tag-b"
+
+		// descriptionWord appears only in descriptions; nameWord only in a name.
+		descriptionWord = "zymurgy"
+		nameWord        = "quokka"
+	)
+
+	withBoth := seedFilterPattern(t, repo, "both", "plain words", tagA, tagB)
+	onlyA := seedFilterPattern(t, repo, "only-a", descriptionWord+" brewing", tagA)
+	// only-b is a decoy for every case: it carries tagB but never both tags and
+	// never the description word.
+	seedFilterPattern(t, repo, "only-b", "plain words", tagB)
+	bothAndWord := seedFilterPattern(t, repo, "both-word", descriptionWord+" brewing", tagA, tagB)
+	byName := seedFilterPattern(t, repo, "by-"+nameWord, "plain words")
+
+	tests := []struct {
+		name   string
+		filter pattern.Filter
+		want   []string
+	}{
+		{
+			name:   "one tag keeps every pattern carrying it",
+			filter: pattern.Filter{Tags: []string{tagA}},
+			want:   []string{withBoth, onlyA, bothAndWord},
+		},
+		{
+			name:   "two tags keep only patterns carrying both",
+			filter: pattern.Filter{Tags: []string{tagA, tagB}},
+			want:   []string{withBoth, bothAndWord},
+		},
+		{
+			name:   "search matches a word found only in the description",
+			filter: pattern.Filter{SearchQuery: descriptionWord},
+			want:   []string{onlyA, bothAndWord},
+		},
+		{
+			name:   "search matches a word found only in the name",
+			filter: pattern.Filter{SearchQuery: nameWord},
+			want:   []string{byName},
+		},
+		{
+			name:   "tags and search must both match",
+			filter: pattern.Filter{Tags: []string{tagA, tagB}, SearchQuery: descriptionWord},
+			want:   []string{bothAndWord},
+		},
+		{
+			name:   "tag that no pattern carries matches nothing",
+			filter: pattern.Filter{Tags: []string{tagA, "flt-tag-absent"}},
+			want:   []string{},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := repo.List(ctx, tc.filter, repository.ListOptions{})
+			require.NoError(t, err)
+
+			got := make([]string, 0, len(result))
+			for _, p := range result {
+				got = append(got, p.Name)
+			}
+
+			assert.ElementsMatch(t, tc.want, got)
+		})
+	}
+}
+
+// seedFilterPattern creates a pattern named after suffix and returns its name.
+func seedFilterPattern(t *testing.T, repo pattern.Repository, suffix, description string, tags ...string) string {
+	t.Helper()
+
+	p := &pattern.Pattern{
+		Name:        testPatternPrefix + "filter-" + suffix,
+		Description: &description,
+		Content:     "Filter fixture content.",
+		Tags:        tags,
+	}
+	require.NoError(t, repo.Create(context.Background(), p))
+
+	return p.Name
+}
