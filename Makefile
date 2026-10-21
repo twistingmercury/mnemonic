@@ -30,6 +30,129 @@ e2e-stub: ## Start the gateway with stub services, run the tests, stop it
 	$(STUB_COMPOSE) up -d --build --wait --wait-timeout 240
 	cd gateway/test/e2e && go test -count=1 -v ./... ; status=$$? ; cd ../../.. ; $(STUB_COMPOSE) down ; exit $$status
 
+# ------------------------------------------------------------------ Services
+# The Go module lives in src/ (cmd/api, cmd/mcp, cmd/enricher).
+
+GO_SRC       := src
+GO_BIN       := $(GO_SRC)/.bin
+GIT_COMMIT   := $(shell git rev-parse --short=8 HEAD 2>/dev/null || echo unknown)
+GIT_TAG      := $(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)
+BUILD_DATE   := $(shell date -u +%Y-%m-%d)
+GO_MODULE    := github.com/twistingmercury/mnemonic
+# Packages that carry `integration`-tagged tests (Postgres and Neo4j).
+INTEGRATION_PKGS := ./internal/api/repository/... ./internal/api/service/... \
+	./internal/mcp/repository/... ./internal/enricher/repository/...
+
+.PHONY: build build-api build-mcp build-enricher local analyze tests-unit tests-bench tests-integration docs-swagger
+
+# The scripts build the image and then run its end-to-end suite in containers;
+# they never push and never use the build cache.
+build: build-api build-mcp build-enricher ## Build the api, mcp and enricher images (e2e step fails until the e2e tests are re-homed)
+
+build-api: ## Build the api image and run its e2e suite (e2e step fails until the e2e tests are re-homed)
+	build/api/api.build.sh
+
+build-mcp: ## Build the mcp image and run its e2e suite (e2e step fails until the e2e tests are re-homed)
+	build/mcp/mcp.build.sh
+
+build-enricher: ## Build the enricher image and run its e2e suite (e2e step fails until the e2e tests are re-homed)
+	build/enricher/enricher.build.sh
+
+local: ## Build the api, mcp and enricher binaries into src/.bin (no tests, no Docker)
+	mkdir -p $(GO_BIN)
+	for svc in api mcp enricher; do \
+		go -C $(GO_SRC) build -ldflags "-s -w \
+			-X '$(GO_MODULE)/internal/$${svc}/version.version=$(GIT_TAG)' \
+			-X '$(GO_MODULE)/internal/$${svc}/version.buildDate=$(BUILD_DATE)' \
+			-X '$(GO_MODULE)/internal/$${svc}/version.commit=$(GIT_COMMIT)'" \
+			-o .bin/mnemonic-$${svc} ./cmd/$${svc} || exit 1; \
+	done
+
+# Runs the same checks as the image builds, with the host's tools. The gates
+# inside the Dockerfiles stay authoritative. Unlike the Dockerfiles, goimports
+# only lists unformatted files here, so the working tree is never rewritten.
+analyze: ## Check formatting, then go vet, golangci-lint, govulncheck and gosec (host tools)
+	cd $(GO_SRC) && unformatted="$$(goimports -l .)"; \
+	if [ -n "$${unformatted}" ]; then echo "goimports: unformatted files:" >&2; echo "$${unformatted}" >&2; exit 1; fi
+	cd $(GO_SRC) && go vet ./...
+	cd $(GO_SRC) && golangci-lint run
+	cd $(GO_SRC) && govulncheck ./cmd/... ./internal/...
+	cd $(GO_SRC) && gosec -quiet -exclude-dir=tests ./...
+
+tests-unit: ## Run the Go unit tests; coverage goes to src/.bin/coverage.out
+	mkdir -p $(GO_BIN)
+	cd $(GO_SRC) && go test -count=1 ./... -coverprofile=.bin/coverage.out
+
+tests-bench: ## Run the Go benchmarks
+	cd $(GO_SRC) && go test ./... -bench=. -benchmem -run='^$$'
+
+# Does not start containers. Start the databases first with
+#   docker compose -f db/docker-compose.yaml up -d --wait postgres neo4j
+# then export (Postgres on 5435, Neo4j bolt on 7690 per that file):
+#   MNEMONIC_TEST_DATABASE_URL, MNEMONIC_NEO4J_URI, MNEMONIC_NEO4J_USER,
+#   MNEMONIC_NEO4J_PASSWORD, MNEMONIC_NEO4J_DATABASE
+tests-integration: ## Run the integration tests (Postgres and Neo4j graph); needs MNEMONIC_TEST_DATABASE_URL and MNEMONIC_NEO4J_*, see the Makefile comment to start the databases
+	@missing=""; \
+	for name in MNEMONIC_TEST_DATABASE_URL MNEMONIC_NEO4J_URI MNEMONIC_NEO4J_USER MNEMONIC_NEO4J_PASSWORD MNEMONIC_NEO4J_DATABASE; do \
+		eval "value=\$${$${name}:-}"; \
+		if [ -z "$${value}" ]; then missing="$${missing} $${name}"; fi; \
+	done; \
+	if [ -n "$${missing}" ]; then \
+		echo "ERROR: set these variables first:$${missing}" >&2; \
+		echo "       Start the databases with: docker compose -f db/docker-compose.yaml up -d --wait postgres neo4j" >&2; \
+		exit 1; \
+	fi
+	cd $(GO_SRC) && go test -count=1 -tags integration $(INTEGRATION_PKGS)
+
+# Same invocation as build/api/api.Dockerfile.
+docs-swagger: ## Regenerate the api swagger into src/docs/api/swagger
+	cd $(GO_SRC) && go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g cmd/api/main.go -o docs/api/swagger --parseInternal
+
+# ------------------------------------------------------------------ Databases
+# These start containers (the runners use db/docker-compose.yaml on ports
+# 5435, 7477 and 7690) and clean them up when they finish.
+
+.PHONY: db-build db-build-postgres db-build-neo4j db-test db-test-postgres db-test-neo4j
+
+db-build: db-build-postgres db-build-neo4j ## Build the mnemonic-postgres and mnemonic-neo4j images
+
+db-build-postgres: ## Build the mnemonic-postgres image
+	db/postgres/build.sh
+
+db-build-neo4j: ## Build the mnemonic-neo4j image
+	db/neo4j/build.sh
+
+db-test: db-test-postgres db-test-neo4j ## Run both database BATS suites (starts containers)
+
+db-test-postgres: ## Run the PostgreSQL migration BATS suite (starts containers)
+	db/tests/postgres-test-runner.sh
+
+db-test-neo4j: ## Run the Neo4j migration BATS suite (starts containers)
+	db/tests/neo4j-test-runner.sh
+
+# ------------------------------------------------------------------ Lint
+SHELL_FILES = git ls-files -z '*.sh' '*.bash' ':!tests/bats/test_helper/bats-*'
+
+.PHONY: tests-bats lint-shell lint-docker lint-helm lint-md
+
+tests-bats: ## Run the BATS tests for the build tooling (tests/bats)
+	bats tests/bats
+
+lint-shell: ## shellcheck every tracked shell script (not the vendored BATS libraries)
+	$(SHELL_FILES) | xargs -0 shellcheck
+
+# hadolint exits non-zero on info-level findings, and the accepted DL3059
+# notes (consecutive RUN instructions kept apart on purpose) are info-level;
+# the warning threshold fails only on warnings and errors.
+lint-docker: ## hadolint the Dockerfiles (fails on warnings and errors only)
+	hadolint --failure-threshold warning build/*/*.Dockerfile db/*/Dockerfile
+
+lint-helm: ## helm lint --strict on the chart
+	helm lint --strict deploy/helm/mnemonic
+
+lint-md: ## markdownlint every tracked Markdown file with the root .markdownlint.json
+	git ls-files -z '*.md' | xargs -0 markdownlint -c .markdownlint.json
+
 # ------------------------------------------------------------------ Kubernetes
 # The same stack on a dedicated minikube profile, from deploy/helm/mnemonic.
 # Every kubectl and helm call names the profile's context, so the current
