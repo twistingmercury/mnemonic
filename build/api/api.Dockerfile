@@ -17,27 +17,38 @@ ARG BUILD_COMMIT=unknown
 WORKDIR /src
 
 COPY src/go.mod src/go.sum ./
-RUN go mod download
-COPY src/. .
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
+COPY src/.golangci.yml ./
+COPY src/cmd/api ./cmd/api
+COPY src/internal/api ./internal/api
+COPY src/docs/api ./docs/api
 
 # Generate Swagger 2.0 docs (required before linters/build — routes.go imports the generated package)
-RUN go install github.com/swaggo/swag/cmd/swag@v1.16.6
-RUN swag init -g cmd/main/main.go -o docs/swagger --parseInternal
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    go install github.com/swaggo/swag/cmd/swag@v1.16.6
+RUN swag init -g cmd/api/main.go -o docs/api/swagger --parseInternal
 
 # Run linters, formatters, security scanners, etc
-RUN goimports -w .
-RUN golangci-lint run
-RUN govulncheck ./cmd/... ./internal/...
-RUN gosec -quiet -exclude-dir=tests ./...
-RUN go test -v ./cmd/main/... ./internal/... -coverprofile=coverage.out
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    goimports -w .
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    golangci-lint run
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    govulncheck ./cmd/... ./internal/...
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    gosec -quiet -exclude-dir=tests ./...
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    go test -v ./cmd/api/... ./internal/... -coverprofile=coverage.out
 
 ARG LD_FLAGS="-s -w \
     -X 'github.com/twistingmercury/librarian/internal/api/version.version=${BUILD_VER}' \
     -X 'github.com/twistingmercury/librarian/internal/api/version.buildDate=${BUILD_DATE}' \
     -X 'github.com/twistingmercury/librarian/internal/api/version.commit=${BUILD_COMMIT}'"
 
-RUN GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" \
-    go build --ldflags "${LD_FLAGS}" -o /out/mnemonic-api ./cmd/main
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" \
+    go build --ldflags "${LD_FLAGS}" -o /out/mnemonic-api ./cmd/api
 
 
 #------------------------------------------------------------
@@ -51,7 +62,7 @@ ARG BUILD_COMMIT=unknown
 
 LABEL org.opencontainers.image.title="mnemonic-api" \
     org.opencontainers.image.description="Admin REST API for reusable knowledge-graph patterns" \
-    org.opencontainers.image.source="https://github.com/twistingmercury/librarian-api" \
+    org.opencontainers.image.source="https://github.com/twistingmercury/librarian" \
     org.opencontainers.image.licenses="Apache-2.0" \
     org.opencontainers.image.authors="Jeremy K. Johnson" \
     org.opencontainers.image.created="${BUILD_DATE}" \
