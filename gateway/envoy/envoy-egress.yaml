@@ -38,7 +38,7 @@ static_resources:
                       request_headers_to_add:
                         - header:
                             key: authorization
-                            value: "Bearer %ENVIRONMENT(OPENAI_API_EMBEDDINGS_KEY)%"
+                            value: "Bearer %ENVIRONMENT(MNEMONIC_OPENAI_API_EMBEDDINGS_KEY)%"
                           append_action: OVERWRITE_IF_EXISTS_OR_ADD
                       routes:
                         - match:

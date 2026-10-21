@@ -15,7 +15,7 @@ test-policy: ## Format-check, type-check and unit-test the OPA policies
 
 validate-envoy: ## Validate both Envoy configs (edge and egress)
 	docker run --rm -v $(CURDIR)/gateway/envoy:/cfg:ro $(ENVOY_IMAGE) envoy --mode validate -c /cfg/envoy.yaml
-	docker run --rm -v $(CURDIR)/gateway/envoy:/cfg:ro -e OPENAI_API_EMBEDDINGS_KEY=validate-only $(ENVOY_IMAGE) envoy --mode validate -c /cfg/envoy-egress.yaml
+	docker run --rm -v $(CURDIR)/gateway/envoy:/cfg:ro -e MNEMONIC_OPENAI_API_EMBEDDINGS_KEY=validate-only $(ENVOY_IMAGE) envoy --mode validate -c /cfg/envoy-egress.yaml
 
 up: ## Start the full stack (needs the Mnemonic images)
 	docker compose -f $(COMPOSE_FILE) up -d --wait
@@ -141,13 +141,13 @@ k8s-config: ## Create the namespace and the ConfigMaps from gateway/envoy/, gate
 # The key travels only through a pipe: printf is a shell builtin, so it never
 # appears in a process list, and server-side apply keeps it out of the
 # last-applied annotation. Recipes are silent so make never echoes them.
-k8s-secret: ## Store the OpenAI key (host env OPENAI_API_EMBEDDINGS_KEY) in a Secret
-	@key="$${OPENAI_API_EMBEDDINGS_KEY:-}"; \
+k8s-secret: ## Store the OpenAI key (host env MNEMONIC_OPENAI_API_EMBEDDINGS_KEY) in a Secret
+	@key="$${MNEMONIC_OPENAI_API_EMBEDDINGS_KEY:-}"; \
 	if [ -z "$${key}" ]; then \
-		echo "ERROR: set OPENAI_API_EMBEDDINGS_KEY to the OpenAI API key" >&2; \
+		echo "ERROR: set MNEMONIC_OPENAI_API_EMBEDDINGS_KEY to the OpenAI API key" >&2; \
 		exit 1; \
 	fi; \
-	echo "Secret $(K8S_OPENAI_SECRET) from OPENAI_API_EMBEDDINGS_KEY"; \
+	echo "Secret $(K8S_OPENAI_SECRET) from MNEMONIC_OPENAI_API_EMBEDDINGS_KEY"; \
 	printf '%s' "$${key}" \
 		| $(KUBECTL) -n $(K8S_NAMESPACE) create secret generic $(K8S_OPENAI_SECRET) --from-file=api-key=/dev/stdin --dry-run=client -o yaml \
 		| $(KUBECTL) apply --server-side --field-manager=mnemonic-make -f - >/dev/null

@@ -531,7 +531,7 @@ check_key_handling() {
     check_equal "only the egress pod references Secret ${OPENAI_SECRET}" "${holders% }" "egress"
 
     egress_ref=$(kube get pod "$(pod_for egress)" \
-        -o jsonpath='{.spec.containers[0].env[?(@.name=="OPENAI_API_EMBEDDINGS_KEY")].valueFrom.secretKeyRef.name}')
+        -o jsonpath='{.spec.containers[0].env[?(@.name=="MNEMONIC_OPENAI_API_EMBEDDINGS_KEY")].valueFrom.secretKeyRef.name}')
     check_equal "egress reads the key from the Secret" "${egress_ref}" "${OPENAI_SECRET}"
 
     return 0

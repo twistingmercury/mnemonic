@@ -46,7 +46,7 @@ spec:
           env:
             # The services must never receive this variable: no bare pass-through
             # entry for it on any other workload.
-            - name: OPENAI_API_EMBEDDINGS_KEY
+            - name: MNEMONIC_OPENAI_API_EMBEDDINGS_KEY
               valueFrom:
                 secretKeyRef:
                   name: {{ required "openai.existingSecret is required" .Values.openai.existingSecret }}

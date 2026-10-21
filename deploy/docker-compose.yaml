@@ -2,7 +2,7 @@
 # and Keycloak (8180) publish ports; the services, OPA and the data stores
 # are reachable only on the internal network, which has no route out. The
 # egress proxy is the one exception: it alone reaches api.openai.com, and it
-# alone holds the API key (set OPENAI_API_EMBEDDINGS_KEY when starting the stack).
+# alone holds the API key (set MNEMONIC_OPENAI_API_EMBEDDINGS_KEY when starting the stack).
 #
 # The Mnemonic images are pulled from ghcr.io when missing. To run local
 # builds instead, set MNEMONIC_API_IMAGE and MNEMONIC_MCP_IMAGE (make build in
@@ -38,7 +38,7 @@ services:
     environment:
       # The services must never receive this variable: no bare pass-through
       # entry for it on any service.
-      OPENAI_API_EMBEDDINGS_KEY: ${OPENAI_API_EMBEDDINGS_KEY:?set OPENAI_API_EMBEDDINGS_KEY}
+      MNEMONIC_OPENAI_API_EMBEDDINGS_KEY: ${MNEMONIC_OPENAI_API_EMBEDDINGS_KEY:?set MNEMONIC_OPENAI_API_EMBEDDINGS_KEY}
     volumes:
       - ../gateway/envoy/envoy-egress.yaml:/etc/envoy/envoy.yaml:ro
     networks: [internal, egress]

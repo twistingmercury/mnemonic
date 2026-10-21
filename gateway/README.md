@@ -97,7 +97,7 @@ make e2e-stub        # gateway + stub services, run the e2e tests, tear down
 For the full stack, which pulls the published `latest-dev` images from ghcr.io:
 
 ```sh
-export OPENAI_API_EMBEDDINGS_KEY=...
+export MNEMONIC_OPENAI_API_EMBEDDINGS_KEY=...
 make up
 make e2e
 ```
@@ -133,7 +133,7 @@ For interactive MCP clients, the public client `mnemonic-mcp-client` uses author
 
 The same stack also runs on a local minikube cluster, from the Helm chart in `deploy/helm/mnemonic/`. It gets its own minikube profile, `mnemonic`, and every `kubectl` and `helm` call names that context, so your current context and other clusters are left alone.
 
-Requirements: Docker, minikube, kubectl, Helm 4, `jq`, the locally built `mnemonic-*` images (`latest-dev` for the services, `v1.0.0-dev` for Postgres and Neo4j), and the OpenAI key in `OPENAI_API_EMBEDDINGS_KEY`. On Linux, set `fs.inotify.max_user_instances` to at least 512, or kube-proxy can fail with `too many open files`.
+Requirements: Docker, minikube, kubectl, Helm 4, `jq`, the locally built `mnemonic-*` images (`latest-dev` for the services, `v1.0.0-dev` for Postgres and Neo4j), and the OpenAI key in `MNEMONIC_OPENAI_API_EMBEDDINGS_KEY`. On Linux, set `fs.inotify.max_user_instances` to at least 512, or kube-proxy can fail with `too many open files`.
 
 ```sh
 make k8s-up            # profile (Calico CNI), image load, ConfigMaps, Secret, helm upgrade --install --wait
