@@ -30,10 +30,6 @@ main() {
         return 1
     fi
 
-    if ! build_lib::push; then
-        return 1
-    fi
-
     return 0
 }
 

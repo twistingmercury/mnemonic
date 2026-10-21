@@ -76,68 +76,7 @@ teardown() {
     assert [ "${down_line}" -gt "${e2e_line}" ]
 }
 
-@test "${COMPONENT} build with PUSH unset - skips the push and exits 0" {
-    run "${SCRIPT_PATH}"
-
-    assert_success
-    assert_output --partial "skipping push (PUSH not set)"
-    run grep -c -e '^push' "${DOCKER_LOG}"
-    assert_output "0"
-}
-
-@test "${COMPONENT} build with PUSH=1 - pushes each tag after the build and e2e" {
-    export PUSH=1
-    image="ghcr.io/twistingmercury/librarian-${COMPONENT}"
-
-    run "${SCRIPT_PATH}"
-
-    assert_success
-    e2e_line="$(log_line_of '--abort-on-container-exit')"
-    down_line="$(log_line_of 'down -v --remove-orphans')"
-    versioned_line="$(log_line_of "push ${image}:v0.5.1")"
-    latest_line="$(log_line_of "push ${image}:latest")"
-    assert [ "${versioned_line}" -gt "${down_line}" ]
-    assert [ "${latest_line}" -gt "${versioned_line}" ]
-    assert [ "${down_line}" -gt "${e2e_line}" ]
-    run grep -c -e '^push' "${DOCKER_LOG}"
-    assert_output "2"
-}
-
-@test "${COMPONENT} build with PUSH=1 and IMAGE_TAG set - pushes that tag and latest" {
-    export PUSH=1
-    export IMAGE_TAG="latest-dev"
-    image="ghcr.io/twistingmercury/librarian-${COMPONENT}"
-
-    run "${SCRIPT_PATH}"
-
-    assert_success
-    assert [ -n "$(log_line_of "push ${image}:latest-dev")" ]
-    assert [ -n "$(log_line_of "push ${image}:latest")" ]
-}
-
-@test "${COMPONENT} build with PUSH=1 and a failing e2e - exits non-zero without pushing" {
-    export PUSH=1
-    export STUB_DOCKER_FAIL_ON="--abort-on-container-exit"
-
-    run "${SCRIPT_PATH}"
-
-    assert_failure
-    assert_output --partial "end-to-end tests failed"
-    run grep -c -e '^push' "${DOCKER_LOG}"
-    assert_output "0"
-}
-
-@test "${COMPONENT} build with PUSH=1 and a failing push - exits non-zero naming the tag" {
-    export PUSH=1
-    export STUB_DOCKER_FAIL_ON="push"
-
-    run "${SCRIPT_PATH}"
-
-    assert_failure
-    assert_output --partial "docker push failed"
-}
-
-@test "${COMPONENT} build without PUSH - a failing e2e exits non-zero" {
+@test "${COMPONENT} build with a failing e2e - exits non-zero" {
     export STUB_DOCKER_FAIL_ON="--abort-on-container-exit"
 
     run "${SCRIPT_PATH}"
@@ -261,5 +200,13 @@ teardown() {
     assert_failure
     assert_output --partial "docker build failed"
     run grep -c -e 'compose' "${DOCKER_LOG}"
+    assert_output "0"
+}
+
+@test "${COMPONENT} build - never pushes an image" {
+    run "${SCRIPT_PATH}"
+
+    assert_success
+    run grep -c -e '^push' "${DOCKER_LOG}"
     assert_output "0"
 }

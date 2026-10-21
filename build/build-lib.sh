@@ -6,7 +6,7 @@
 #        E2E_COMPOSE_FILE, E2E_INFRA_SERVICES, E2E_UP_SERVICES and
 #        E2E_EXIT_CODE_FROM (arrays for the *_SERVICES). Optional:
 #        E2E_PULL_SERVICES (array; pulled first with PULL_POLICY),
-#        NO_CACHE=1 (--no-cache), PULL=1 (--pull), PUSH=1 (push the tags).
+#        NO_CACHE=1 (--no-cache), PULL=1 (--pull).
 #
 # Both steps print one progress line and show docker output only on failure.
 
@@ -98,32 +98,6 @@ build_lib::e2e_tests() {
         printf "ERROR: end-to-end tests failed for %s (exit %s)\n" "${COMPONENT}" "${rc}" >&2
         return "${rc}"
     fi
-
-    printf "done\n"
-
-    return 0
-}
-
-# Pushes every tag build_image applied. Opt-in, so a local run never publishes.
-# Registry login is the caller's job (CI runs docker login first).
-build_lib::push() {
-    local tag
-    local rc=0
-
-    if [ "${PUSH:-0}" != "1" ]; then
-        printf "skipping push (PUSH not set)\n"
-        return 0
-    fi
-
-    printf "pushing %s..." "${COMPONENT}"
-    for tag in "${IMAGE_TAG}" "latest"; do
-        build_lib::run_quiet docker push "${IMAGE_NAME}:${tag}" || rc=$?
-        if [ "${rc}" -ne 0 ]; then
-            printf "failed\n"
-            printf "ERROR: docker push failed for %s:%s (exit %s)\n" "${IMAGE_NAME}" "${tag}" "${rc}" >&2
-            return "${rc}"
-        fi
-    done
 
     printf "done\n"
 
