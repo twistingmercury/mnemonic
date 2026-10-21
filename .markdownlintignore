@@ -1,0 +1,23 @@
+# Licence text and changelogs are not project documentation prose.
+LICENSE
+CHANGELOG
+
+# Local tooling state.
+.claude/
+.superpowers/
+
+# Vendored BATS helper libraries (third-party docs).
+tests/bats/test_helper/bats-support/
+tests/bats/test_helper/bats-assert/
+
+# Temporary migration material; removed together with the matching
+# .gitignore block when the migration is finished.
+_import/
+librarian-*/
+e2e-audit/
+/rename-to-mnemonic-plan.md
+/e2e-consolidation-plan.md
+/librarian-monorepo-plan.md
+/mnemonic-monorepo-plan.md
+/MIGRATION_NOTES.md
+/CLAUDE.md

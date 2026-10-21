@@ -1,4 +1,53 @@
-# Temporary while the fork repos live inside this directory; remove when they are retired.
+# Go build output (src/.bin/ is where the build scripts put binaries)
+.bin/
+/src/main
+
+# Go test and coverage output
+coverage.out
+*.coverprofile
+*.test
+
+# Local environment files; .env.example is the committed template
+.env
+.env.*
+!.env.example
+
+# Dev stack port-forward pid and log files (written by the Makefile)
+.k8s-forward/
+
+# Logs and scratch files
+*.log
+*.tmp
+*.temp
+*.backup
+.cache/
+
+# Local scratch directories and per-developer settings
+local/
+.claude/settings.local.json
+
+# Python caches (e2e suite)
+__pycache__/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# IDEs and editors
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
+
+# Operating system files
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
+
+# TEMPORARY: migration leftovers. Remove this whole block when the migration is finished.
 /librarian-*/
 /librarian-monorepo-plan.md
 /mnemonic-monorepo-plan.md
