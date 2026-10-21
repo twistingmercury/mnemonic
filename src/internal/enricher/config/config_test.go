@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1166,4 +1167,37 @@ func TestLoad_ReadsMnemonicPrefixedVariables(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "db.example.invalid", cfg.Database.Postgres.Host)
+}
+
+// TestLoad_IgnoresHostEmbeddingsKeyVariable pins that the owner's host variable
+// for the egress proxy, which deliberately shares the MNEMONIC_ prefix, is never
+// bound to a service's own OpenAI API key even if it leaks into the environment.
+func TestLoad_IgnoresHostEmbeddingsKeyVariable(t *testing.T) {
+	const hostKey = "fake-host-key-must-not-be-read"
+
+	t.Run("service key wins and host key appears nowhere", func(t *testing.T) {
+		clearMnemonicEnvVars(t)
+		t.Setenv("MNEMONIC_OPENAI_API_KEY", "proxy-managed")
+		t.Setenv("MNEMONIC_OPENAI_API_EMBEDDINGS_KEY", hostKey)
+
+		cfg, err := config.Load(nil)
+		require.NoError(t, err)
+
+		assert.Equal(t, "proxy-managed", cfg.OpenAI.APIKey)
+		// A boolean keeps the fake value out of the failure output.
+		leaked := strings.Contains(fmt.Sprintf("%+v", *cfg), hostKey)
+		assert.False(t, leaked, "host embeddings key found in the loaded config")
+	})
+
+	t.Run("host key alone leaves the api key at its default", func(t *testing.T) {
+		clearMnemonicEnvVars(t)
+		t.Setenv("MNEMONIC_OPENAI_API_EMBEDDINGS_KEY", hostKey)
+
+		cfg, err := config.Load(nil)
+		require.NoError(t, err)
+
+		assert.Empty(t, cfg.OpenAI.APIKey)
+		leaked := strings.Contains(fmt.Sprintf("%+v", *cfg), hostKey)
+		assert.False(t, leaked, "host embeddings key found in the loaded config")
+	})
 }
