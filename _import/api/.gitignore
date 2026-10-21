@@ -1,0 +1,91 @@
+.claude/settings.local.json
+# Operating System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# Windows
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+*.sublime-project
+.code-workspace
+
+# JetBrains
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Visual Studio Code
+.vscode/*
+
+*.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+**/*.log
+**/*.log*
+
+
+# Temporary files
+**/*.tmp
+**/*.temp
+.cache/
+
+# MkDocs
+site/
+**/out/
+**/bin/
+**/.bin/
+**/*.pdf
+**/publish/
+**/*.err
+# Local documentation scripts
+docs/scripts/
+
+# Go artifacts
+
+**/coverage.out
+/src/main
+src/mnemonic/docs/swagger/
+
+**/rlm_state/
+**/*.backup
+/_ideas/
+/_archive/
+/_reviews/
+**/local/
+**/_code-reviews/
+docs/code_reviews/
+# Local Ralph-loop planning inputs
+docs/plans/**/PRD.md
+docs/plans/**/PROMPT.md
+**/_draft-skills/

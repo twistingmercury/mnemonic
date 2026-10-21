@@ -1,0 +1,88 @@
+# The only door out of the stack. The enricher, MCP and API sit on a network
+# with no route to the internet and send their OpenAI calls here instead
+# (LIBRARIAN_OPENAI_BASE_URL). This proxy forwards two paths to api.openai.com,
+# adds the real API key, and refuses everything else. The key lives only in
+# this container's environment, never in the services that use it.
+
+admin:
+  address:
+    socket_address: { address: 127.0.0.1, port_value: 9901 }
+
+static_resources:
+  listeners:
+    - name: openai_egress
+      address:
+        socket_address: { address: 0.0.0.0, port_value: 8443 }
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: openai_egress
+                normalize_path: true
+                merge_slashes: true
+                path_with_escaped_slashes_action: REJECT_REQUEST
+                access_log:
+                  - name: envoy.access_loggers.stdout
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+                      log_format:
+                        text_format_source:
+                          inline_string: "%START_TIME% %REQ(:METHOD)% %REQ(:PATH)% -> %RESPONSE_CODE% %DURATION%ms\n"
+                route_config:
+                  name: openai
+                  virtual_hosts:
+                    - name: openai
+                      domains: ["*"]
+                      # Replace whatever Authorization header the caller sent.
+                      request_headers_to_add:
+                        - header:
+                            key: authorization
+                            value: "Bearer %ENVIRONMENT(LIBRARIAN_OPENAI_API_KEY)%"
+                          append_action: OVERWRITE_IF_EXISTS_OR_ADD
+                      routes:
+                        - match:
+                            path: /v1/embeddings
+                            headers:
+                              - { name: ":method", string_match: { exact: POST } }
+                          route: &openai_route
+                            cluster: openai
+                            host_rewrite_literal: api.openai.com
+                            timeout: 60s
+                        - match:
+                            path: /v1/chat/completions
+                            headers:
+                              - { name: ":method", string_match: { exact: POST } }
+                          route: *openai_route
+                        - match: { prefix: "/" }
+                          direct_response:
+                            status: 403
+                            body: { inline_string: "egress: destination not allowed\n" }
+                http_filters:
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  clusters:
+    - name: openai
+      type: STRICT_DNS
+      # Docker bridge networks have no IPv6 route; without this Envoy may pick
+      # an AAAA record and fail to connect.
+      dns_lookup_family: V4_ONLY
+      connect_timeout: 5s
+      load_assignment:
+        cluster_name: openai
+        endpoints:
+          - lb_endpoints:
+              - endpoint: { address: { socket_address: { address: api.openai.com, port_value: 443 } } }
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+          sni: api.openai.com
+          common_tls_context:
+            validation_context:
+              trusted_ca: { filename: /etc/ssl/certs/ca-certificates.crt }
+              match_typed_subject_alt_names:
+                - san_type: DNS
+                  matcher: { exact: api.openai.com }

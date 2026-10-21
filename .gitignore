@@ -1,0 +1,5 @@
+# Temporary while the fork repos live inside this directory; remove when they are retired.
+/librarian-*/
+/librarian-monorepo-plan.md
+/mnemonic-monorepo-plan.md
+/CLAUDE.md

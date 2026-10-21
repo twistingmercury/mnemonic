@@ -1,0 +1,16 @@
+**/.git/
+**/bin/
+**/*.log
+**/*.tmp
+**/*.env
+**/*.env.*
+**/*.enc
+**/*.key
+**/*.pem
+**/.gitignore
+**/.dockerignore
+**/*.md
+**/Makefile
+**/Dockerfile
+**/.vscode
+**/.idea

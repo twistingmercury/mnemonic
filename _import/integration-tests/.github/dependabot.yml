@@ -1,0 +1,29 @@
+# Weekly grouped updates against develop: one PR per ecosystem.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directories: ["/src", "/openai-stub"]
+    target-branch: develop
+    schedule:
+      interval: weekly
+    groups:
+      go:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directories: ["/openai-stub"]
+    target-branch: develop
+    schedule:
+      interval: weekly
+    groups:
+      docker:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

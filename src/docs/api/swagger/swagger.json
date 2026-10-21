@@ -1,0 +1,804 @@
+{
+    "schemes": [
+        "http"
+    ],
+    "swagger": "2.0",
+    "info": {
+        "description": "REST API for the Mnemonic agent-pattern-skill management service",
+        "title": "Mnemonic API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/v1/api",
+    "paths": {
+        "/patterns": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Patterns"
+                ],
+                "summary": "List patterns",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Max results (1–100, default 20)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Pagination cursor",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Comma-separated tag filter",
+                        "name": "tags",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Keyword search filter",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Language filter",
+                        "name": "language",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain filter",
+                        "name": "domain",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Entity type filter",
+                        "name": "entity_type",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/patterns.patternListResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ProblemDetail"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ProblemDetail"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Patterns"
+                ],
+                "summary": "Create pattern",
+                "parameters": [
+                    {
+                        "description": "Pattern to create",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/patterns.patternRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/patterns.patternResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ProblemDetail"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ProblemDetail"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ProblemDetail"
+                        }
+                    }
+                }
+            }
+        },
+        "/patterns/search": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Patterns"
+                ],
+                "summary": "Search patterns",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search query (required, max 1000 chars)",
+                        "name": "q",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Max results (1–50, default 10)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "Similarity threshold (0–1, default 0.7)",
+                        "name": "threshold",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Comma-separated tag filter",
+                        "name": "tags",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Language filter",
+                        "name": "language",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain filter",
+                        "name": "domain",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/patterns.searchResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ProblemDetail"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ProblemDetail"
+                        }
+                    }
+                }
+            }
+        },
+        "/patterns/{id}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Patterns"
+                ],
+                "summary": "Get pattern",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Pattern UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/patterns.patternResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ProblemDetail"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ProblemDetail"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ProblemDetail"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Patterns"
+                ],
+                "summary": "Update pattern",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Pattern UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Pattern fields to update",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/patterns.patternRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ProblemDetail"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ProblemDetail"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ProblemDetail"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ProblemDetail"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "Patterns"
+                ],
+                "summary": "Delete pattern",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Pattern UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "no content",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ProblemDetail"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ProblemDetail"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ProblemDetail"
+                        }
+                    }
+                }
+            }
+        },
+        "/patterns/{id}/chunks": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Patterns"
+                ],
+                "summary": "Get pattern chunks",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Pattern UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/patterns.chunkListResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ProblemDetail"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ProblemDetail"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ProblemDetail"
+                        }
+                    }
+                }
+            }
+        },
+        "/version": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Operations"
+                ],
+                "summary": "Get service version",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "handlers.FieldError": {
+            "description": "Field-level validation error returned inside a ProblemDetail",
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "enum": [
+                        "REQUIRED",
+                        "MAX_LENGTH",
+                        "MAX_ITEMS",
+                        "TOO_LARGE",
+                        "INVALID_FORMAT",
+                        "INVALID_VALUE"
+                    ],
+                    "example": "REQUIRED"
+                },
+                "field": {
+                    "type": "string",
+                    "example": "name"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "name is required"
+                }
+            }
+        },
+        "handlers.Pagination": {
+            "description": "Cursor-based pagination metadata returned with list responses",
+            "type": "object",
+            "properties": {
+                "cursor": {
+                    "type": "string",
+                    "example": "dGVzdA=="
+                },
+                "has_more": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "limit": {
+                    "type": "integer",
+                    "example": 100
+                },
+                "next_cursor": {
+                    "type": "string",
+                    "example": "dGVzdA=="
+                }
+            }
+        },
+        "handlers.ProblemDetail": {
+            "description": "RFC 7807 Problem Details error response",
+            "type": "object",
+            "properties": {
+                "detail": {
+                    "type": "string",
+                    "example": "pattern not found"
+                },
+                "errors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.FieldError"
+                    }
+                },
+                "instance": {
+                    "type": "string",
+                    "example": "/v1/api/patterns/my-pattern"
+                },
+                "status": {
+                    "type": "integer",
+                    "example": 404
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Not Found"
+                },
+                "traceId": {
+                    "type": "string",
+                    "example": "trace-abc123"
+                },
+                "type": {
+                    "type": "string",
+                    "example": "https://mnemonic.example.com/problems/not-found"
+                }
+            }
+        },
+        "patterns.chunkListResponse": {
+            "description": "List of chunk summaries for a pattern",
+            "type": "object",
+            "properties": {
+                "chunks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/patterns.chunkSummary"
+                    }
+                },
+                "count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "patterns.chunkSummary": {
+            "description": "Summary of a single content chunk belonging to a pattern",
+            "type": "object",
+            "properties": {
+                "chunk_index": {
+                    "type": "integer"
+                },
+                "enrichment_status": {
+                    "type": "string"
+                },
+                "section_title": {
+                    "type": "string"
+                }
+            }
+        },
+        "patterns.conceptResponse": {
+            "description": "Concept node returned in graph context",
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "patterns.graphContextResponse": {
+            "description": "Graph context containing related patterns and concepts",
+            "type": "object",
+            "properties": {
+                "concepts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/patterns.conceptResponse"
+                    }
+                },
+                "related_patterns": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/patterns.relatedPatternResponse"
+                    }
+                }
+            }
+        },
+        "patterns.patternListResponse": {
+            "description": "Paginated list of pattern summaries",
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/patterns.patternSummaryResponse"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/handlers.Pagination"
+                }
+            }
+        },
+        "patterns.patternRequest": {
+            "description": "Request body for creating or updating a pattern",
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "domain": {
+                    "type": "string"
+                },
+                "entity_type": {
+                    "type": "string"
+                },
+                "language": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "related_patterns": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "patterns.patternResponse": {
+            "description": "Full pattern resource returned by create, get, and update operations",
+            "type": "object",
+            "properties": {
+                "chunks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/patterns.chunkSummary"
+                    }
+                },
+                "content": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "domain": {
+                    "type": "string"
+                },
+                "enriched_at": {
+                    "type": "string"
+                },
+                "enrichment_error": {
+                    "type": "string"
+                },
+                "enrichment_status": {
+                    "type": "string"
+                },
+                "entity_type": {
+                    "type": "string"
+                },
+                "graph": {
+                    "$ref": "#/definitions/patterns.graphContextResponse"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "language": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "related_patterns": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "patterns.patternSummaryResponse": {
+            "description": "Abbreviated pattern resource returned in list responses",
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "enrichment_status": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "patterns.relatedPatternResponse": {
+            "description": "Related pattern entry returned in graph context",
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "relationship": {
+                    "type": "string"
+                },
+                "strength": {
+                    "type": "number"
+                }
+            }
+        },
+        "patterns.searchMetadata": {
+            "description": "Metadata returned alongside semantic search results",
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string"
+                },
+                "search_duration_ms": {
+                    "type": "integer"
+                },
+                "total_candidates": {
+                    "type": "integer"
+                }
+            }
+        },
+        "patterns.searchResponse": {
+            "description": "Response body for a semantic pattern search operation",
+            "type": "object",
+            "properties": {
+                "metadata": {
+                    "$ref": "#/definitions/patterns.searchMetadata"
+                },
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/patterns.searchResultResponse"
+                    }
+                }
+            }
+        },
+        "patterns.searchResultResponse": {
+            "description": "Single semantic search result matching a query",
+            "type": "object",
+            "properties": {
+                "chunk_index": {
+                    "type": "integer"
+                },
+                "content": {
+                    "type": "string"
+                },
+                "domain": {
+                    "type": "string"
+                },
+                "entity_type": {
+                    "type": "string"
+                },
+                "language": {
+                    "type": "string"
+                },
+                "pattern_id": {
+                    "type": "string"
+                },
+                "pattern_name": {
+                    "type": "string"
+                },
+                "section_title": {
+                    "type": "string"
+                },
+                "similarity": {
+                    "type": "number"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,6 @@
+# Shellcheck configuration
+disable=SC2034,SC2086,SC2030,SC2031
+external-sources=true
+format=gcc
+severity=warning
+shell=bash

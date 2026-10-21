@@ -1,0 +1,12 @@
+**
+!LICENSE
+!src/
+!src/go.mod
+!src/go.sum
+!src/.golangci.yml
+!src/cmd/
+!src/cmd/**
+!src/internal/
+!src/internal/**
+!src/docs/
+!src/docs/**

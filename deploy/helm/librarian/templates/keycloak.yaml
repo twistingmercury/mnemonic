@@ -1,0 +1,95 @@
+{{- $c := dict "ctx" $ "component" "keycloak" }}
+{{- $v := .Values.keycloak }}
+{{- $secret := include "librarian.credentialsSecret" . }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $v.serviceName }}
+  labels:
+    {{- include "librarian.labels" $c | nindent 4 }}
+spec:
+  selector:
+    {{- include "librarian.selectorLabels" $c | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ $v.port }}
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  labels:
+    {{- include "librarian.labels" $c | nindent 4 }}
+spec:
+  replicas: 1
+  # start-dev keeps its database inside the pod, so two pods never overlap.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "librarian.selectorLabels" $c | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "librarian.labels" $c | nindent 8 }}
+      annotations:
+        checksum/config: {{ include "librarian.configChecksum" (dict "ctx" $ "names" (list .Values.configMaps.keycloakRealm)) }}
+        checksum/credentials: {{ include (print $.Template.BasePath "/secret-dev-credentials.yaml") . | sha256sum }}
+    spec:
+      {{- include "librarian.podDefaults" . | nindent 6 }}
+      securityContext:
+        {{- include "librarian.podSecurityContext" 1000 | nindent 8 }}
+      containers:
+        - name: keycloak
+          image: {{ $v.image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          args: ["start-dev", "--import-realm"]
+          env:
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef: { name: {{ $secret }}, key: keycloak-admin-user }
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: {{ $secret }}, key: keycloak-admin-password }
+            # Tokens carry this issuer however Keycloak is reached, so tokens
+            # fetched through the port-forward verify at Envoy, which fetches
+            # the keys over the in-cluster Service.
+            - name: KC_HOSTNAME
+              value: {{ $v.publicUrl | quote }}
+            - name: KC_HOSTNAME_BACKCHANNEL_DYNAMIC
+              value: "true"
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: management
+              containerPort: {{ $v.managementPort }}
+          startupProbe:
+            httpGet: { path: /health/started, port: management }
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: { path: /health/ready, port: management }
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health/live, port: management }
+            periodSeconds: 20
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml $v.resources | nindent 12 }}
+          # readOnlyRootFilesystem is off: start-dev rebuilds the Quarkus
+          # application under /opt/keycloak/lib at startup and keeps its dev
+          # database under /opt/keycloak/data.
+          securityContext:
+            {{- include "librarian.containerSecurityContext" false | nindent 12 }}
+          volumeMounts:
+            - name: realm
+              mountPath: /opt/keycloak/data/import
+              readOnly: true
+      volumes:
+        - name: realm
+          configMap:
+            name: {{ .Values.configMaps.keycloakRealm }}

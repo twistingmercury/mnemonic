@@ -1,0 +1,77 @@
+{{- $c := dict "ctx" $ "component" "envoy" }}
+{{- $v := .Values.envoy }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $v.serviceName }}
+  labels:
+    {{- include "librarian.labels" $c | nindent 4 }}
+spec:
+  selector:
+    {{- include "librarian.selectorLabels" $c | nindent 4 }}
+  ports:
+    - name: api-edge
+      port: {{ $v.apiPort }}
+      targetPort: api-edge
+    - name: mcp-edge
+      port: {{ $v.mcpPort }}
+      targetPort: mcp-edge
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: envoy
+  labels:
+    {{- include "librarian.labels" $c | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "librarian.selectorLabels" $c | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "librarian.labels" $c | nindent 8 }}
+      annotations:
+        checksum/config: {{ include "librarian.configChecksum" (dict "ctx" $ "names" (list .Values.configMaps.envoy)) }}
+    spec:
+      {{- include "librarian.podDefaults" . | nindent 6 }}
+      # The image's envoy user (101), started directly rather than through the
+      # image entrypoint, which would start as root and switch users.
+      securityContext:
+        {{- include "librarian.podSecurityContext" 101 | nindent 8 }}
+      containers:
+        - name: envoy
+          image: {{ $v.image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          command: ["envoy"]
+          args: ["-c", "/etc/envoy/envoy.yaml", "--log-level", {{ $v.logLevel | quote }}]
+          ports:
+            - name: api-edge
+              containerPort: 8080
+            - name: mcp-edge
+              containerPort: 8081
+          # The admin interface listens on 127.0.0.1 only, so probes check
+          # that both listeners accept connections.
+          readinessProbe:
+            tcpSocket: { port: mcp-edge }
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: api-edge }
+            periodSeconds: 20
+          resources:
+            {{- toYaml $v.resources | nindent 12 }}
+          securityContext:
+            {{- include "librarian.containerSecurityContext" true | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/envoy
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: {{ .Values.configMaps.envoy }}
+        - name: tmp
+          emptyDir: {}

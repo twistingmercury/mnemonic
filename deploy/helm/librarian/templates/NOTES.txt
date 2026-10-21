@@ -1,0 +1,22 @@
+Librarian is installed in namespace {{ .Release.Namespace }}.
+
+Reach it from the host (from the librarian-gateway repo):
+
+  make k8s-forward     # API edge localhost:18080, MCP edge localhost:18081, Keycloak localhost:18180
+  make k8s-test        # end-to-end and NetworkPolicy checks
+
+Tokens carry the issuer {{ .Values.keycloak.publicUrl }}/realms/mnemonic, so get them
+through the Keycloak port-forward.
+
+{{- if .Values.networkPolicy.enabled }}
+
+NetworkPolicies are on: default-deny, and only the egress pod
+({{ .Values.egress.serviceName }}) may leave the cluster, on TCP {{ .Values.networkPolicy.internet.port }}.
+{{- else }}
+
+WARNING: networkPolicy.enabled is false; every pod can reach every other pod
+and the internet.
+{{- end }}
+
+The OpenAI key is read from Secret {{ .Values.openai.existingSecret }} by the egress pod only.
+After rotating it, restart that pod: kubectl --context <ctx> -n {{ .Release.Namespace }} rollout restart deployment/egress

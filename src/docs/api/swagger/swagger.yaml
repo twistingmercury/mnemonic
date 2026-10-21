@@ -1,0 +1,537 @@
+basePath: /v1/api
+definitions:
+  handlers.FieldError:
+    description: Field-level validation error returned inside a ProblemDetail
+    properties:
+      code:
+        enum:
+        - REQUIRED
+        - MAX_LENGTH
+        - MAX_ITEMS
+        - TOO_LARGE
+        - INVALID_FORMAT
+        - INVALID_VALUE
+        example: REQUIRED
+        type: string
+      field:
+        example: name
+        type: string
+      message:
+        example: name is required
+        type: string
+    type: object
+  handlers.Pagination:
+    description: Cursor-based pagination metadata returned with list responses
+    properties:
+      cursor:
+        example: dGVzdA==
+        type: string
+      has_more:
+        example: false
+        type: boolean
+      limit:
+        example: 100
+        type: integer
+      next_cursor:
+        example: dGVzdA==
+        type: string
+    type: object
+  handlers.ProblemDetail:
+    description: RFC 7807 Problem Details error response
+    properties:
+      detail:
+        example: pattern not found
+        type: string
+      errors:
+        items:
+          $ref: '#/definitions/handlers.FieldError'
+        type: array
+      instance:
+        example: /v1/api/patterns/my-pattern
+        type: string
+      status:
+        example: 404
+        type: integer
+      title:
+        example: Not Found
+        type: string
+      traceId:
+        example: trace-abc123
+        type: string
+      type:
+        example: https://mnemonic.example.com/problems/not-found
+        type: string
+    type: object
+  patterns.chunkListResponse:
+    description: List of chunk summaries for a pattern
+    properties:
+      chunks:
+        items:
+          $ref: '#/definitions/patterns.chunkSummary'
+        type: array
+      count:
+        type: integer
+    type: object
+  patterns.chunkSummary:
+    description: Summary of a single content chunk belonging to a pattern
+    properties:
+      chunk_index:
+        type: integer
+      enrichment_status:
+        type: string
+      section_title:
+        type: string
+    type: object
+  patterns.conceptResponse:
+    description: Concept node returned in graph context
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+    type: object
+  patterns.graphContextResponse:
+    description: Graph context containing related patterns and concepts
+    properties:
+      concepts:
+        items:
+          $ref: '#/definitions/patterns.conceptResponse'
+        type: array
+      related_patterns:
+        items:
+          $ref: '#/definitions/patterns.relatedPatternResponse'
+        type: array
+    type: object
+  patterns.patternListResponse:
+    description: Paginated list of pattern summaries
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/patterns.patternSummaryResponse'
+        type: array
+      pagination:
+        $ref: '#/definitions/handlers.Pagination'
+    type: object
+  patterns.patternRequest:
+    description: Request body for creating or updating a pattern
+    properties:
+      content:
+        type: string
+      description:
+        type: string
+      domain:
+        type: string
+      entity_type:
+        type: string
+      language:
+        type: string
+      name:
+        type: string
+      related_patterns:
+        items:
+          type: string
+        type: array
+      tags:
+        items:
+          type: string
+        type: array
+      version:
+        type: string
+    type: object
+  patterns.patternResponse:
+    description: Full pattern resource returned by create, get, and update operations
+    properties:
+      chunks:
+        items:
+          $ref: '#/definitions/patterns.chunkSummary'
+        type: array
+      content:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      domain:
+        type: string
+      enriched_at:
+        type: string
+      enrichment_error:
+        type: string
+      enrichment_status:
+        type: string
+      entity_type:
+        type: string
+      graph:
+        $ref: '#/definitions/patterns.graphContextResponse'
+      id:
+        type: string
+      language:
+        type: string
+      name:
+        type: string
+      related_patterns:
+        items:
+          type: string
+        type: array
+      tags:
+        items:
+          type: string
+        type: array
+      updated_at:
+        type: string
+      version:
+        type: string
+    type: object
+  patterns.patternSummaryResponse:
+    description: Abbreviated pattern resource returned in list responses
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      enrichment_status:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      updated_at:
+        type: string
+    type: object
+  patterns.relatedPatternResponse:
+    description: Related pattern entry returned in graph context
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      relationship:
+        type: string
+      strength:
+        type: number
+    type: object
+  patterns.searchMetadata:
+    description: Metadata returned alongside semantic search results
+    properties:
+      query:
+        type: string
+      search_duration_ms:
+        type: integer
+      total_candidates:
+        type: integer
+    type: object
+  patterns.searchResponse:
+    description: Response body for a semantic pattern search operation
+    properties:
+      metadata:
+        $ref: '#/definitions/patterns.searchMetadata'
+      results:
+        items:
+          $ref: '#/definitions/patterns.searchResultResponse'
+        type: array
+    type: object
+  patterns.searchResultResponse:
+    description: Single semantic search result matching a query
+    properties:
+      chunk_index:
+        type: integer
+      content:
+        type: string
+      domain:
+        type: string
+      entity_type:
+        type: string
+      language:
+        type: string
+      pattern_id:
+        type: string
+      pattern_name:
+        type: string
+      section_title:
+        type: string
+      similarity:
+        type: number
+      tags:
+        items:
+          type: string
+        type: array
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: REST API for the Mnemonic agent-pattern-skill management service
+  title: Mnemonic API
+  version: "1.0"
+paths:
+  /patterns:
+    get:
+      parameters:
+      - description: Max results (1–100, default 20)
+        in: query
+        name: limit
+        type: integer
+      - description: Pagination cursor
+        in: query
+        name: cursor
+        type: string
+      - description: Comma-separated tag filter
+        in: query
+        name: tags
+        type: string
+      - description: Keyword search filter
+        in: query
+        name: search
+        type: string
+      - description: Language filter
+        in: query
+        name: language
+        type: string
+      - description: Domain filter
+        in: query
+        name: domain
+        type: string
+      - description: Entity type filter
+        in: query
+        name: entity_type
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/patterns.patternListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ProblemDetail'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ProblemDetail'
+      summary: List patterns
+      tags:
+      - Patterns
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Pattern to create
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/patterns.patternRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/patterns.patternResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ProblemDetail'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.ProblemDetail'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ProblemDetail'
+      summary: Create pattern
+      tags:
+      - Patterns
+  /patterns/{id}:
+    delete:
+      parameters:
+      - description: Pattern UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: no content
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ProblemDetail'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ProblemDetail'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ProblemDetail'
+      summary: Delete pattern
+      tags:
+      - Patterns
+    get:
+      parameters:
+      - description: Pattern UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/patterns.patternResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ProblemDetail'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ProblemDetail'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ProblemDetail'
+      summary: Get pattern
+      tags:
+      - Patterns
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Pattern UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Pattern fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/patterns.patternRequest'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ProblemDetail'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ProblemDetail'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.ProblemDetail'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ProblemDetail'
+      summary: Update pattern
+      tags:
+      - Patterns
+  /patterns/{id}/chunks:
+    get:
+      parameters:
+      - description: Pattern UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/patterns.chunkListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ProblemDetail'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ProblemDetail'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ProblemDetail'
+      summary: Get pattern chunks
+      tags:
+      - Patterns
+  /patterns/search:
+    get:
+      parameters:
+      - description: Search query (required, max 1000 chars)
+        in: query
+        name: q
+        required: true
+        type: string
+      - description: Max results (1–50, default 10)
+        in: query
+        name: limit
+        type: integer
+      - description: Similarity threshold (0–1, default 0.7)
+        in: query
+        name: threshold
+        type: number
+      - description: Comma-separated tag filter
+        in: query
+        name: tags
+        type: string
+      - description: Language filter
+        in: query
+        name: language
+        type: string
+      - description: Domain filter
+        in: query
+        name: domain
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/patterns.searchResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ProblemDetail'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ProblemDetail'
+      summary: Search patterns
+      tags:
+      - Patterns
+  /version:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get service version
+      tags:
+      - Operations
+schemes:
+- http
+swagger: "2.0"

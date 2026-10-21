@@ -1,0 +1,35 @@
+# Weekly grouped updates against develop: one PR per ecosystem.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directories: ["/src", "/src/tests/e2e", "/src/tests/e2e/openai-stub"]
+    target-branch: develop
+    schedule:
+      interval: weekly
+    groups:
+      go:
+        patterns: ["*"]
+    ignore:
+      # pgx 5.11 added TypeMap() to pgx.Rows; pgxmock v4.9.0 doesn't implement
+      # it, so the repository tests stop compiling. Drop this once pgxmock ships
+      # a compatible release.
+      - dependency-name: github.com/jackc/pgx/v5
+        versions: [">=5.11.0"]
+
+  - package-ecosystem: docker
+    directories: ["/src/build", "/src/tests/e2e", "/src/tests/e2e/openai-stub"]
+    target-branch: develop
+    schedule:
+      interval: weekly
+    groups:
+      docker:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

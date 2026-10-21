@@ -1,0 +1,29 @@
+Cycle 1 - Remove API MCP E2E ownership
+Date: 2026-08-24
+Summary: Removed the API-owned MCP E2E package, compose/test MCP configuration, and MCP-only test helpers and types. Confirmed mnemonic-mcp retains the canonical MCP protocol E2E suite.
+Verification: `cd mnemonic-api && make build && cd ../mnemonic-mcp && make build` passed.
+Follow-up: Cycle 2 removes the API runtime MCP listener.
+
+Cycle 2 - Stop API MCP serving
+Date: 2026-08-24
+Summary: Removed MCP dependency construction, the MCP listener errgroup task, MCP shutdown handling, and MCP-specific startup logging from the API server. Dependency wiring now returns only REST services and the queue publisher; added server-level regression coverage.
+Verification: `cd src && go test ./internal/server`, `cd src && go test -race ./internal/server`, and `make build` passed (including Docker API E2E).
+Follow-up: Cycle 3 removes the now-unused API MCP configuration contract.
+
+Cycle 4 - Remove MCP implementation dependency
+Date: 2026-08-24
+Summary: Removed the API-local MCP implementation and its tests, removed the Model Context Protocol SDK and unused transitive module requirements, and updated service comments to describe REST-only responsibilities.
+Verification: `cd src && go test ./internal/service/...`, `cd src && go test ./internal/server`, and `make build` passed (including Docker API E2E).
+Follow-up: Cycle 5 aligns deployment metadata and source-of-truth documentation.
+
+Cycle 5 - Align deployment and documentation
+Date: 2026-08-24
+Summary: Removed API MCP/port-8081 claims from deployment metadata and documentation, documented `mnemonic-mcp` as the sole MCP service, and reconciled the cross-repository duplicate-MCP audit finding.
+Verification: `cd mnemonic-api && make build && git -C mnemonic-api diff --check && git -C mnemonic-docs diff --check` passed.
+Follow-up: Cycle 6 proves the API-only network boundary through Docker E2E coverage.
+
+Cycle 6 - Prove the API-only network boundary
+Date: 2026-08-24
+Summary: Added API E2E coverage proving `/mcp` returns 404 and TCP port 8081 rejects connections, while the existing suite continues to cover the approved REST and operational surface.
+Verification: Fresh Docker E2E suite passed (including health, version, REST, Swagger, metrics, and boundary assertion); `cd src/tests/e2e && GOCACHE=/tmp/mnemonic-api-go-cache go test ./api -run '^$'`; `cd mnemonic-api && make build` passed.
+Follow-up: No unchecked implementation cycles remain.

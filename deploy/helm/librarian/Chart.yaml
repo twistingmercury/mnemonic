@@ -1,0 +1,9 @@
+apiVersion: v2
+name: librarian
+description: >-
+  The Librarian stack (gateway, services, data stores and the OpenAI egress
+  proxy) for a local minikube cluster, with NetworkPolicy isolation.
+type: application
+version: 0.1.0
+appVersion: "1.0.0-dev"
+kubeVersion: ">=1.29.0-0"

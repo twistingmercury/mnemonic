@@ -1,0 +1,144 @@
+{{- /*
+Default-deny for the namespace, then one policy per component that allows
+exactly the flows the compose stack uses. Ports are the pods' container ports,
+which is what policies match after Service translation.
+
+  from -> to                          port
+  any (port-forward) -> envoy         8080, 8081
+  envoy -> opa                        9191 (ext_authz gRPC)
+  envoy -> keycloak                   8080 (JWKS)
+  envoy -> api                        8080
+  envoy -> mcp                        8081
+  api, mcp, enricher -> postgres      5432
+  api, mcp, enricher -> neo4j         7687
+  api, enricher -> rabbitmq           5672
+  api, mcp, enricher -> egress        8443
+  egress -> internet (not private)    443
+  every pod -> kube-dns               53 UDP/TCP
+*/ -}}
+{{- if .Values.networkPolicy.enabled }}
+{{- $np := .Values.networkPolicy }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  labels:
+    {{- include "librarian.labels" (dict "ctx" $ "component" "network-policy") | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  labels:
+    {{- include "librarian.labels" (dict "ctx" $ "component" "network-policy") | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $np.dns.namespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml $np.dns.podLabels | nindent 14 }}
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+{{- range $policy := list
+  (dict "component" "envoy"
+        "ingress" (list (dict "from" (list) "ports" (list 8080 8081)))
+        "egress" (list
+          (dict "to" (list "opa") "ports" (list 9191))
+          (dict "to" (list "keycloak") "ports" (list 8080))
+          (dict "to" (list "api") "ports" (list (int $.Values.api.port)))
+          (dict "to" (list "mcp") "ports" (list (int $.Values.mcp.mcpPort)))))
+  (dict "component" "opa"
+        "ingress" (list (dict "from" (list "envoy") "ports" (list 9191))))
+  (dict "component" "keycloak"
+        "ingress" (list (dict "from" (list "envoy") "ports" (list 8080))))
+  (dict "component" "api"
+        "ingress" (list (dict "from" (list "envoy") "ports" (list (int $.Values.api.port))))
+        "egress" (list
+          (dict "to" (list "postgres") "ports" (list 5432))
+          (dict "to" (list "neo4j") "ports" (list 7687))
+          (dict "to" (list "rabbitmq") "ports" (list 5672))
+          (dict "to" (list "egress") "ports" (list 8443))))
+  (dict "component" "mcp"
+        "ingress" (list (dict "from" (list "envoy") "ports" (list (int $.Values.mcp.mcpPort))))
+        "egress" (list
+          (dict "to" (list "postgres") "ports" (list 5432))
+          (dict "to" (list "neo4j") "ports" (list 7687))
+          (dict "to" (list "egress") "ports" (list 8443))))
+  (dict "component" "enricher"
+        "egress" (list
+          (dict "to" (list "postgres") "ports" (list 5432))
+          (dict "to" (list "neo4j") "ports" (list 7687))
+          (dict "to" (list "rabbitmq") "ports" (list 5672))
+          (dict "to" (list "egress") "ports" (list 8443))))
+  (dict "component" "egress"
+        "ingress" (list (dict "from" (list "api" "mcp" "enricher") "ports" (list 8443))))
+  (dict "component" "postgres"
+        "ingress" (list (dict "from" (list "api" "mcp" "enricher") "ports" (list 5432))))
+  (dict "component" "neo4j"
+        "ingress" (list (dict "from" (list "api" "mcp" "enricher") "ports" (list 7687))))
+  (dict "component" "rabbitmq"
+        "ingress" (list (dict "from" (list "api" "enricher") "ports" (list 5672))))
+}}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $policy.component }}
+  labels:
+    {{- include "librarian.labels" (dict "ctx" $ "component" "network-policy") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "librarian.policyLabels" (dict "ctx" $ "component" $policy.component) | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    {{- range $rule := $policy.ingress | default list }}
+    - ports:
+        {{- range $rule.ports }}
+        - { protocol: TCP, port: {{ . }} }
+        {{- end }}
+      {{- if $rule.from }}
+      from:
+        {{- range $rule.from }}
+        - podSelector:
+            matchLabels:
+              {{- include "librarian.policyLabels" (dict "ctx" $ "component" .) | nindent 14 }}
+        {{- end }}
+      {{- else }}
+      # No "from": any source, as the edges are reached through port-forward.
+      {{- end }}
+    {{- end }}
+  egress:
+    {{- range $rule := $policy.egress | default list }}
+    - to:
+        {{- range $rule.to }}
+        - podSelector:
+            matchLabels:
+              {{- include "librarian.policyLabels" (dict "ctx" $ "component" .) | nindent 14 }}
+        {{- end }}
+      ports:
+        {{- range $rule.ports }}
+        - { protocol: TCP, port: {{ . }} }
+        {{- end }}
+    {{- end }}
+    {{- if eq $policy.component "egress" }}
+    # The one route out of the namespace.
+    - to:
+        - ipBlock:
+            cidr: {{ $np.internet.cidr }}
+            except:
+              {{- toYaml $np.internet.except | nindent 14 }}
+      ports:
+        - { protocol: TCP, port: {{ $np.internet.port }} }
+    {{- end }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,133 @@
+# This docker compose file is used to run mnemonic locally so it can be developed against.
+
+services:
+  dev_postgres:
+    image: ghcr.io/twistingmercury/librarian-postgres:v1.0.0-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mnemonic
+      POSTGRES_USER: mnemonic
+      POSTGRES_PASSWORD: mnemonic_dev
+    ports:
+      - "15433:5432"
+    volumes:
+      - dev_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mnemonic"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dev_network
+
+  dev_neo4j:
+    image: ghcr.io/twistingmercury/librarian-neo4j:v1.0.0-dev
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: neo4j/mnemonic_dev
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+      NEO4J_dbms_security_procedures_allowlist: apoc.*
+    ports:
+      - "17475:7474"
+      - "17688:7687"
+    volumes:
+      - dev_neo4j_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p mnemonic_dev 'RETURN 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dev_network
+
+  dev_mcp:
+    image: ghcr.io/twistingmercury/librarian-mcp:latest-dev
+    pull_policy: never
+    restart: unless-stopped
+    ports:
+      - "18081:8081"
+      - "19090:9090"
+    environment:
+      LIBRARIAN_DATABASE_POSTGRES_HOST: dev_postgres
+      LIBRARIAN_DATABASE_POSTGRES_PASSWORD: mnemonic_dev
+      LIBRARIAN_DATABASE_POSTGRES_SSL_MODE: disable
+      LIBRARIAN_DATABASE_NEO4J_URI: bolt://dev_neo4j:7687
+      LIBRARIAN_DATABASE_NEO4J_PASSWORD: mnemonic_dev
+      LIBRARIAN_OPENAI_API_KEY: ${LIBRARIAN_OPENAI_API_KEY}
+      LIBRARIAN_MCP_PORT: 8081
+      LIBRARIAN_MCP_DEFAULT_SEARCH_THRESHOLD: 0.5
+      LIBRARIAN_LOGGING_LEVEL: debug
+    depends_on:
+      dev_neo4j:
+        condition: service_healthy
+      dev_postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/mnemonic", "--health"]
+      interval: 2s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dev_network
+
+  dev_rabbitmq:
+    image: rabbitmq:4-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "15673:5672"
+      - "25673:15672"
+    volumes:
+      - dev_rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dev_network
+
+  dev_api:
+    image: ghcr.io/twistingmercury/librarian-api:latest-dev
+    pull_policy: never
+    restart: unless-stopped
+    ports:
+      - "18080:8080"
+    environment:
+      LIBRARIAN_DATABASE_POSTGRES_HOST: dev_postgres
+      LIBRARIAN_DATABASE_POSTGRES_PASSWORD: mnemonic_dev
+      LIBRARIAN_DATABASE_POSTGRES_SSL_MODE: disable
+      LIBRARIAN_DATABASE_NEO4J_URI: bolt://dev_neo4j:7687
+      LIBRARIAN_DATABASE_NEO4J_PASSWORD: mnemonic_dev
+      LIBRARIAN_OPENAI_API_KEY: ${LIBRARIAN_OPENAI_API_KEY}
+      LIBRARIAN_LOGGING_LEVEL: debug
+      LIBRARIAN_QUEUE_RABBITMQ_HOST: dev_rabbitmq
+      LIBRARIAN_QUEUE_RABBITMQ_PORT: 5672
+      LIBRARIAN_QUEUE_RABBITMQ_USER: guest
+      LIBRARIAN_QUEUE_RABBITMQ_PASSWORD: guest
+    depends_on:
+      dev_neo4j:
+        condition: service_healthy
+      dev_postgres:
+        condition: service_healthy
+      dev_rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/mnemonic-api", "--health"]
+      interval: 2s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dev_network
+
+volumes:
+  dev_postgres_data:
+  dev_neo4j_data:
+  dev_rabbitmq_data:
+
+networks:
+  dev_network:
+    driver: bridge

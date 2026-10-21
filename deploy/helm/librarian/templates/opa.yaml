@@ -1,0 +1,82 @@
+{{- $c := dict "ctx" $ "component" "opa" }}
+{{- $v := .Values.opa }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $v.serviceName }}
+  labels:
+    {{- include "librarian.labels" $c | nindent 4 }}
+spec:
+  selector:
+    {{- include "librarian.selectorLabels" $c | nindent 4 }}
+  ports:
+    - name: grpc
+      port: {{ $v.grpcPort }}
+      targetPort: grpc
+      appProtocol: grpc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opa
+  labels:
+    {{- include "librarian.labels" $c | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "librarian.selectorLabels" $c | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "librarian.labels" $c | nindent 8 }}
+      annotations:
+        checksum/config: {{ include "librarian.configChecksum" (dict "ctx" $ "names" (list .Values.configMaps.opaConfig .Values.configMaps.opaPolicy)) }}
+    spec:
+      {{- include "librarian.podDefaults" . | nindent 6 }}
+      securityContext:
+        {{- include "librarian.podSecurityContext" 1000 | nindent 8 }}
+      containers:
+        - name: opa
+          image: {{ $v.image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          # As in docker-compose.yaml. The extra ignore skips the hidden
+          # ..data directories of the ConfigMap mount, which would otherwise
+          # load every policy twice.
+          args:
+            - run
+            - --server
+            - --addr=:{{ $v.httpPort }}
+            - --config-file=/config/config.yaml
+            - --ignore=*_test.rego
+            - --ignore=.*
+            - /policy
+          ports:
+            - name: grpc
+              containerPort: 9191
+            - name: http
+              containerPort: {{ $v.httpPort }}
+          readinessProbe:
+            httpGet: { path: "/health?plugins", port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 20
+          resources:
+            {{- toYaml $v.resources | nindent 12 }}
+          securityContext:
+            {{- include "librarian.containerSecurityContext" true | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: policy
+              mountPath: /policy
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: {{ .Values.configMaps.opaConfig }}
+        - name: policy
+          configMap:
+            name: {{ .Values.configMaps.opaPolicy }}

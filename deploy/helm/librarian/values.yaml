@@ -1,0 +1,171 @@
+# Values for the local minikube deployment. docker-compose.yaml in the repo
+# root is the reference stack; settings here mirror it unless noted.
+
+# The librarian-* images exist only in the host's Docker cache and are loaded
+# into the node with `minikube image load` (make k8s-images), so they must
+# never be pulled.
+imagePullPolicy: IfNotPresent
+
+# ConfigMaps created by `make k8s-config` straight from envoy/, opa/ and
+# keycloak/ in the repo. The chart mounts them and never copies their content.
+configMaps:
+  envoy: librarian-envoy            # envoy/envoy.yaml
+  egress: librarian-egress          # envoy/envoy-egress.yaml
+  opaConfig: librarian-opa-config   # opa/config.yaml
+  opaPolicy: librarian-opa-policy   # opa/policy/
+  keycloakRealm: librarian-keycloak-realm  # keycloak/realm-mnemonic.json
+
+openai:
+  # Secret holding the real OpenAI key, created by `make k8s-secret`. Only the
+  # egress pod mounts it; the services get the placeholder below.
+  existingSecret: librarian-openai
+  secretKey: api-key
+  placeholderKey: proxy-managed
+
+# DEV ONLY. The same throwaway credentials as docker-compose.yaml, rendered
+# into a Secret so no pod spec carries them in plain env values. Replace
+# before any shared deployment.
+devCredentials:
+  postgres:
+    database: mnemonic
+    user: mnemonic
+    password: mnemonic_dev
+  neo4j:
+    user: neo4j
+    password: mnemonic_dev
+  rabbitmq:
+    user: mnemonic
+    password: mnemonic_dev
+  keycloakAdmin:
+    user: admin
+    password: admin
+
+networkPolicy:
+  # Default-deny ingress and egress for the namespace plus the allows in
+  # templates/networkpolicies.yaml. Needs a CNI that enforces policy (Calico).
+  enabled: true
+  dns:
+    namespace: kube-system
+    podLabels:
+      k8s-app: kube-dns
+  # Where the egress proxy may connect (TCP 443). Private and link-local
+  # ranges, which hold the pod, service and node networks, are excluded.
+  internet:
+    cidr: 0.0.0.0/0
+    except:
+      - 10.0.0.0/8
+      - 172.16.0.0/12
+      - 192.168.0.0/16
+      - 100.64.0.0/10
+      - 169.254.0.0/16
+    port: 443
+
+# Service names are fixed: envoy/envoy.yaml and envoy-egress.yaml address
+# their upstreams by these names, exactly as on the compose network.
+
+api:
+  image: ghcr.io/twistingmercury/librarian-api:latest-dev
+  serviceName: librarian-api
+  port: 8080
+  logLevel: debug
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 500m, memory: 256Mi }
+
+mcp:
+  image: ghcr.io/twistingmercury/librarian-mcp:latest-dev
+  serviceName: librarian-mcp
+  # Health and version are served on the HTTP port, MCP on its own port.
+  port: 8080
+  mcpPort: 8081
+  logLevel: debug
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 500m, memory: 256Mi }
+
+enricher:
+  image: ghcr.io/twistingmercury/librarian-enricher:latest-dev
+  serviceName: librarian-enricher
+  port: 8080
+  logLevel: debug
+  queue: enrichment-jobs
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 500m, memory: 256Mi }
+
+envoy:
+  image: envoyproxy/envoy:v1.34.1
+  serviceName: envoy
+  apiPort: 8080
+  mcpPort: 8081
+  logLevel: info
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 500m, memory: 256Mi }
+
+egress:
+  image: envoyproxy/envoy:v1.34.1
+  serviceName: egress
+  port: 8443
+  logLevel: info
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 500m, memory: 256Mi }
+
+opa:
+  image: openpolicyagent/opa:1.4.2-envoy-static
+  serviceName: opa
+  # ext_authz gRPC port, as set in opa/config.yaml and envoy/envoy.yaml.
+  grpcPort: 9191
+  httpPort: 8181
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 500m, memory: 256Mi }
+
+keycloak:
+  image: keycloak/keycloak:26.2.5
+  serviceName: keycloak
+  port: 8080
+  managementPort: 9000
+  # Public URL clients reach Keycloak on (kubectl port-forward, see
+  # make k8s-forward). Tokens carry it as their issuer, which must match the
+  # issuer in envoy/envoy.yaml.
+  publicUrl: http://localhost:18180
+  # start-dev runs a build step (kc.sh build-and-exit) before it serves, and
+  # that step is OOM-killed below roughly 2Gi.
+  resources:
+    requests: { cpu: 250m, memory: 1Gi }
+    limits: { cpu: "2", memory: 3Gi }
+
+postgres:
+  image: ghcr.io/twistingmercury/librarian-postgres:v1.0.0-dev
+  serviceName: postgres
+  port: 5432
+  storageClass: standard
+  storage: 2Gi
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: "1", memory: 1Gi }
+
+neo4j:
+  image: ghcr.io/twistingmercury/librarian-neo4j:v1.0.0-dev
+  serviceName: neo4j
+  boltPort: 7687
+  storageClass: standard
+  storage: 2Gi
+  # Neo4j sizes itself from host memory unless told; these fit the limit.
+  heapSize: 768m
+  pageCacheSize: 256m
+  resources:
+    requests: { cpu: 250m, memory: 1Gi }
+    limits: { cpu: "2", memory: 2Gi }
+
+rabbitmq:
+  image: rabbitmq:4-management-alpine
+  serviceName: rabbitmq
+  port: 5672
+  storageClass: standard
+  storage: 1Gi
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: "1", memory: 768Mi }

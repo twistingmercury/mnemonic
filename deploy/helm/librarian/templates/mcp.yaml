@@ -1,0 +1,65 @@
+{{- $c := dict "ctx" $ "component" "mcp" }}
+{{- $v := .Values.mcp }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $v.serviceName }}
+  labels:
+    {{- include "librarian.labels" $c | nindent 4 }}
+spec:
+  selector:
+    {{- include "librarian.selectorLabels" $c | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ $v.port }}
+      targetPort: http
+    - name: mcp
+      port: {{ $v.mcpPort }}
+      targetPort: mcp
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: librarian-mcp
+  labels:
+    {{- include "librarian.labels" $c | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "librarian.selectorLabels" $c | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "librarian.labels" $c | nindent 8 }}
+      annotations:
+        checksum/credentials: {{ include (print $.Template.BasePath "/secret-dev-credentials.yaml") . | sha256sum }}
+    spec:
+      {{- include "librarian.podDefaults" . | nindent 6 }}
+      # The image sets no user; it runs as the same non-root user as the API.
+      securityContext:
+        {{- include "librarian.podSecurityContext" 65532 | nindent 8 }}
+      containers:
+        - name: mcp
+          image: {{ $v.image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          env:
+            {{- include "librarian.serviceEnv" (dict "ctx" $ "logLevel" $v.logLevel) | nindent 12 }}
+            - name: LIBRARIAN_MCP_PORT
+              value: {{ $v.mcpPort | quote }}
+          ports:
+            - name: http
+              containerPort: {{ $v.port }}
+            - name: mcp
+              containerPort: {{ $v.mcpPort }}
+          {{- include "librarian.serviceProbes" . | nindent 10 }}
+          resources:
+            {{- toYaml $v.resources | nindent 12 }}
+          securityContext:
+            {{- include "librarian.containerSecurityContext" true | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

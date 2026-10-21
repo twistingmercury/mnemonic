@@ -1,0 +1,227 @@
+# Local Librarian stack behind the gateway. Only Envoy (18080 API, 18081 MCP)
+# and Keycloak (18180) publish ports; the services, OPA and the data stores
+# are reachable only on the internal network, which has no route out. The
+# egress proxy is the one exception: it alone reaches api.openai.com, and it
+# alone holds the API key (set LIBRARIAN_OPENAI_API_KEY when starting the stack).
+#
+# The Mnemonic images are pulled from ghcr.io when missing. To run local
+# builds instead, set LIBRARIAN_API_IMAGE and LIBRARIAN_MCP_IMAGE (make build in
+# those repos tags them ghcr.io/twistingmercury/<name>:latest).
+
+services:
+  envoy:
+    image: envoyproxy/envoy:v1.34.1
+    restart: unless-stopped
+    command: ["envoy", "-c", "/etc/envoy/envoy.yaml", "--log-level", "info"]
+    volumes:
+      - ./envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
+    ports:
+      - "18080:8080"
+      - "18081:8081"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      opa:
+        condition: service_started
+      librarian-api:
+        condition: service_started
+      librarian-mcp:
+        condition: service_started
+    networks: [edge, internal]
+
+  # The only container with a route to the internet. It forwards OpenAI
+  # embedding and chat calls and holds the API key (see envoy/envoy-egress.yaml).
+  egress:
+    image: envoyproxy/envoy:v1.34.1
+    restart: unless-stopped
+    command: ["envoy", "-c", "/etc/envoy/envoy.yaml", "--log-level", "info"]
+    environment:
+      LIBRARIAN_OPENAI_API_KEY: ${LIBRARIAN_OPENAI_API_KEY:?set LIBRARIAN_OPENAI_API_KEY}
+    volumes:
+      - ./envoy/envoy-egress.yaml:/etc/envoy/envoy.yaml:ro
+    networks: [internal, egress]
+
+  opa:
+    image: openpolicyagent/opa:1.4.2-envoy-static
+    restart: unless-stopped
+    command:
+      - run
+      - --server
+      - --addr=:8181
+      - --config-file=/config/config.yaml
+      - --ignore=*_test.rego
+      - /policy
+    volumes:
+      - ./opa/config.yaml:/config/config.yaml:ro
+      - ./opa/policy:/policy:ro
+    networks: [internal]
+
+  keycloak:
+    image: keycloak/keycloak:26.2.5
+    restart: unless-stopped
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      # Tokens carry this issuer however Keycloak is reached, so tokens from
+      # the host verify at Envoy, which fetches keys over the internal network.
+      KC_HOSTNAME: http://localhost:18180
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HEALTH_ENABLED: "true"
+    volumes:
+      - ./keycloak/realm-mnemonic.json:/opt/keycloak/data/import/realm-mnemonic.json:ro
+    ports:
+      - "18180:8080"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/9000 &&
+          printf 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 &&
+          grep -q '"status": "UP"' <&3
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    networks: [edge, internal]
+
+  librarian-api:
+    image: ${LIBRARIAN_API_IMAGE:-ghcr.io/twistingmercury/librarian-api:latest-dev}
+    pull_policy: missing
+    restart: unless-stopped
+    environment:
+      LIBRARIAN_DATABASE_POSTGRES_HOST: postgres
+      LIBRARIAN_DATABASE_POSTGRES_PASSWORD: mnemonic_dev
+      LIBRARIAN_DATABASE_POSTGRES_SSL_MODE: disable
+      LIBRARIAN_DATABASE_NEO4J_URI: bolt://neo4j:7687
+      LIBRARIAN_DATABASE_NEO4J_PASSWORD: mnemonic_dev
+      LIBRARIAN_OPENAI_API_KEY: proxy-managed
+      LIBRARIAN_OPENAI_BASE_URL: http://egress:8443/v1
+      LIBRARIAN_LOGGING_LEVEL: debug
+      LIBRARIAN_QUEUE_RABBITMQ_HOST: rabbitmq
+      LIBRARIAN_QUEUE_RABBITMQ_USER: mnemonic
+      LIBRARIAN_QUEUE_RABBITMQ_PASSWORD: mnemonic_dev
+    depends_on:
+      egress:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks: [internal]
+
+  librarian-mcp:
+    image: ${LIBRARIAN_MCP_IMAGE:-ghcr.io/twistingmercury/librarian-mcp:latest-dev}
+    pull_policy: missing
+    restart: unless-stopped
+    environment:
+      LIBRARIAN_DATABASE_POSTGRES_HOST: postgres
+      LIBRARIAN_DATABASE_POSTGRES_PASSWORD: mnemonic_dev
+      LIBRARIAN_DATABASE_POSTGRES_SSL_MODE: disable
+      LIBRARIAN_DATABASE_NEO4J_URI: bolt://neo4j:7687
+      LIBRARIAN_DATABASE_NEO4J_PASSWORD: mnemonic_dev
+      LIBRARIAN_OPENAI_API_KEY: proxy-managed
+      LIBRARIAN_OPENAI_BASE_URL: http://egress:8443/v1
+      LIBRARIAN_MCP_PORT: 8081
+      LIBRARIAN_LOGGING_LEVEL: debug
+    depends_on:
+      egress:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    networks: [internal]
+
+  librarian-enricher:
+    image: ${LIBRARIAN_ENRICHER_IMAGE:-ghcr.io/twistingmercury/librarian-enricher:latest-dev}
+    pull_policy: missing
+    restart: unless-stopped
+    environment:
+      LIBRARIAN_DATABASE_POSTGRES_HOST: postgres
+      LIBRARIAN_DATABASE_POSTGRES_PASSWORD: mnemonic_dev
+      LIBRARIAN_DATABASE_POSTGRES_SSL_MODE: disable
+      LIBRARIAN_DATABASE_NEO4J_URI: bolt://neo4j:7687
+      LIBRARIAN_DATABASE_NEO4J_PASSWORD: mnemonic_dev
+      LIBRARIAN_OPENAI_API_KEY: proxy-managed
+      LIBRARIAN_OPENAI_BASE_URL: http://egress:8443/v1
+      LIBRARIAN_LOGGING_LEVEL: debug
+      LIBRARIAN_QUEUE_PROVIDER: rabbitmq
+      LIBRARIAN_QUEUE_RABBITMQ_HOST: rabbitmq
+      LIBRARIAN_QUEUE_RABBITMQ_USER: mnemonic
+      LIBRARIAN_QUEUE_RABBITMQ_PASSWORD: mnemonic_dev
+      LIBRARIAN_QUEUE_RABBITMQ_QUEUE: enrichment-jobs
+    depends_on:
+      egress:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks: [internal]
+
+  postgres:
+    image: ghcr.io/twistingmercury/librarian-postgres:v1.0.0-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mnemonic
+      POSTGRES_USER: mnemonic
+      POSTGRES_PASSWORD: mnemonic_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mnemonic"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [internal]
+
+  neo4j:
+    image: ghcr.io/twistingmercury/librarian-neo4j:v1.0.0-dev
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: neo4j/mnemonic_dev
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+      NEO4J_dbms_security_procedures_allowlist: apoc.*
+    # Neo4j needs about 10s to stop; the default 10s grace period ends in SIGKILL.
+    stop_grace_period: 30s
+    volumes:
+      - neo4j_data:/data
+    # The marker file is written once the image has applied its schema, so
+    # dependents never start against a database without its constraints.
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/schema_ready && cypher-shell -u neo4j -p mnemonic_dev 'RETURN 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [internal]
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: mnemonic
+      RABBITMQ_DEFAULT_PASS: mnemonic_dev
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [internal]
+
+volumes:
+  postgres_data:
+  neo4j_data:
+
+networks:
+  # Published ports attach here.
+  edge:
+  # Only the egress proxy attaches here, to reach api.openai.com.
+  egress:
+  # No route out of the stack; services are reachable only from Envoy.
+  internal:
+    internal: true

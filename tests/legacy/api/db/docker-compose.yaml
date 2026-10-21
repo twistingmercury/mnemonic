@@ -1,0 +1,21 @@
+# Postgres only, for tests tagged `integration`. The image ships the schema
+# pre-applied, so no migration step is needed.
+#
+# Port 5435 and a named project keep this clear of the dev stack on 5432 and of
+# any other compose project on this machine. No volume is declared: every run
+# starts from an empty database, so tests cannot pass on rows a previous run
+# left behind.
+services:
+  postgres:
+    image: ghcr.io/twistingmercury/librarian-postgres:v1.0.0-dev
+    environment:
+      POSTGRES_DB: mnemonic
+      POSTGRES_USER: mnemonic
+      POSTGRES_PASSWORD: mnemonic_test
+    ports:
+      - "15435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mnemonic -d mnemonic"]
+      interval: 2s
+      timeout: 3s
+      retries: 30

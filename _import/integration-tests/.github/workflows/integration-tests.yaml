@@ -1,0 +1,46 @@
+name: Integration Tests
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+    branches:
+      - develop
+      - main
+  schedule:
+    - cron: "0 0 * * *" # midnight UTC daily
+  workflow_dispatch:
+
+jobs:
+  integration-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Compose directly rather than make test, so the stack is still up for
+      # the diagnostics step when a test fails.
+      - name: Run integration tests
+        run: docker compose -f docker-compose.yaml up --build --abort-on-container-exit --exit-code-from librarian_tests
+
+      - name: Capture Compose diagnostics
+        if: failure()
+        run: |
+          docker compose -f docker-compose.yaml ps
+          docker compose -f docker-compose.yaml logs --no-color
+
+      - name: Tear down Compose stack
+        if: always()
+        run: docker compose -f docker-compose.yaml down -v --remove-orphans

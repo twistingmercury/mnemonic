@@ -1,0 +1,53 @@
+# Ignore any file or directory whose name starts with an underscore
+**/_*
+**/log*
+**/plan*
+**/settings.local.json
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.fuse_hidden*
+.nfs*
+.directory
+.Trash-*
+
+# Editors and IDEs
+.vscode/
+.vscode-test/
+.idea/
+*.iml
+*.ipr
+*.iws
+*.suo
+*.user
+*.userossc
+*.sln.docstates
+*.swp
+*.swo
+*.tmp
+*.kate-swp
+*~
+\#*\#
+.project
+.classpath
+.settings/
+.metadata/
+
+# Code reviews (local only)
+**/code-reviews/
+**/code_reviews/

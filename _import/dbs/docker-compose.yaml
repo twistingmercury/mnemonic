@@ -1,0 +1,97 @@
+# This docker compose file is used to run mnemonic locally so it can be developed against.
+
+services:
+  dev_postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mnemonic
+      POSTGRES_USER: mnemonic
+      POSTGRES_PASSWORD: mnemonic_dev
+    ports:
+      - "15433:5432"
+    volumes:
+      - dev_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mnemonic"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dev_network
+
+  migrate:
+    image: migrate/migrate
+    depends_on:
+      dev_postgres:
+        condition: service_healthy
+    volumes:
+      - ./src/migrations/postgres:/migrations:ro
+    command:
+      - "-path=/migrations"
+      - "-database=postgres://mnemonic:mnemonic_dev@dev_postgres:5432/mnemonic?sslmode=disable"
+      - "up"
+    networks:
+      - dev_network
+
+  dev_neo4j:
+    image: neo4j:5
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: neo4j/mnemonic_dev
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+      NEO4J_dbms_security_procedures_allowlist: apoc.*
+    ports:
+      - "17475:7474"
+      - "17688:7687"
+    volumes:
+      - dev_neo4j_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p mnemonic_dev 'RETURN 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dev_network
+
+  dev_api:
+    image: ghcr.io/twistingmercury/librarian-mcp:latest-dev
+    pull_policy: always
+    restart: unless-stopped
+    ports:
+      - "18080:8080"
+      - "18081:8081"
+      - "19090:9090"
+    environment:
+      LIBRARIAN_DATABASE_POSTGRES_HOST: dev_postgres
+      LIBRARIAN_DATABASE_POSTGRES_PASSWORD: mnemonic_dev
+      LIBRARIAN_DATABASE_POSTGRES_SSL_MODE: disable
+      LIBRARIAN_DATABASE_NEO4J_URI: bolt://dev_neo4j:7687
+      LIBRARIAN_DATABASE_NEO4J_PASSWORD: mnemonic_dev
+      LIBRARIAN_OPENAI_API_KEY: ${LIBRARIAN_OPENAI_API_KEY}
+      LIBRARIAN_MCP_PORT: 8081
+      LIBRARIAN_MCP_DEFAULT_SEARCH_THRESHOLD: 0.5
+      LIBRARIAN_LOGGING_LEVEL: debug
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      dev_neo4j:
+        condition: service_healthy
+      dev_postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/mnemonic", "--health"]
+      interval: 2s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dev_network
+
+volumes:
+  dev_postgres_data:
+  dev_neo4j_data:
+
+networks:
+  dev_network:
+    driver: bridge

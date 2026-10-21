@@ -1,0 +1,105 @@
+{{- $c := dict "ctx" $ "component" "postgres" }}
+{{- $v := .Values.postgres }}
+{{- $secret := include "librarian.credentialsSecret" . }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $v.serviceName }}
+  labels:
+    {{- include "librarian.labels" $c | nindent 4 }}
+spec:
+  selector:
+    {{- include "librarian.selectorLabels" $c | nindent 4 }}
+  ports:
+    - name: postgres
+      port: {{ $v.port }}
+      targetPort: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  labels:
+    {{- include "librarian.labels" $c | nindent 4 }}
+spec:
+  serviceName: {{ $v.serviceName }}
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "librarian.selectorLabels" $c | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "librarian.labels" $c | nindent 8 }}
+      annotations:
+        checksum/credentials: {{ include (print $.Template.BasePath "/secret-dev-credentials.yaml") . | sha256sum }}
+    spec:
+      {{- include "librarian.podDefaults" . | nindent 6 }}
+      # The image's entrypoint runs fine as the postgres user (999) when it
+      # owns the data directory, so it never needs root or gosu.
+      securityContext:
+        {{- include "librarian.podSecurityContext" 999 | nindent 8 }}
+      containers:
+        - name: postgres
+          image: {{ $v.image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef: { name: {{ $secret }}, key: postgres-database }
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef: { name: {{ $secret }}, key: postgres-user }
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: {{ $secret }}, key: postgres-password }
+            # A subdirectory, because initdb needs a directory it creates
+            # itself (mode 0700), not the volume root.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - name: postgres
+              containerPort: 5432
+          # TCP on purpose: during first-start init the server listens only on
+          # its Unix socket, so this stays not-ready until the schema is in.
+          startupProbe:
+            exec:
+              command: ["sh", "-c", 'pg_isready -h 127.0.0.1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}"']
+            periodSeconds: 3
+            failureThreshold: 60
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", 'pg_isready -h 127.0.0.1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}"']
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: postgres }
+            periodSeconds: 20
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml $v.resources | nindent 12 }}
+          securityContext:
+            {{- include "librarian.containerSecurityContext" true | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: run
+              mountPath: /var/run/postgresql
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: run
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "librarian.selectorLabels" $c | nindent 10 }}
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: {{ $v.storageClass }}
+        resources:
+          requests:
+            storage: {{ $v.storage }}
