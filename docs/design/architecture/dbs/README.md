@@ -1,3 +1,9 @@
+---
+version: 1
+date: 2026-10-21
+notes: "Imported from librarian-docs; title and back-link updated for the monorepo."
+---
+
 # Database Images Architecture
 
 > Back to [Design Index](../../README.md)

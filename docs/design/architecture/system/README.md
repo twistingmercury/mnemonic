@@ -1,3 +1,9 @@
+---
+version: 1
+date: 2026-10-21
+notes: "Imported from librarian-docs; design-docs location and back-link updated for the monorepo."
+---
+
 # Architecture
 
 > Back to [Design Index](../../README.md)

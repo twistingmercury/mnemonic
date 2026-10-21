@@ -1,3 +1,9 @@
+---
+version: 1
+date: 2026-10-21
+notes: "Imported from librarian-docs; service names, code paths and E2E wording updated for the monorepo; metric names unchanged."
+---
+
 # Observability Implementation Design
 
 > Back to [Design Documents](README.md)

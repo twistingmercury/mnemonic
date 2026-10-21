@@ -1,3 +1,9 @@
+---
+version: 1
+date: 2026-10-21
+notes: "Imported from librarian-docs; service, db/ and image names updated for the monorepo."
+---
+
 # Data Architecture
 
 > Back to [System Architecture](README.md) | [Design Index](../../README.md)

@@ -1,3 +1,9 @@
+---
+version: 1
+date: 2026-10-21
+notes: "Imported from librarian-docs; paths and image names moved to db/ and librarian-*; CI and tag text marked as not yet ported to the monorepo."
+---
+
 # Database Images — Deployment Architecture
 
 > Back to [Database Architecture](README.md) | [Design Index](../../README.md)

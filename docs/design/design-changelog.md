@@ -1,3 +1,9 @@
+---
+version: 1
+date: 2026-10-21
+notes: "Imported from librarian-docs; repo wording updated for the monorepo; history entries otherwise unchanged."
+---
+
 # Mnemonic Design Change Log
 
 > Back to [Design Documents](README.md)

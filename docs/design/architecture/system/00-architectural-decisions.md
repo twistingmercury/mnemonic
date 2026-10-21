@@ -1,3 +1,9 @@
+---
+version: 1
+date: 2026-10-21
+notes: "Imported from librarian-docs; service references updated for the monorepo, ADR history kept; back-link repointed."
+---
+
 # Architectural Decisions
 
 > Back to [System Architecture](README.md) | [Design Index](../../README.md)

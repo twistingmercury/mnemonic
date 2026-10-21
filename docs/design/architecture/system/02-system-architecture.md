@@ -1,3 +1,9 @@
+---
+version: 1
+date: 2026-10-21
+notes: "Imported from librarian-docs; repository column replaced with source paths; service names and admin UI label updated."
+---
+
 # System Architecture
 
 > Back to [System Architecture](README.md) | [Design Index](../../README.md)

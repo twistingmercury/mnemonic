@@ -1,3 +1,9 @@
+---
+version: 1
+date: 2026-10-21
+notes: "Imported from librarian-docs; service name and links updated for the monorepo."
+---
+
 # Mnemonic Service Architecture
 
 > Back to [Design Index](../../README.md)

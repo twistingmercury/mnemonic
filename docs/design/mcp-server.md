@@ -1,3 +1,9 @@
+---
+version: 1
+date: 2026-10-21
+notes: "Imported from librarian-docs; service names and code paths updated for the monorepo."
+---
+
 # MCP Server Implementation Design
 
 > Back to [Design Documents](README.md)

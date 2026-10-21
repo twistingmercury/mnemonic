@@ -1,3 +1,9 @@
+---
+version: 1
+date: 2026-10-21
+notes: "Imported from librarian-docs; repository, service and db/ references updated for the monorepo."
+---
+
 # Data Storage Implementation
 
 > Back to [Design Documents](README.md)

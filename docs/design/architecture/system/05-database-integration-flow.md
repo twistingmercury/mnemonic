@@ -1,3 +1,9 @@
+---
+version: 1
+date: 2026-10-21
+notes: "Imported from librarian-docs; db/ references updated; admin UI noted as not part of this repository for now."
+---
+
 # Database Integration Flow
 
 > Back to [System Architecture](README.md) | [Design Index](../../README.md)

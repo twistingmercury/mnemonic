@@ -1,3 +1,9 @@
+---
+version: 1
+date: 2026-10-21
+notes: "Imported from librarian-docs; build script paths changed to build/<service>/; CI description marked as the former per-repo workflow, not yet in the monorepo."
+---
+
 # Build Pipeline Diagram
 
 > Back to [Design Index](../README.md)

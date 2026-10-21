@@ -1,3 +1,9 @@
+---
+version: 1
+date: 2026-10-21
+notes: "Imported from librarian-docs; service names, headings and code paths updated for the monorepo; config keys and env names unchanged."
+---
+
 # Mnemonic Server Configuration
 
 > Back to [Design Documents](README.md)

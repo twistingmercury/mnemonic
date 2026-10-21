@@ -1,3 +1,9 @@
+---
+version: 1
+date: 2026-10-21
+notes: "Imported from librarian-docs; service names updated; admin UI noted as not part of this repository for now."
+---
+
 # Security Architecture
 
 > Back to [System Architecture](README.md) | [Design Index](../../README.md)

@@ -1,3 +1,9 @@
+---
+version: 1
+date: 2026-10-21
+notes: "Imported from librarian-docs; compose, pipeline and service references rewritten for the monorepo; admin UI noted as not part of this repository for now."
+---
+
 # Deployment Architecture
 
 > Back to [System Architecture](README.md) | [Design Index](../../README.md)

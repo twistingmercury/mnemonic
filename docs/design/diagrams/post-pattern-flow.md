@@ -1,3 +1,9 @@
+---
+version: 1
+date: 2026-10-21
+notes: "Imported from librarian-docs; service names and source paths updated for the monorepo."
+---
+
 # POST /v1/api/patterns — Activity Diagram
 
 > Back to [Design Index](../README.md)

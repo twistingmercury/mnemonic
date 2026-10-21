@@ -1,3 +1,9 @@
+---
+version: 1
+date: 2026-10-21
+notes: "Imported from librarian-docs; service versions, service names and back-link updated for the monorepo."
+---
+
 # Mnemonic Requirements
 
 > Back to [Design Index](README.md)

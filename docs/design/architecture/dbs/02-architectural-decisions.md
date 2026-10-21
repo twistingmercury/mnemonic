@@ -1,3 +1,9 @@
+---
+version: 1
+date: 2026-10-21
+notes: "Imported from librarian-docs; ADR-002 marked superseded by the monorepo, history kept; repo references updated."
+---
+
 # Database Images — Architectural Decisions
 
 > Back to [Database Architecture](README.md) | [Design Index](../../README.md)

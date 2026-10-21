@@ -1,3 +1,9 @@
+---
+version: 1
+date: 2026-10-21
+notes: "Imported from librarian-docs; service names in sequence labels updated; service.name values unchanged."
+---
+
 # Observability Architecture
 
 > Back to [System Architecture](README.md) | [Design Index](../../README.md)

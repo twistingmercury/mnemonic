@@ -1,3 +1,9 @@
+---
+version: 1
+date: 2026-10-21
+notes: "Imported from librarian-docs; back-link and relative links updated."
+---
+
 # MVP 1
 
 > Back to [Design Index](../README.md)

@@ -1,3 +1,9 @@
+---
+version: 1
+date: 2026-10-21
+notes: "Owner's design document copied into docs/design; frontmatter added only."
+---
+
 # Mnemonic: From Coding Patterns to Any Knowledge
 
 Oct 17, 2026 · @Jeremy Johnson

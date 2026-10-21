@@ -1,3 +1,9 @@
+---
+version: 1
+date: 2026-10-21
+notes: "Imported from librarian-docs; design index rewritten for the monorepo, admin pages removed from the list, navigation limited to pages that exist."
+---
+
 # Design Documents
 
 Implementation-level design documents covering cross-cutting concerns shared by the Go services (the mcp, api and enricher services under `src/`). These docs describe _how_ things are built. For _what_ and _why_, see the [architecture documents](architecture/system/README.md).

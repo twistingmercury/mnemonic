@@ -1,3 +1,9 @@
+---
+version: 1
+date: 2026-10-21
+notes: "Imported from librarian-docs; service names and db/ test paths updated for the monorepo."
+---
+
 # Database Images — Data Architecture
 
 > Back to [Database Architecture](README.md) | [Design Index](../../README.md)
