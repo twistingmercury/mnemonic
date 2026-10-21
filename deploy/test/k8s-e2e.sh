@@ -1,28 +1,28 @@
 #!/usr/bin/env bash
-# k8s-e2e.sh: end-to-end and isolation checks for the Librarian chart on the
-# librarian minikube profile. Talks to the gateway through the port-forwards
+# k8s-e2e.sh: end-to-end and isolation checks for the Mnemonic chart on the
+# mnemonic minikube profile. Talks to the gateway through the port-forwards
 # from `make k8s-forward`, enriches with the real OpenAI API through the egress
 # proxy, and proves the NetworkPolicies are enforced with short-lived probe
 # pods. Every isolation check has a positive control, so a probe that cannot
 # reach anything never passes as "blocked".
 #
-# Usage: make k8s-test, or KUBE_CONTEXT=librarian deploy/test/k8s-e2e.sh
+# Usage: make k8s-test, or KUBE_CONTEXT=mnemonic deploy/test/k8s-e2e.sh
 
 set -euo pipefail
 
-KUBE_CONTEXT="${KUBE_CONTEXT:-librarian}"
-NAMESPACE="${NAMESPACE:-librarian}"
-RELEASE="${RELEASE:-librarian}"
-API_URL="${API_URL:-http://localhost:18080}"
-MCP_URL="${MCP_URL:-http://localhost:18081}"
-KEYCLOAK_URL="${KEYCLOAK_URL:-http://localhost:18180}"
+KUBE_CONTEXT="${KUBE_CONTEXT:-mnemonic}"
+NAMESPACE="${NAMESPACE:-mnemonic}"
+RELEASE="${RELEASE:-mnemonic}"
+API_URL="${API_URL:-http://localhost:8080}"
+MCP_URL="${MCP_URL:-http://localhost:8081}"
+KEYCLOAK_URL="${KEYCLOAK_URL:-http://localhost:8180}"
 PROBE_IMAGE="${PROBE_IMAGE:-curlimages/curl:8.10.1}"
-OPENAI_SECRET="${OPENAI_SECRET:-librarian-openai}"
+OPENAI_SECRET="${OPENAI_SECRET:-mnemonic-openai}"
 ENRICH_ATTEMPTS="${ENRICH_ATTEMPTS:-45}"
 EXPECTED_PODS="${EXPECTED_PODS:-10}"
 
 readonly MCP_PROTOCOL="2026-07-28"
-readonly PROBE_LABEL="librarian-e2e=probe"
+readonly PROBE_LABEL="mnemonic-e2e=probe"
 readonly TEST_PATTERNS="retry-with-backoff circuit-breaker table-driven-tests retry-with-jitter"
 readonly INTERNET_URL="https://api.openai.com/v1/models"
 
@@ -324,7 +324,7 @@ check_stack() {
     local policy
 
     section "1. stack ready"
-    ready_count=$(kube get pods -l "app.kubernetes.io/instance=${RELEASE},app.kubernetes.io/name=librarian" -o json \
+    ready_count=$(kube get pods -l "app.kubernetes.io/instance=${RELEASE},app.kubernetes.io/name=mnemonic" -o json \
         | jq '[.items[] | select(.status.conditions[]? | .type == "Ready" and .status == "True")] | length')
     check_equal "${EXPECTED_PODS} pods Ready" "${ready_count}" "${EXPECTED_PODS}"
 
@@ -438,7 +438,7 @@ related_threshold() {
     local value
 
     value=$(kube get deploy -l "app.kubernetes.io/instance=${RELEASE},app.kubernetes.io/component=enricher" \
-        -o jsonpath='{.items[0].spec.template.spec.containers[0].env[?(@.name=="LIBRARIAN_ENRICHMENT_RELATED_TO_MIN_SIMILARITY")].value}')
+        -o jsonpath='{.items[0].spec.template.spec.containers[0].env[?(@.name=="MNEMONIC_ENRICHMENT_RELATED_TO_MIN_SIMILARITY")].value}')
 
     printf '%s' "${value:-0.3}"
 }
@@ -518,7 +518,7 @@ check_key_handling() {
     for component in api mcp enricher; do
         pod=$(pod_for "${component}")
         key_value=$(kube get pod "${pod}" \
-            -o jsonpath='{.spec.containers[0].env[?(@.name=="LIBRARIAN_OPENAI_API_KEY")].value}')
+            -o jsonpath='{.spec.containers[0].env[?(@.name=="MNEMONIC_OPENAI_API_KEY")].value}')
         check_equal "${component} holds the placeholder key only" "${key_value}" "proxy-managed"
     done
 
@@ -531,7 +531,7 @@ check_key_handling() {
     check_equal "only the egress pod references Secret ${OPENAI_SECRET}" "${holders% }" "egress"
 
     egress_ref=$(kube get pod "$(pod_for egress)" \
-        -o jsonpath='{.spec.containers[0].env[?(@.name=="LIBRARIAN_OPENAI_API_KEY")].valueFrom.secretKeyRef.name}')
+        -o jsonpath='{.spec.containers[0].env[?(@.name=="MNEMONIC_OPENAI_API_KEY")].valueFrom.secretKeyRef.name}')
     check_equal "egress reads the key from the Secret" "${egress_ref}" "${OPENAI_SECRET}"
 
     return 0
@@ -563,7 +563,7 @@ check_isolation_unlabelled() {
 
     section "9b. a pod without the chart's labels reaches no service"
     results=$(run_probe "" http://envoy:8080/version http://postgres:5432/ http://neo4j:7687/ \
-        http://rabbitmq:5672/ http://librarian-api:8080/version http://librarian-mcp:8081/ \
+        http://rabbitmq:5672/ http://mnemonic-api:8080/version http://mnemonic-mcp:8081/ \
         http://egress:8443/v1/embeddings http://opa:9191/ http://keycloak:8080/)
     # No positive control here: namespace egress is default-deny, so a pod with
     # no chart labels is not allowed to reach anything, the envoy edge included
@@ -574,8 +574,8 @@ check_isolation_unlabelled() {
     expect_flow "unlabelled -> postgres blocked" "${results}" http://postgres:5432/ blocked
     expect_flow "unlabelled -> neo4j blocked" "${results}" http://neo4j:7687/ blocked
     expect_flow "unlabelled -> rabbitmq blocked" "${results}" http://rabbitmq:5672/ blocked
-    expect_flow "unlabelled -> librarian-api blocked" "${results}" http://librarian-api:8080/version blocked
-    expect_flow "unlabelled -> librarian-mcp blocked" "${results}" http://librarian-mcp:8081/ blocked
+    expect_flow "unlabelled -> mnemonic-api blocked" "${results}" http://mnemonic-api:8080/version blocked
+    expect_flow "unlabelled -> mnemonic-mcp blocked" "${results}" http://mnemonic-mcp:8081/ blocked
     expect_flow "unlabelled -> egress proxy blocked" "${results}" http://egress:8443/v1/embeddings blocked
     expect_flow "unlabelled -> opa blocked" "${results}" http://opa:9191/ blocked
     expect_flow "unlabelled -> keycloak blocked" "${results}" http://keycloak:8080/ blocked
@@ -588,24 +588,24 @@ check_isolation_services() {
 
     section "9c. the services reach only their own dependencies"
     results=$(run_probe "$(labels_for api)" http://postgres:5432/ http://rabbitmq:5672/ \
-        http://librarian-mcp:8081/ http://librarian-enricher:8080/health)
+        http://mnemonic-mcp:8081/ http://mnemonic-enricher:8080/health)
     expect_flow "control: api-labelled pod reaches postgres" "${results}" http://postgres:5432/ reachable
     expect_flow "control: api-labelled pod reaches rabbitmq" "${results}" http://rabbitmq:5672/ reachable
-    expect_flow "api -> librarian-mcp blocked" "${results}" http://librarian-mcp:8081/ blocked
-    expect_flow "api -> librarian-enricher blocked" "${results}" http://librarian-enricher:8080/health blocked
+    expect_flow "api -> mnemonic-mcp blocked" "${results}" http://mnemonic-mcp:8081/ blocked
+    expect_flow "api -> mnemonic-enricher blocked" "${results}" http://mnemonic-enricher:8080/health blocked
 
-    results=$(run_probe "$(labels_for mcp)" http://neo4j:7687/ http://librarian-api:8080/version \
-        http://librarian-enricher:8080/health http://rabbitmq:5672/)
+    results=$(run_probe "$(labels_for mcp)" http://neo4j:7687/ http://mnemonic-api:8080/version \
+        http://mnemonic-enricher:8080/health http://rabbitmq:5672/)
     expect_flow "control: mcp-labelled pod reaches neo4j" "${results}" http://neo4j:7687/ reachable
-    expect_flow "mcp -> librarian-api blocked" "${results}" http://librarian-api:8080/version blocked
-    expect_flow "mcp -> librarian-enricher blocked" "${results}" http://librarian-enricher:8080/health blocked
+    expect_flow "mcp -> mnemonic-api blocked" "${results}" http://mnemonic-api:8080/version blocked
+    expect_flow "mcp -> mnemonic-enricher blocked" "${results}" http://mnemonic-enricher:8080/health blocked
     expect_flow "mcp -> rabbitmq blocked (MCP is read-only)" "${results}" http://rabbitmq:5672/ blocked
 
-    results=$(run_probe "$(labels_for enricher)" http://egress:8443/v1/models http://librarian-api:8080/version \
-        http://librarian-mcp:8081/)
+    results=$(run_probe "$(labels_for enricher)" http://egress:8443/v1/models http://mnemonic-api:8080/version \
+        http://mnemonic-mcp:8081/)
     expect_flow "control: enricher-labelled pod reaches the egress proxy" "${results}" http://egress:8443/v1/models reachable
-    expect_flow "enricher -> librarian-api blocked" "${results}" http://librarian-api:8080/version blocked
-    expect_flow "enricher -> librarian-mcp blocked" "${results}" http://librarian-mcp:8081/ blocked
+    expect_flow "enricher -> mnemonic-api blocked" "${results}" http://mnemonic-api:8080/version blocked
+    expect_flow "enricher -> mnemonic-mcp blocked" "${results}" http://mnemonic-mcp:8081/ blocked
 
     return 0
 }
