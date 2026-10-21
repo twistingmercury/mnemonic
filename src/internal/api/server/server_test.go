@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/twistingmercury/librarian/internal/api/config"
+	"github.com/twistingmercury/mnemonic/internal/api/config"
 )
 
 func TestCreateHTTPServerUsesAdminAPIConfiguration(t *testing.T) {

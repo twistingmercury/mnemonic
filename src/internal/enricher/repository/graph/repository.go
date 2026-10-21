@@ -15,7 +15,7 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/twistingmercury/librarian/internal/enricher/metrics"
+	"github.com/twistingmercury/mnemonic/internal/enricher/metrics"
 )
 
 var tracer = otel.Tracer("mnemonic/neo4j")

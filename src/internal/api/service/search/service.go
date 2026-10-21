@@ -11,10 +11,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
-	"github.com/twistingmercury/librarian/internal/api/metrics"
-	chunkrepo "github.com/twistingmercury/librarian/internal/api/repository/chunk"
-	"github.com/twistingmercury/librarian/internal/api/service"
-	openaisvc "github.com/twistingmercury/librarian/internal/api/service/openai"
+	"github.com/twistingmercury/mnemonic/internal/api/metrics"
+	chunkrepo "github.com/twistingmercury/mnemonic/internal/api/repository/chunk"
+	"github.com/twistingmercury/mnemonic/internal/api/service"
+	openaisvc "github.com/twistingmercury/mnemonic/internal/api/service/openai"
 )
 
 // Service handles semantic search over patterns.

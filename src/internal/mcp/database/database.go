@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	neo4jcfg "github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
-	"github.com/twistingmercury/librarian/internal/mcp/config"
+	"github.com/twistingmercury/mnemonic/internal/mcp/config"
 )
 
 // NewPostgresPool creates a pgxpool.Pool configured from the provided PostgresConfig.

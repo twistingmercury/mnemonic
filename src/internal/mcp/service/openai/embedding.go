@@ -15,7 +15,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/twistingmercury/librarian/internal/mcp/config"
+	"github.com/twistingmercury/mnemonic/internal/mcp/config"
 )
 
 // ErrEmbeddingFailed is returned when embedding generation fails after all retries.

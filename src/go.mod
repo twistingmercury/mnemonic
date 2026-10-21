@@ -1,4 +1,4 @@
-module github.com/twistingmercury/librarian
+module github.com/twistingmercury/mnemonic
 
 go 1.27.3
 

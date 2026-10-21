@@ -6,7 +6,7 @@ import (
 
 	"github.com/exaring/otelpgx"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/twistingmercury/librarian/internal/api/config"
+	"github.com/twistingmercury/mnemonic/internal/api/config"
 )
 
 // NewPostgresPool creates a pgxpool.Pool configured from the provided PostgresConfig.

@@ -12,12 +12,12 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
-	"github.com/twistingmercury/librarian/internal/enricher/config"
-	chunkrepo "github.com/twistingmercury/librarian/internal/enricher/repository/chunk"
-	enrichmentjob "github.com/twistingmercury/librarian/internal/enricher/repository/enrichmentjob"
-	graphrepo "github.com/twistingmercury/librarian/internal/enricher/repository/graph"
-	patternrepo "github.com/twistingmercury/librarian/internal/enricher/repository/pattern"
-	openaisvc "github.com/twistingmercury/librarian/internal/enricher/service/openai"
+	"github.com/twistingmercury/mnemonic/internal/enricher/config"
+	chunkrepo "github.com/twistingmercury/mnemonic/internal/enricher/repository/chunk"
+	enrichmentjob "github.com/twistingmercury/mnemonic/internal/enricher/repository/enrichmentjob"
+	graphrepo "github.com/twistingmercury/mnemonic/internal/enricher/repository/graph"
+	patternrepo "github.com/twistingmercury/mnemonic/internal/enricher/repository/pattern"
+	openaisvc "github.com/twistingmercury/mnemonic/internal/enricher/service/openai"
 )
 
 // ErrJobFailed is returned by ProcessJob when a pipeline step failed and the

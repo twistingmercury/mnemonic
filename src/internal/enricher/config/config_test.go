@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/twistingmercury/librarian/internal/enricher/config"
+	"github.com/twistingmercury/mnemonic/internal/enricher/config"
 )
 
 // TestDefaultValues verifies that all default values are set correctly.
@@ -178,10 +178,10 @@ openai:
 `
 
 	// Set environment variables to override
-	t.Setenv("LIBRARIAN_SERVER_HOST", "env-host")
-	t.Setenv("LIBRARIAN_SERVER_PORT", "8888")
-	t.Setenv("LIBRARIAN_DATABASE_POSTGRES_PASSWORD", "envpassword")
-	t.Setenv("LIBRARIAN_LOGGING_LEVEL", "error")
+	t.Setenv("MNEMONIC_SERVER_HOST", "env-host")
+	t.Setenv("MNEMONIC_SERVER_PORT", "8888")
+	t.Setenv("MNEMONIC_DATABASE_POSTGRES_PASSWORD", "envpassword")
+	t.Setenv("MNEMONIC_LOGGING_LEVEL", "error")
 
 	cfg, err := loadFromYAML(t, configContent)
 	require.NoError(t, err)
@@ -207,7 +207,7 @@ func TestEnvironmentVariableNaming(t *testing.T) {
 	}{
 		{
 			name:   "server.port",
-			envVar: "LIBRARIAN_SERVER_PORT",
+			envVar: "MNEMONIC_SERVER_PORT",
 			value:  "3000",
 			check: func(t *testing.T, cfg *config.MnemonicConfig) {
 				assert.Equal(t, 3000, cfg.Server.Port)
@@ -215,7 +215,7 @@ func TestEnvironmentVariableNaming(t *testing.T) {
 		},
 		{
 			name:   "database.postgres.max_open_conns",
-			envVar: "LIBRARIAN_DATABASE_POSTGRES_MAX_OPEN_CONNS",
+			envVar: "MNEMONIC_DATABASE_POSTGRES_MAX_OPEN_CONNS",
 			value:  "50",
 			check: func(t *testing.T, cfg *config.MnemonicConfig) {
 				assert.Equal(t, int32(50), cfg.Database.Postgres.MaxOpenConns)
@@ -223,7 +223,7 @@ func TestEnvironmentVariableNaming(t *testing.T) {
 		},
 		{
 			name:   "database.neo4j.max_connection_pool_size",
-			envVar: "LIBRARIAN_DATABASE_NEO4J_MAX_CONNECTION_POOL_SIZE",
+			envVar: "MNEMONIC_DATABASE_NEO4J_MAX_CONNECTION_POOL_SIZE",
 			value:  "100",
 			check: func(t *testing.T, cfg *config.MnemonicConfig) {
 				assert.Equal(t, 100, cfg.Database.Neo4j.MaxConnectionPoolSize)
@@ -231,7 +231,7 @@ func TestEnvironmentVariableNaming(t *testing.T) {
 		},
 		{
 			name:   "openai.api_key",
-			envVar: "LIBRARIAN_OPENAI_API_KEY",
+			envVar: "MNEMONIC_OPENAI_API_KEY",
 			value:  "sk-test-123",
 			check: func(t *testing.T, cfg *config.MnemonicConfig) {
 				assert.Equal(t, "sk-test-123", cfg.OpenAI.APIKey)
@@ -239,7 +239,7 @@ func TestEnvironmentVariableNaming(t *testing.T) {
 		},
 		{
 			name:   "enrichment.related_to_min_similarity",
-			envVar: "LIBRARIAN_ENRICHMENT_RELATED_TO_MIN_SIMILARITY",
+			envVar: "MNEMONIC_ENRICHMENT_RELATED_TO_MIN_SIMILARITY",
 			value:  "0.7",
 			check: func(t *testing.T, cfg *config.MnemonicConfig) {
 				assert.Equal(t, 0.7, cfg.Enrichment.RelatedToMinSimilarity)
@@ -247,7 +247,7 @@ func TestEnvironmentVariableNaming(t *testing.T) {
 		},
 		{
 			name:   "observability.metrics.enabled",
-			envVar: "LIBRARIAN_OBSERVABILITY_METRICS_ENABLED",
+			envVar: "MNEMONIC_OBSERVABILITY_METRICS_ENABLED",
 			value:  "false",
 			check: func(t *testing.T, cfg *config.MnemonicConfig) {
 				assert.False(t, cfg.Observability.Metrics.Enabled)
@@ -255,7 +255,7 @@ func TestEnvironmentVariableNaming(t *testing.T) {
 		},
 		{
 			name:   "observability.tracing.sample_rate",
-			envVar: "LIBRARIAN_OBSERVABILITY_TRACING_SAMPLE_RATE",
+			envVar: "MNEMONIC_OBSERVABILITY_TRACING_SAMPLE_RATE",
 			value:  "0.5",
 			check: func(t *testing.T, cfg *config.MnemonicConfig) {
 				assert.Equal(t, 0.5, cfg.Observability.Tracing.SampleRate)
@@ -279,7 +279,7 @@ func TestEnvironmentVariableNaming(t *testing.T) {
 // are rejected when the config is loaded rather than silently wrapped.
 func TestPostgresPoolSizeOverflow(t *testing.T) {
 	clearMnemonicEnvVars(t)
-	t.Setenv("LIBRARIAN_DATABASE_POSTGRES_MAX_OPEN_CONNS", "3000000000")
+	t.Setenv("MNEMONIC_DATABASE_POSTGRES_MAX_OPEN_CONNS", "3000000000")
 
 	_, err := loadFromYAML(t, "")
 	require.Error(t, err)
@@ -992,7 +992,7 @@ func TestNeo4jSafeURI(t *testing.T) {
 }
 
 // TestConfigFileFlagOverride verifies that a --config flag takes precedence
-// over $LIBRARIAN_CONFIG_FILE.
+// over $MNEMONIC_CONFIG_FILE.
 func TestConfigFileFlagOverride(t *testing.T) {
 	clearMnemonicEnvVars(t)
 
@@ -1006,7 +1006,7 @@ func TestConfigFileFlagOverride(t *testing.T) {
 	assert.Equal(t, 9002, cfg.Server.Port)
 }
 
-// TestConfigFileFromEnv verifies that $LIBRARIAN_CONFIG_FILE is read when no
+// TestConfigFileFromEnv verifies that $MNEMONIC_CONFIG_FILE is read when no
 // flag is given, and that a missing explicitly named file is an error.
 func TestConfigFileFromEnv(t *testing.T) {
 	clearMnemonicEnvVars(t)
@@ -1031,7 +1031,7 @@ func TestValidConfig(t *testing.T) {
 
 // Helper functions
 
-// clearMnemonicEnvVars clears all LIBRARIAN_ prefixed environment variables.
+// clearMnemonicEnvVars clears all MNEMONIC_ prefixed environment variables.
 func clearMnemonicEnvVars(t *testing.T) {
 	t.Helper()
 	for _, env := range os.Environ() {
@@ -1039,7 +1039,7 @@ func clearMnemonicEnvVars(t *testing.T) {
 		if !ok {
 			continue
 		}
-		if strings.HasPrefix(key, "LIBRARIAN_") {
+		if strings.HasPrefix(key, "MNEMONIC_") {
 			// t.Setenv handles cleanup automatically when test completes
 			t.Setenv(key, "")
 		}
@@ -1137,7 +1137,7 @@ func validConfig() *config.MnemonicConfig {
 
 func TestOpenAIBaseURL_EnvOverride(t *testing.T) {
 	clearMnemonicEnvVars(t)
-	t.Setenv("LIBRARIAN_OPENAI_BASE_URL", "http://localhost:8090/v1")
+	t.Setenv("MNEMONIC_OPENAI_BASE_URL", "http://localhost:8090/v1")
 
 	cfg, err := loadFromYAML(t, "")
 	require.NoError(t, err)
@@ -1154,4 +1154,16 @@ func TestOpenAIBaseURL_ValidateRejectsBareString(t *testing.T) {
 	cfg := validConfig()
 	cfg.OpenAI.BaseURL = "not-a-url"
 	assert.ErrorContains(t, cfg.Validate(), "openai.base_url")
+}
+
+// TestLoad_ReadsMnemonicPrefixedVariables verifies that configuration is read
+// from MNEMONIC_-prefixed environment variables.
+func TestLoad_ReadsMnemonicPrefixedVariables(t *testing.T) {
+	clearMnemonicEnvVars(t)
+	t.Setenv("MNEMONIC_DATABASE_POSTGRES_HOST", "db.example.invalid")
+
+	cfg, err := config.Load(nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, "db.example.invalid", cfg.Database.Postgres.Host)
 }

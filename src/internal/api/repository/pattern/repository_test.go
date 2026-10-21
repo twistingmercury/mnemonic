@@ -12,8 +12,8 @@ import (
 	"github.com/pashagolub/pgxmock/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/twistingmercury/librarian/internal/api/repository"
-	"github.com/twistingmercury/librarian/internal/api/repository/pattern"
+	"github.com/twistingmercury/mnemonic/internal/api/repository"
+	"github.com/twistingmercury/mnemonic/internal/api/repository/pattern"
 )
 
 // testPattern returns a sample pattern for testing.

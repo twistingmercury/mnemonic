@@ -144,7 +144,7 @@ type TracingConfig struct {
 //
 // The config file is discovered in the following order:
 // 1. The "config" flag in flags (if flags is non-nil and the flag was set)
-// 2. $LIBRARIAN_CONFIG_FILE (if set)
+// 2. $MNEMONIC_CONFIG_FILE (if set)
 // 3. /etc/mnemonic/config.yaml (production)
 // 4. ./config.yaml (development)
 func Load(flags *pflag.FlagSet) (*MnemonicConfig, error) {
@@ -172,7 +172,7 @@ func Load(flags *pflag.FlagSet) (*MnemonicConfig, error) {
 // both read the same sources with the same precedence.
 //
 // A config file that cannot be read is an error only when it was named
-// explicitly (by flag or $LIBRARIAN_CONFIG_FILE); otherwise defaults and
+// explicitly (by flag or $MNEMONIC_CONFIG_FILE); otherwise defaults and
 // environment variables are used.
 func Resolve(flags *pflag.FlagSet) (*viper.Viper, error) {
 	v := viper.New()

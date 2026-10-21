@@ -18,7 +18,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/twistingmercury/librarian/internal/api/config"
+	"github.com/twistingmercury/mnemonic/internal/api/config"
 )
 
 func TestFormatHealthStatus_ValidJSON(t *testing.T) {
@@ -85,7 +85,7 @@ func TestResolveServerPort_DefaultWithoutConfigFile(t *testing.T) {
 func TestCheckHealth_Healthy(t *testing.T) {
 	isolateLoaderSources(t)
 	port, hits := healthServer(t, http.StatusOK)
-	t.Setenv("LIBRARIAN_SERVER_PORT", port)
+	t.Setenv("MNEMONIC_SERVER_PORT", port)
 
 	assert.Equal(t, 0, checkHealth(probeFlags(t)))
 	assert.Equal(t, int32(1), hits.Load())
@@ -94,7 +94,7 @@ func TestCheckHealth_Healthy(t *testing.T) {
 func TestCheckHealth_Unhealthy(t *testing.T) {
 	isolateLoaderSources(t)
 	port, hits := healthServer(t, http.StatusServiceUnavailable)
-	t.Setenv("LIBRARIAN_SERVER_PORT", port)
+	t.Setenv("MNEMONIC_SERVER_PORT", port)
 
 	assert.Equal(t, 1, checkHealth(probeFlags(t)))
 	assert.Equal(t, int32(1), hits.Load())
@@ -103,7 +103,7 @@ func TestCheckHealth_Unhealthy(t *testing.T) {
 func TestCheckHealth_Unreachable(t *testing.T) {
 	isolateLoaderSources(t)
 	// Nothing listens on port 1.
-	t.Setenv("LIBRARIAN_SERVER_PORT", "1")
+	t.Setenv("MNEMONIC_SERVER_PORT", "1")
 
 	assert.Equal(t, 1, checkHealth(probeFlags(t)))
 }
@@ -162,7 +162,7 @@ func TestCheckHealth_EnvPortOverridesFilePort(t *testing.T) {
 	envPort, envHits := healthServer(t, http.StatusOK)
 	filePort, fileHits := healthServer(t, http.StatusOK)
 	path := writePortConfig(t, dir, "flag.yaml", filePort)
-	t.Setenv("LIBRARIAN_SERVER_PORT", envPort)
+	t.Setenv("MNEMONIC_SERVER_PORT", envPort)
 
 	assert.Equal(t, 0, checkHealth(probeFlags(t, "--config", path)))
 	assert.Equal(t, int32(1), envHits.Load())
@@ -192,7 +192,7 @@ func TestCheckHealth_SkipsUnrelatedValidation(t *testing.T) {
 func TestMain_HealthUnreadableConfigFileFailsWithoutRequest(t *testing.T) {
 	dir := isolateLoaderSources(t)
 	port, hits := healthServer(t, http.StatusOK)
-	t.Setenv("LIBRARIAN_SERVER_PORT", port)
+	t.Setenv("MNEMONIC_SERVER_PORT", port)
 	missing := filepath.Join(dir, "missing.yaml")
 
 	code, stderr := runMain(t, "--health", "--config", missing)
@@ -220,7 +220,7 @@ func TestMain_HealthInvalidPortFailsWithoutRequest(t *testing.T) {
 			dir := isolateLoaderSources(t)
 			filePort, hits := healthServer(t, http.StatusOK)
 			path := writePortConfig(t, dir, "flag.yaml", filePort)
-			t.Setenv("LIBRARIAN_SERVER_PORT", tt.port)
+			t.Setenv("MNEMONIC_SERVER_PORT", tt.port)
 
 			code, stderr := runMain(t, "--health", "--config", path)
 
@@ -339,7 +339,7 @@ func TestParseFlags_LeavesCommandLineUntouched(t *testing.T) {
 }
 
 // mainArgsEnv carries the child's arguments; it deliberately avoids the
-// LIBRARIAN_ prefix so it can never be mistaken for configuration.
+// MNEMONIC_ prefix so it can never be mistaken for configuration.
 const mainArgsEnv = "GO_TEST_MAIN_ARGS"
 
 // TestMainProcess is not a test: runMain re-executes the test binary into it

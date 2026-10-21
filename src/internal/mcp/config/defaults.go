@@ -70,6 +70,6 @@ const (
 const (
 	ProductionConfigPath  = "/etc/mnemonic/config.yaml"
 	DevelopmentConfigPath = "./config.yaml"
-	EnvConfigFile         = "LIBRARIAN_CONFIG_FILE"
-	EnvPrefix             = "LIBRARIAN"
+	EnvConfigFile         = "MNEMONIC_CONFIG_FILE"
+	EnvPrefix             = "MNEMONIC"
 )

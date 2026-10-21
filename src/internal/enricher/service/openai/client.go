@@ -14,7 +14,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/twistingmercury/librarian/internal/enricher/config"
+	"github.com/twistingmercury/mnemonic/internal/enricher/config"
 )
 
 // client is the HTTP, auth and retry plumbing the embedding and extraction

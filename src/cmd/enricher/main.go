@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
-	"github.com/twistingmercury/librarian/internal/enricher/config"
-	"github.com/twistingmercury/librarian/internal/enricher/server"
-	"github.com/twistingmercury/librarian/internal/enricher/version"
+	"github.com/twistingmercury/mnemonic/internal/enricher/config"
+	"github.com/twistingmercury/mnemonic/internal/enricher/server"
+	"github.com/twistingmercury/mnemonic/internal/enricher/version"
 )
 
 func main() {

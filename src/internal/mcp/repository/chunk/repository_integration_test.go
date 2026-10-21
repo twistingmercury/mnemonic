@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/twistingmercury/librarian/internal/mcp/repository/chunk"
+	"github.com/twistingmercury/mnemonic/internal/mcp/repository/chunk"
 )
 
 const testPatternPrefix = "test-integration-chunk-"

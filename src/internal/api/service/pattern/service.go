@@ -12,13 +12,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
-	"github.com/twistingmercury/librarian/internal/api/queue"
-	"github.com/twistingmercury/librarian/internal/api/repository"
-	chunkrepo "github.com/twistingmercury/librarian/internal/api/repository/chunk"
-	enrichRepo "github.com/twistingmercury/librarian/internal/api/repository/enrichmentjob"
-	graphRepo "github.com/twistingmercury/librarian/internal/api/repository/graph"
-	patternRepo "github.com/twistingmercury/librarian/internal/api/repository/pattern"
-	"github.com/twistingmercury/librarian/internal/api/service"
+	"github.com/twistingmercury/mnemonic/internal/api/queue"
+	"github.com/twistingmercury/mnemonic/internal/api/repository"
+	chunkrepo "github.com/twistingmercury/mnemonic/internal/api/repository/chunk"
+	enrichRepo "github.com/twistingmercury/mnemonic/internal/api/repository/enrichmentjob"
+	graphRepo "github.com/twistingmercury/mnemonic/internal/api/repository/graph"
+	patternRepo "github.com/twistingmercury/mnemonic/internal/api/repository/pattern"
+	"github.com/twistingmercury/mnemonic/internal/api/service"
 )
 
 // Service defines the operations for managing pattern lifecycle.

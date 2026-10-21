@@ -10,10 +10,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	chunkrepo "github.com/twistingmercury/librarian/internal/api/repository/chunk"
-	"github.com/twistingmercury/librarian/internal/api/service"
-	openaisvc "github.com/twistingmercury/librarian/internal/api/service/openai"
-	"github.com/twistingmercury/librarian/internal/api/service/search"
+	chunkrepo "github.com/twistingmercury/mnemonic/internal/api/repository/chunk"
+	"github.com/twistingmercury/mnemonic/internal/api/service"
+	openaisvc "github.com/twistingmercury/mnemonic/internal/api/service/openai"
+	"github.com/twistingmercury/mnemonic/internal/api/service/search"
 )
 
 // --- Mock: openaisvc.EmbeddingService ---

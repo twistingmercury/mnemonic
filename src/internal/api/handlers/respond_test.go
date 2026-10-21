@@ -12,8 +12,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/twistingmercury/librarian/internal/api/handlers"
-	"github.com/twistingmercury/librarian/internal/api/service"
+	"github.com/twistingmercury/mnemonic/internal/api/handlers"
+	"github.com/twistingmercury/mnemonic/internal/api/service"
 )
 
 func init() {

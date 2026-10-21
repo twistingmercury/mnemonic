@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/twistingmercury/librarian/internal/enricher/config"
+	"github.com/twistingmercury/mnemonic/internal/enricher/config"
 )
 
 // ErrExtractionFailed is returned when concept extraction fails after all retries.

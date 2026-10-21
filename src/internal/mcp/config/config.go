@@ -148,7 +148,7 @@ func Load() (*MnemonicConfig, error) {
 // 3. Environment variables
 //
 // The config file is discovered in the following order:
-// 1. $LIBRARIAN_CONFIG_FILE (if set; a read error is then fatal)
+// 1. $MNEMONIC_CONFIG_FILE (if set; a read error is then fatal)
 // 2. /etc/mnemonic/config.yaml (production)
 // 3. ./config.yaml (development)
 func Resolve() (*viper.Viper, error) {

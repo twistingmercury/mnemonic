@@ -11,7 +11,7 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/twistingmercury/librarian/internal/api/queue/rabbitmq"
+	"github.com/twistingmercury/mnemonic/internal/api/queue/rabbitmq"
 )
 
 // TestHeaderCarrier_RoundTrip verifies that trace context injected into AMQP

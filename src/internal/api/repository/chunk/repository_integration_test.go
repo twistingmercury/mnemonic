@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/twistingmercury/librarian/internal/api/repository/chunk"
+	"github.com/twistingmercury/mnemonic/internal/api/repository/chunk"
 )
 
 const (

@@ -16,8 +16,8 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
-	"github.com/twistingmercury/librarian/internal/enricher/metrics"
-	"github.com/twistingmercury/librarian/internal/enricher/repository/graph"
+	"github.com/twistingmercury/mnemonic/internal/enricher/metrics"
+	"github.com/twistingmercury/mnemonic/internal/enricher/repository/graph"
 )
 
 // Invalid input is rejected before the driver is touched, so a nil driver is fine.

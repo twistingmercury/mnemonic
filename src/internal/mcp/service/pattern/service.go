@@ -11,8 +11,8 @@ import (
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 
-	graphrepo "github.com/twistingmercury/librarian/internal/mcp/repository/graph"
-	patternrepo "github.com/twistingmercury/librarian/internal/mcp/repository/pattern"
+	graphrepo "github.com/twistingmercury/mnemonic/internal/mcp/repository/graph"
+	patternrepo "github.com/twistingmercury/mnemonic/internal/mcp/repository/pattern"
 )
 
 // graphContextRelatedLimit caps the related patterns get_pattern shows.

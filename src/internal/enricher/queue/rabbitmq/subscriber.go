@@ -11,8 +11,8 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/rs/zerolog/log"
 
-	"github.com/twistingmercury/librarian/internal/enricher/config"
-	"github.com/twistingmercury/librarian/internal/enricher/queue"
+	"github.com/twistingmercury/mnemonic/internal/enricher/config"
+	"github.com/twistingmercury/mnemonic/internal/enricher/queue"
 )
 
 // amqpURL builds an AMQP connection URL from cfg, escaping the credentials

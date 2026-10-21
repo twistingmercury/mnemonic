@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/twistingmercury/librarian/internal/enricher/repository"
+	"github.com/twistingmercury/mnemonic/internal/enricher/repository"
 )
 
 // Repository defines the pattern operations the enrichment pipeline needs.

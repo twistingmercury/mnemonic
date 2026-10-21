@@ -12,7 +12,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/twistingmercury/librarian/internal/api/repository/graph"
+	"github.com/twistingmercury/mnemonic/internal/api/repository/graph"
 )
 
 const (

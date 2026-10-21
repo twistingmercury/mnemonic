@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/twistingmercury/heartbeat/v2"
-	"github.com/twistingmercury/librarian/internal/mcp/config"
+	"github.com/twistingmercury/mnemonic/internal/mcp/config"
 )
 
 // checkTimeout is the per-check timeout used when probing dependencies.

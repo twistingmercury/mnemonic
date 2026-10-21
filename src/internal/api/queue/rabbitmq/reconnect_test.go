@@ -16,8 +16,8 @@ import (
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/metric/noop"
 
-	"github.com/twistingmercury/librarian/internal/api/config"
-	"github.com/twistingmercury/librarian/internal/api/queue/rabbitmq"
+	"github.com/twistingmercury/mnemonic/internal/api/config"
+	"github.com/twistingmercury/mnemonic/internal/api/queue/rabbitmq"
 )
 
 // fakeChannel fails the first failFirst publishes, then succeeds.

@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/twistingmercury/heartbeat/v2"
-	"github.com/twistingmercury/librarian/internal/api/version"
+	"github.com/twistingmercury/mnemonic/internal/api/version"
 )
 
 // SetupHandlers associates the handlers related to operations endpoints

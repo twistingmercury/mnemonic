@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/twistingmercury/librarian/internal/api/repository"
+	"github.com/twistingmercury/mnemonic/internal/api/repository"
 )
 
 // Repository defines data access operations for enrichment jobs.

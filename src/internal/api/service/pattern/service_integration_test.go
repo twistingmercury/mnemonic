@@ -20,12 +20,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/twistingmercury/librarian/internal/api/queue"
-	chunkrepo "github.com/twistingmercury/librarian/internal/api/repository/chunk"
-	enrichmentrepo "github.com/twistingmercury/librarian/internal/api/repository/enrichmentjob"
-	graphrepo "github.com/twistingmercury/librarian/internal/api/repository/graph"
-	patternrepo "github.com/twistingmercury/librarian/internal/api/repository/pattern"
-	patternsvc "github.com/twistingmercury/librarian/internal/api/service/pattern"
+	"github.com/twistingmercury/mnemonic/internal/api/queue"
+	chunkrepo "github.com/twistingmercury/mnemonic/internal/api/repository/chunk"
+	enrichmentrepo "github.com/twistingmercury/mnemonic/internal/api/repository/enrichmentjob"
+	graphrepo "github.com/twistingmercury/mnemonic/internal/api/repository/graph"
+	patternrepo "github.com/twistingmercury/mnemonic/internal/api/repository/pattern"
+	patternsvc "github.com/twistingmercury/mnemonic/internal/api/service/pattern"
 )
 
 const integrationContent = "[//]: pattern\n## Philosophy\nStorage-only databases.\n\n[//]: pattern\n## Usage\nCall the API."

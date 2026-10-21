@@ -161,7 +161,7 @@ func LoadWithFlags(flags *pflag.FlagSet) (*MnemonicConfig, error) {
 //
 // The config file is discovered in the following order:
 // 1. The "config" flag in flags, if flags is non-nil and the flag was set
-// 2. $LIBRARIAN_CONFIG_FILE (if set)
+// 2. $MNEMONIC_CONFIG_FILE (if set)
 // 3. /etc/mnemonic/config.yaml (production)
 // 4. ./config.yaml (development)
 //
@@ -259,7 +259,7 @@ func findConfigFile(flags *pflag.FlagSet) string {
 		}
 	}
 
-	// 2. Check LIBRARIAN_CONFIG_FILE environment variable
+	// 2. Check MNEMONIC_CONFIG_FILE environment variable
 	if envPath := os.Getenv(EnvConfigFile); envPath != "" {
 		return envPath
 	}

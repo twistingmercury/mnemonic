@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/twistingmercury/librarian/internal/enricher/config"
-	"github.com/twistingmercury/librarian/internal/enricher/version"
+	"github.com/twistingmercury/mnemonic/internal/enricher/config"
+	"github.com/twistingmercury/mnemonic/internal/enricher/version"
 	"github.com/twistingmercury/otelx/v2"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -63,10 +63,10 @@ func buildConfig(ctx context.Context, cfg *config.MnemonicConfig) (otelx.Config,
 	return otelCfg, nil
 }
 
-// getEnvironment determines the environment from the LIBRARIAN_ENV environment variable.
+// getEnvironment determines the environment from the MNEMONIC_ENV environment variable.
 // Returns "development" if the environment variable is not set.
 func getEnvironment() string {
-	if env := os.Getenv("LIBRARIAN_ENV"); env != "" {
+	if env := os.Getenv("MNEMONIC_ENV"); env != "" {
 		return env
 	}
 	return "development"

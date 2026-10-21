@@ -18,12 +18,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/twistingmercury/librarian/internal/api/config"
-	"github.com/twistingmercury/librarian/internal/api/handlers"
-	chunkrepo "github.com/twistingmercury/librarian/internal/api/repository/chunk"
-	patternrepo "github.com/twistingmercury/librarian/internal/api/repository/pattern"
-	patternsvc "github.com/twistingmercury/librarian/internal/api/service/pattern"
-	searchsvc "github.com/twistingmercury/librarian/internal/api/service/search"
+	"github.com/twistingmercury/mnemonic/internal/api/config"
+	"github.com/twistingmercury/mnemonic/internal/api/handlers"
+	chunkrepo "github.com/twistingmercury/mnemonic/internal/api/repository/chunk"
+	patternrepo "github.com/twistingmercury/mnemonic/internal/api/repository/pattern"
+	patternsvc "github.com/twistingmercury/mnemonic/internal/api/service/pattern"
+	searchsvc "github.com/twistingmercury/mnemonic/internal/api/service/search"
 )
 
 // timeFormat is the RFC 3339 UTC layout, to the second, used for every

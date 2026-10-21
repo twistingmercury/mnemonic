@@ -14,11 +14,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
-	"github.com/twistingmercury/librarian/internal/mcp/metrics"
-	chunkrepo "github.com/twistingmercury/librarian/internal/mcp/repository/chunk"
-	graphrepo "github.com/twistingmercury/librarian/internal/mcp/repository/graph"
-	patternrepo "github.com/twistingmercury/librarian/internal/mcp/repository/pattern"
-	openaisvc "github.com/twistingmercury/librarian/internal/mcp/service/openai"
+	"github.com/twistingmercury/mnemonic/internal/mcp/metrics"
+	chunkrepo "github.com/twistingmercury/mnemonic/internal/mcp/repository/chunk"
+	graphrepo "github.com/twistingmercury/mnemonic/internal/mcp/repository/graph"
+	patternrepo "github.com/twistingmercury/mnemonic/internal/mcp/repository/pattern"
+	openaisvc "github.com/twistingmercury/mnemonic/internal/mcp/service/openai"
 )
 
 // SearchOptions defines the parameters for a semantic search.

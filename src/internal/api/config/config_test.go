@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/twistingmercury/librarian/internal/api/config"
+	"github.com/twistingmercury/mnemonic/internal/api/config"
 )
 
 // TestDefaultValues verifies that all default values are set correctly.
@@ -188,10 +188,10 @@ vocabulary:
 	require.NoError(t, err)
 
 	t.Setenv(config.EnvConfigFile, configPath)
-	t.Setenv("LIBRARIAN_SERVER_HOST", "env-host")
-	t.Setenv("LIBRARIAN_SERVER_PORT", "8888")
-	t.Setenv("LIBRARIAN_DATABASE_POSTGRES_PASSWORD", "envpassword")
-	t.Setenv("LIBRARIAN_LOGGING_LEVEL", "error")
+	t.Setenv("MNEMONIC_SERVER_HOST", "env-host")
+	t.Setenv("MNEMONIC_SERVER_PORT", "8888")
+	t.Setenv("MNEMONIC_DATABASE_POSTGRES_PASSWORD", "envpassword")
+	t.Setenv("MNEMONIC_LOGGING_LEVEL", "error")
 
 	cfg, err := config.LoadWithFlags(nil)
 	require.NoError(t, err)
@@ -216,7 +216,7 @@ func TestEnvironmentVariableNaming(t *testing.T) {
 	}{
 		{
 			name:   "server.port",
-			envVar: "LIBRARIAN_SERVER_PORT",
+			envVar: "MNEMONIC_SERVER_PORT",
 			value:  "3000",
 			check: func(t *testing.T, cfg *config.MnemonicConfig) {
 				assert.Equal(t, 3000, cfg.Server.Port)
@@ -224,7 +224,7 @@ func TestEnvironmentVariableNaming(t *testing.T) {
 		},
 		{
 			name:   "database.postgres.max_open_conns",
-			envVar: "LIBRARIAN_DATABASE_POSTGRES_MAX_OPEN_CONNS",
+			envVar: "MNEMONIC_DATABASE_POSTGRES_MAX_OPEN_CONNS",
 			value:  "50",
 			check: func(t *testing.T, cfg *config.MnemonicConfig) {
 				assert.Equal(t, int32(50), cfg.Database.Postgres.MaxOpenConns)
@@ -232,7 +232,7 @@ func TestEnvironmentVariableNaming(t *testing.T) {
 		},
 		{
 			name:   "database.neo4j.max_connection_pool_size",
-			envVar: "LIBRARIAN_DATABASE_NEO4J_MAX_CONNECTION_POOL_SIZE",
+			envVar: "MNEMONIC_DATABASE_NEO4J_MAX_CONNECTION_POOL_SIZE",
 			value:  "100",
 			check: func(t *testing.T, cfg *config.MnemonicConfig) {
 				assert.Equal(t, 100, cfg.Database.Neo4j.MaxConnectionPoolSize)
@@ -240,7 +240,7 @@ func TestEnvironmentVariableNaming(t *testing.T) {
 		},
 		{
 			name:   "openai.api_key",
-			envVar: "LIBRARIAN_OPENAI_API_KEY",
+			envVar: "MNEMONIC_OPENAI_API_KEY",
 			value:  "sk-test-123",
 			check: func(t *testing.T, cfg *config.MnemonicConfig) {
 				assert.Equal(t, "sk-test-123", cfg.OpenAI.APIKey)
@@ -248,7 +248,7 @@ func TestEnvironmentVariableNaming(t *testing.T) {
 		},
 		{
 			name:   "observability.metrics.enabled",
-			envVar: "LIBRARIAN_OBSERVABILITY_METRICS_ENABLED",
+			envVar: "MNEMONIC_OBSERVABILITY_METRICS_ENABLED",
 			value:  "false",
 			check: func(t *testing.T, cfg *config.MnemonicConfig) {
 				assert.False(t, cfg.Observability.Metrics.Enabled)
@@ -256,7 +256,7 @@ func TestEnvironmentVariableNaming(t *testing.T) {
 		},
 		{
 			name:   "observability.tracing.sample_rate",
-			envVar: "LIBRARIAN_OBSERVABILITY_TRACING_SAMPLE_RATE",
+			envVar: "MNEMONIC_OBSERVABILITY_TRACING_SAMPLE_RATE",
 			value:  "0.5",
 			check: func(t *testing.T, cfg *config.MnemonicConfig) {
 				assert.Equal(t, 0.5, cfg.Observability.Tracing.SampleRate)
@@ -949,7 +949,7 @@ func TestLoadWithFlags_ConfigFileSelection(t *testing.T) {
 func TestLoadWithFlags_EnvOverridesFlagSelectedFile(t *testing.T) {
 	dir := isolateConfigSources(t)
 	path := writeConfigFile(t, dir, "flag.yaml", "server:\n  port: 9002\n  host: file-host\n")
-	t.Setenv("LIBRARIAN_SERVER_PORT", "9100")
+	t.Setenv("MNEMONIC_SERVER_PORT", "9100")
 
 	cfg, err := config.LoadWithFlags(configFlagSet(t, path))
 	require.NoError(t, err)
@@ -1089,7 +1089,7 @@ func TestResolve_AgreesWithLoadWithFlags(t *testing.T) {
 				t.Setenv(config.EnvConfigFile, path)
 			}
 			if tt.envPort != "" {
-				t.Setenv("LIBRARIAN_SERVER_PORT", tt.envPort)
+				t.Setenv("MNEMONIC_SERVER_PORT", tt.envPort)
 			}
 
 			v, err := config.Resolve(flags)
@@ -1152,7 +1152,7 @@ func TestBooleanEnvironmentVariables(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			isolateConfigSources(t)
 			// metrics.enabled validates cleanly either way with the default port and path
-			t.Setenv("LIBRARIAN_OBSERVABILITY_METRICS_ENABLED", tt.value)
+			t.Setenv("MNEMONIC_OBSERVABILITY_METRICS_ENABLED", tt.value)
 
 			cfg, err := config.LoadWithFlags(nil)
 			require.NoError(t, err)
@@ -1177,7 +1177,7 @@ func TestDurationEnvironmentVariables(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			isolateConfigSources(t)
-			t.Setenv("LIBRARIAN_SERVER_READ_TIMEOUT", tt.value)
+			t.Setenv("MNEMONIC_SERVER_READ_TIMEOUT", tt.value)
 
 			cfg, err := config.LoadWithFlags(nil)
 			require.NoError(t, err)
@@ -1242,7 +1242,7 @@ func TestVocabularyConfig_Validate(t *testing.T) {
 
 // Helper functions
 
-// clearMnemonicEnvVars clears all LIBRARIAN_ prefixed environment variables.
+// clearMnemonicEnvVars clears all MNEMONIC_ prefixed environment variables.
 func clearMnemonicEnvVars(t *testing.T) {
 	t.Helper()
 	for _, env := range os.Environ() {
@@ -1250,7 +1250,7 @@ func clearMnemonicEnvVars(t *testing.T) {
 		if !ok {
 			continue
 		}
-		if strings.HasPrefix(key, "LIBRARIAN_") {
+		if strings.HasPrefix(key, "MNEMONIC_") {
 			// t.Setenv handles cleanup automatically when test completes
 			t.Setenv(key, "")
 		}
@@ -1258,7 +1258,7 @@ func clearMnemonicEnvVars(t *testing.T) {
 }
 
 // isolateConfigSources removes every ambient source LoadWithFlags consults:
-// LIBRARIAN_* variables and ./config.yaml, by moving into an empty directory.
+// MNEMONIC_* variables and ./config.yaml, by moving into an empty directory.
 // /etc/mnemonic/config.yaml cannot be redirected, so its presence skips the
 // test rather than letting a host file decide the result.
 func isolateConfigSources(t *testing.T) string {
@@ -1367,7 +1367,7 @@ func TestOpenAIBaseURL_DefaultsToOpenAI(t *testing.T) {
 
 func TestOpenAIBaseURL_EnvOverride(t *testing.T) {
 	isolateConfigSources(t)
-	t.Setenv("LIBRARIAN_OPENAI_BASE_URL", "http://localhost:8090/v1")
+	t.Setenv("MNEMONIC_OPENAI_BASE_URL", "http://localhost:8090/v1")
 
 	cfg, err := config.LoadWithFlags(nil)
 	require.NoError(t, err)
@@ -1386,4 +1386,16 @@ func TestOpenAIBaseURL_ValidateRejectsBareString(t *testing.T) {
 	require.NoError(t, v.Unmarshal(cfg))
 
 	assert.ErrorContains(t, errors.Join(cfg.Validate()...), "openai.base_url")
+}
+
+// TestLoad_ReadsMnemonicPrefixedVariables verifies that configuration is read
+// from MNEMONIC_-prefixed environment variables.
+func TestLoad_ReadsMnemonicPrefixedVariables(t *testing.T) {
+	clearMnemonicEnvVars(t)
+	t.Setenv("MNEMONIC_DATABASE_POSTGRES_HOST", "db.example.invalid")
+
+	cfg, err := config.LoadWithFlags(nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, "db.example.invalid", cfg.Database.Postgres.Host)
 }

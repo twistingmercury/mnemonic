@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
-	"github.com/twistingmercury/librarian/internal/api/config"
-	"github.com/twistingmercury/librarian/internal/api/server"
-	"github.com/twistingmercury/librarian/internal/api/version"
+	"github.com/twistingmercury/mnemonic/internal/api/config"
+	"github.com/twistingmercury/mnemonic/internal/api/server"
+	"github.com/twistingmercury/mnemonic/internal/api/version"
 )
 
 // @title Mnemonic API

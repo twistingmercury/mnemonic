@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/twistingmercury/librarian/internal/enricher/config"
+	"github.com/twistingmercury/mnemonic/internal/enricher/config"
 )
 
 // mustParseFlags parses args with the production flag set.
@@ -25,7 +25,7 @@ func mustParseFlags(t *testing.T, args ...string) *pflag.FlagSet {
 
 func TestResolveServerPort_Default(t *testing.T) {
 	// Cannot use t.Parallel with t.Setenv.
-	t.Setenv("LIBRARIAN_SERVER_PORT", "")
+	t.Setenv("MNEMONIC_SERVER_PORT", "")
 
 	port, err := resolveServerPort(mustParseFlags(t))
 	require.NoError(t, err)
@@ -33,7 +33,7 @@ func TestResolveServerPort_Default(t *testing.T) {
 }
 
 func TestResolveServerPort_EnvOverride(t *testing.T) {
-	t.Setenv("LIBRARIAN_SERVER_PORT", "9999")
+	t.Setenv("MNEMONIC_SERVER_PORT", "9999")
 
 	port, err := resolveServerPort(mustParseFlags(t))
 	require.NoError(t, err)
@@ -43,7 +43,7 @@ func TestResolveServerPort_EnvOverride(t *testing.T) {
 // TestResolveServerPort_ConfigFile verifies the probe reads the port from the
 // same config file the server would load.
 func TestResolveServerPort_ConfigFile(t *testing.T) {
-	t.Setenv("LIBRARIAN_SERVER_PORT", "")
+	t.Setenv("MNEMONIC_SERVER_PORT", "")
 	path := filepath.Join(t.TempDir(), "config.yaml")
 	require.NoError(t, os.WriteFile(path, []byte("server:\n  port: 8181\n"), 0o600))
 
@@ -93,7 +93,7 @@ func TestCheckHealth_Healthy(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	t.Setenv("LIBRARIAN_SERVER_PORT", serverPort(t, srv))
+	t.Setenv("MNEMONIC_SERVER_PORT", serverPort(t, srv))
 
 	exitCode := checkHealth(mustParseFlags(t))
 	assert.Equal(t, 0, exitCode)
@@ -114,7 +114,7 @@ func TestCheckHealth_Unhealthy(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	t.Setenv("LIBRARIAN_SERVER_PORT", serverPort(t, srv))
+	t.Setenv("MNEMONIC_SERVER_PORT", serverPort(t, srv))
 
 	exitCode := checkHealth(mustParseFlags(t))
 	assert.Equal(t, 1, exitCode)
@@ -122,14 +122,14 @@ func TestCheckHealth_Unhealthy(t *testing.T) {
 
 func TestCheckHealth_Unreachable(t *testing.T) {
 	// Use a port where nothing is listening.
-	t.Setenv("LIBRARIAN_SERVER_PORT", "1")
+	t.Setenv("MNEMONIC_SERVER_PORT", "1")
 
 	exitCode := checkHealth(mustParseFlags(t))
 	assert.Equal(t, 1, exitCode)
 }
 
 func TestCheckHealth_BadPort(t *testing.T) {
-	t.Setenv("LIBRARIAN_SERVER_PORT", "not_a_number")
+	t.Setenv("MNEMONIC_SERVER_PORT", "not_a_number")
 
 	// A non-numeric port is rejected when it is decoded, producing exit code 1.
 	exitCode := checkHealth(mustParseFlags(t))

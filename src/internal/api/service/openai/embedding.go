@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/twistingmercury/librarian/internal/api/config"
+	"github.com/twistingmercury/mnemonic/internal/api/config"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"

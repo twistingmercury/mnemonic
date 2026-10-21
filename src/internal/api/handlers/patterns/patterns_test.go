@@ -17,14 +17,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"github.com/twistingmercury/librarian/internal/api/config"
-	"github.com/twistingmercury/librarian/internal/api/handlers"
-	"github.com/twistingmercury/librarian/internal/api/handlers/patterns"
-	chunkrepo "github.com/twistingmercury/librarian/internal/api/repository/chunk"
-	patternrepo "github.com/twistingmercury/librarian/internal/api/repository/pattern"
-	"github.com/twistingmercury/librarian/internal/api/service"
-	patternsvc "github.com/twistingmercury/librarian/internal/api/service/pattern"
-	searchsvc "github.com/twistingmercury/librarian/internal/api/service/search"
+	"github.com/twistingmercury/mnemonic/internal/api/config"
+	"github.com/twistingmercury/mnemonic/internal/api/handlers"
+	"github.com/twistingmercury/mnemonic/internal/api/handlers/patterns"
+	chunkrepo "github.com/twistingmercury/mnemonic/internal/api/repository/chunk"
+	patternrepo "github.com/twistingmercury/mnemonic/internal/api/repository/pattern"
+	"github.com/twistingmercury/mnemonic/internal/api/service"
+	patternsvc "github.com/twistingmercury/mnemonic/internal/api/service/pattern"
+	searchsvc "github.com/twistingmercury/mnemonic/internal/api/service/search"
 )
 
 func init() {

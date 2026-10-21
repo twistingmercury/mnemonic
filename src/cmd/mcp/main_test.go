@@ -10,13 +10,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/twistingmercury/librarian/internal/mcp/config"
+	"github.com/twistingmercury/mnemonic/internal/mcp/config"
 )
 
 func TestResolveServerPort_Default(t *testing.T) {
 	// Cannot use t.Parallel with t.Setenv.
 	t.Setenv(config.EnvConfigFile, "")
-	t.Setenv("LIBRARIAN_SERVER_PORT", "")
+	t.Setenv("MNEMONIC_SERVER_PORT", "")
 
 	port, err := resolveServerPort()
 	require.NoError(t, err)
@@ -25,7 +25,7 @@ func TestResolveServerPort_Default(t *testing.T) {
 
 func TestResolveServerPort_EnvOverride(t *testing.T) {
 	t.Setenv(config.EnvConfigFile, "")
-	t.Setenv("LIBRARIAN_SERVER_PORT", "9999")
+	t.Setenv("MNEMONIC_SERVER_PORT", "9999")
 
 	port, err := resolveServerPort()
 	require.NoError(t, err)
@@ -38,7 +38,7 @@ func TestResolveServerPort_ConfigFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")
 	require.NoError(t, os.WriteFile(path, []byte("server:\n  port: 9123\n"), 0o600))
 	t.Setenv(config.EnvConfigFile, path)
-	t.Setenv("LIBRARIAN_SERVER_PORT", "")
+	t.Setenv("MNEMONIC_SERVER_PORT", "")
 
 	port, err := resolveServerPort()
 	require.NoError(t, err)
@@ -90,7 +90,7 @@ func TestCheckHealth_Healthy(t *testing.T) {
 
 	// Extract port from test server address.
 	port := extractPort(t, srv.URL)
-	t.Setenv("LIBRARIAN_SERVER_PORT", port)
+	t.Setenv("MNEMONIC_SERVER_PORT", port)
 
 	exitCode := checkHealth()
 	assert.Equal(t, 0, exitCode)
@@ -107,7 +107,7 @@ func TestCheckHealth_Unhealthy(t *testing.T) {
 	defer srv.Close()
 
 	port := extractPort(t, srv.URL)
-	t.Setenv("LIBRARIAN_SERVER_PORT", port)
+	t.Setenv("MNEMONIC_SERVER_PORT", port)
 
 	exitCode := checkHealth()
 	assert.Equal(t, 1, exitCode)
@@ -115,14 +115,14 @@ func TestCheckHealth_Unhealthy(t *testing.T) {
 
 func TestCheckHealth_Unreachable(t *testing.T) {
 	// Use a port where nothing is listening.
-	t.Setenv("LIBRARIAN_SERVER_PORT", "1")
+	t.Setenv("MNEMONIC_SERVER_PORT", "1")
 
 	exitCode := checkHealth()
 	assert.Equal(t, 1, exitCode)
 }
 
 func TestCheckHealth_BadPort(t *testing.T) {
-	t.Setenv("LIBRARIAN_SERVER_PORT", "not_a_number")
+	t.Setenv("MNEMONIC_SERVER_PORT", "not_a_number")
 
 	// The value does not decode as a port, so the probe fails before any request.
 	exitCode := checkHealth()

@@ -8,8 +8,8 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/twistingmercury/librarian/internal/api/middleware"
-	"github.com/twistingmercury/librarian/internal/api/service"
+	"github.com/twistingmercury/mnemonic/internal/api/middleware"
+	"github.com/twistingmercury/mnemonic/internal/api/service"
 	"go.opentelemetry.io/otel/trace"
 )
 
