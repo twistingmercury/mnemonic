@@ -3,82 +3,36 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJ_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-LOCAL=${LOCAL:-0}
+PROJ_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
-BUILD_VER="${BUILD_VER:-$(git -C "${PROJ_ROOT}" describe --tags --abbrev=0 2>/dev/null || echo 'dev')}"
+COMPONENT="enricher"
+IMAGE_NAME="${IMAGE_NAME:-ghcr.io/twistingmercury/librarian-enricher}"
+BUILD_VER="${BUILD_VER:-$("${PROJ_ROOT}/build/version.sh" "${COMPONENT}")}"
 BUILD_DATE="${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 BUILD_COMMIT="${BUILD_COMMIT:-$(git -C "${PROJ_ROOT}" rev-parse --short HEAD 2>/dev/null || echo 'unknown')}"
+IMAGE_TAG="${IMAGE_TAG:-v${BUILD_VER}}"
 
-IMAGE_NAME="${IMAGE_NAME:-ghcr.io/twistingmercury/librarian-enricher}"
-IMAGE_TAG="${IMAGE_TAG:-$BUILD_VER}"
+# The e2e suite is still parked under tests/legacy until it is re-homed.
+E2E_COMPOSE_FILE="${E2E_COMPOSE_FILE:-${PROJ_ROOT}/tests/legacy/enricher/docker-compose.yaml}"
+E2E_INFRA_SERVICES=(e2e_postgres e2e_neo4j e2e_rabbitmq e2e_openai_stub)
+E2E_UP_SERVICES=(e2e_enricher e2e_tests)
+E2E_EXIT_CODE_FROM="e2e_tests"
+E2E_PULL_SERVICES=(e2e_postgres e2e_neo4j e2e_rabbitmq)
 
-E2E_COMPOSE_FILE="${PROJ_ROOT}/tests/docker-compose.yaml"
+source "${PROJ_ROOT}/build/build-lib.sh"
 
-
-build_api(){
-    printf "\n=== starting image build, version %s ===\n" "${BUILD_VER}"
-
-    docker build --rm --no-cache \
-        --file "${SCRIPT_DIR}/Dockerfile" \
-        --build-arg BUILD_VER="${BUILD_VER}" \
-        --build-arg BUILD_DATE="${BUILD_DATE}" \
-        --build-arg BUILD_COMMIT="${BUILD_COMMIT}" \
-        --target final \
-        --tag "${IMAGE_NAME}:${IMAGE_TAG}" \
-        --tag "${IMAGE_NAME}:latest" \
-        "$(cd "${PROJ_ROOT}" && pwd)"
-
-    printf "\nImage: %s:%s\n" "${IMAGE_NAME}" "${IMAGE_TAG}"
-    docker images "${IMAGE_NAME}:${IMAGE_TAG}" --format "Size: {{.Size}}"
-
-    return 0
-}
-
-e2e_tests(){
-    printf "\n=== starting end-to-end tests ===\n"
-
-    # local compose_file="${PROJ_ROOT}/tests/docker-compose.yaml"
-
-    cleanup() {
-        docker compose -f "${E2E_COMPOSE_FILE}" down -v --remove-orphans > /dev/null 2>&1 || true
-
-        if [ ${LOCAL} = 1 ]; then
-            # docker image ls --filter 'reference=tests*' --quiet | sort -u | xargs -r docker image rm --force > /dev/null 2>&1 || true
-            docker rmi tests_librarian_tests:latest -f > /dev/null 2>&1 || true
-            docker system prune -f > /dev/null 2>&1 || true
-        fi
-    }
-    trap cleanup EXIT
-
-    printf "Pulling infrastructure images...\n"
-    if ! docker compose -f "${E2E_COMPOSE_FILE}" pull --policy "${PULL_POLICY:-always}" e2e_postgres e2e_neo4j e2e_rabbitmq; then
-        printf "ERROR: Failed to pull infrastructure images\n" >&2
+main() {
+    if ! build_lib::build_image; then
         return 1
     fi
 
-    printf "Starting infrastructure services...\n"
-    if ! docker compose -f "${E2E_COMPOSE_FILE}" up -d e2e_postgres e2e_neo4j e2e_rabbitmq e2e_openai_stub; then
-        printf "ERROR: Failed to start infrastructure services\n" >&2
+    if ! build_lib::e2e_tests; then
         return 1
     fi
 
-    docker compose -f "${E2E_COMPOSE_FILE}" up \
-        --build \
-        --abort-on-container-exit \
-        --exit-code-from e2e_tests \
-        e2e_enricher e2e_tests
-
-    trap - EXIT
-    cleanup
-
-    return 0
-}
-
-main(){
-    build_api
-
-    e2e_tests
+    if ! build_lib::push; then
+        return 1
+    fi
 
     return 0
 }
