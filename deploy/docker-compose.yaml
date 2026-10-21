@@ -36,6 +36,8 @@ services:
     restart: unless-stopped
     command: ["envoy", "-c", "/etc/envoy/envoy.yaml", "--log-level", "info"]
     environment:
+      # The services must never receive this variable: no bare pass-through
+      # entry for it on any service.
       OPENAI_API_EMBEDDINGS_KEY: ${OPENAI_API_EMBEDDINGS_KEY:?set OPENAI_API_EMBEDDINGS_KEY}
     volumes:
       - ../gateway/envoy/envoy-egress.yaml:/etc/envoy/envoy.yaml:ro
