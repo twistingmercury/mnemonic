@@ -29,6 +29,7 @@ jobs:
     timeout-minutes: 10
     outputs:
       components: ${{ steps.detect.outputs.components }}
+      services: ${{ steps.detect.outputs.services }}
     steps:
       # Full history: the change detection diffs against the base commit.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -50,7 +51,9 @@ jobs:
           else
             names="$(build/changed-components.sh "${MNEMONIC_BASE_SHA}" "${GITHUB_SHA}")"
           fi
-          printf 'components=%s\n' "$(jq -R -s -c 'split("\n") | map(select(. != ""))' <<<"${names}")" >> "${GITHUB_OUTPUT}"
+          components="$(jq -R -s -c 'split("\n") | map(select(. != ""))' <<<"${names}")"
+          printf 'components=%s\n' "${components}" >> "${GITHUB_OUTPUT}"
+          printf 'services=%s\n' "$(jq -c 'map(select(. == "api" or . == "mcp" or . == "enricher"))' <<<"${components}")" >> "${GITHUB_OUTPUT}"
 
   static:
     runs-on: ubuntu-24.04
@@ -102,12 +105,51 @@ jobs:
       - name: e2e boundary check
         run: build/check-e2e-boundary.sh
 
+  # A matrix needs at least one entry, so the job is skipped when no service is
+  # affected. The script builds the image, runs the e2e suite and never pushes.
+  service:
+    needs: detect
+    if: needs.detect.outputs.services != '[]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        component: ${{ fromJSON(needs.detect.outputs.services) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Build and test
+        env:
+          MNEMONIC_COMPONENT: ${{ matrix.component }}
+        run: build/"${MNEMONIC_COMPONENT}"/"${MNEMONIC_COMPONENT}".build.sh
+
+      # The publish job pushes this exact tested image. Only pushes upload it;
+      # the trigger limits pushes to develop and main.
+      - name: Save the image
+        if: github.event_name == 'push'
+        env:
+          MNEMONIC_COMPONENT: ${{ matrix.component }}
+        run: docker save --output "${RUNNER_TEMP}/image-${MNEMONIC_COMPONENT}.tar" "ghcr.io/twistingmercury/mnemonic-${MNEMONIC_COMPONENT}:latest"
+
+      - name: Upload the image
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: image-${{ matrix.component }}
+          path: ${{ runner.temp }}/image-${{ matrix.component }}.tar
+          if-no-files-found: error
+          retention-days: 1
+
   # The one required check. It runs even when a job it needs failed or was
   # skipped, and fails on a failure or a cancellation (detection included); a
   # skipped job is fine.
   ci-gate:
     if: always()
-    needs: [detect, static]
+    needs: [detect, static, service]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
