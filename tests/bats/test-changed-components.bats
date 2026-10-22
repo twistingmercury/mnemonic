@@ -124,6 +124,21 @@ run_after_change() {
     assert_output "$(printf 'api\nenricher\nmcp')"
 }
 
+@test "changed-components tests openai-stub - marks all three services" {
+    run_after_change "tests/openai-stub/main.go"
+
+    assert_success
+    assert_output "$(printf 'api\nenricher\nmcp')"
+}
+
+@test "changed-components docker failure - fails instead of skipping the service" {
+    printf '#!/usr/bin/env bash\nexit 1\n' > "${STUB_BIN}/docker"
+
+    run_after_change "src/internal/shared/x.go"
+
+    assert_failure
+}
+
 @test "changed-components db - maps to db" {
     run_after_change "db/schema.sql"
 

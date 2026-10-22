@@ -87,24 +87,30 @@ mark_passthrough_path() {
 # Lists the repo directories of a service's non-standard-library packages. The
 # repo is mounted at /repo, so only paths under it belong to the repo; module
 # cache paths are dropped. -buildvcs=false because the mounted checkout is owned
-# by another user, which makes git inside the container refuse it.
+# by another user, which makes git inside the container refuse it. No trailing
+# return: the pipeline status (docker failing) must reach the caller.
 service_package_dirs() {
     local service="${1}"
 
     docker run --rm -v "${PROJ_ROOT}:/repo:ro" ghcr.io/twistingmercury/golang-tooling:go1.27.3 \
         go -C /repo/src list -buildvcs=false -deps -f '{{if not .Standard}}{{.Dir}}{{end}}' "./cmd/${service}" \
-        | grep '^/repo/' | sed 's|^/repo/||'
-
-    return 0
+        | awk 'index($0, "/repo/") == 1 { print substr($0, 7) }'
 }
 
 # A service is also affected when a package it imports lives in a changed directory.
 mark_shared_package_service() {
     local service="${1}"
+    local package_dirs
     local package_dir
 
     if is_affected "${service}"; then
         return 0
+    fi
+
+    # Captured first: a process substitution would swallow a docker failure.
+    if ! package_dirs=$(service_package_dirs "${service}"); then
+        printf "ERROR: could not list the packages of %s\n" "${service}" >&2
+        return 1
     fi
 
     while IFS= read -r package_dir; do
@@ -112,7 +118,7 @@ mark_shared_package_service() {
             mark "${service}"
             return 0
         fi
-    done < <(service_package_dirs "${service}")
+    done <<< "${package_dirs}"
 
     return 0
 }
@@ -129,7 +135,9 @@ mark_shared_packages() {
     fi
 
     for service in api enricher mcp; do
-        mark_shared_package_service "${service}"
+        if ! mark_shared_package_service "${service}"; then
+            return 1
+        fi
     done
 
     return 0
@@ -169,7 +177,9 @@ main() {
         mark_passthrough_path "${path}"
     done <<< "${CHANGED_PATHS}"
 
-    mark_shared_packages
+    if ! mark_shared_packages; then
+        return 1
+    fi
 
     printf "%s" "${AFFECTED}" | sort -u
 
