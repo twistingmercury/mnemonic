@@ -52,7 +52,7 @@ graph LR
 Built with a standard `docker build` (`db/postgres/build.sh`). The `Dockerfile` is in `db/postgres/`:
 
 1. `FROM pgvector/pgvector:pg16`
-2. Sets `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` environment variables
+2. Sets the `POSTGRES_DB` and `POSTGRES_USER` environment variables; the caller supplies `POSTGRES_PASSWORD`
 3. Copies all `*.up.sql` files into `/docker-entrypoint-initdb.d/`
 
 On first container start with an empty data directory, Postgres runs the init scripts in filename order, applying all 10 migrations (`000001` to `000010`) automatically. No external tooling required.
