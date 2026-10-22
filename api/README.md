@@ -87,10 +87,9 @@ Run all commands from the repository root:
 ```bash
 make help
 make build-api
-make local
 ```
 
-`make local` builds the `api`, `mcp` and `enricher` binaries into `src/.bin` without tests or Docker. To run the whole stack behind the gateway, export `MNEMONIC_OPENAI_API_EMBEDDINGS_KEY` in your shell and run `docker compose -f deploy/docker-compose.yaml up -d` (`docker compose -f deploy/docker-compose.yaml down` stops it). That file is [deploy/docker-compose.yaml](../deploy/docker-compose.yaml), which uses the images named by `MNEMONIC_API_IMAGE`, `MNEMONIC_MCP_IMAGE` and `MNEMONIC_ENRICHER_IMAGE`, defaulting to the `latest-dev` images on ghcr.io, and publishes the API on `http://localhost:8080`. To run the service directly, copy [.env.example](../.env.example) to `.env` and use the databases from `db/docker-compose.yaml`. That file has no RabbitMQ, so run your own broker on `localhost:5672` (the `guest`/`guest` defaults in `.env.example`); the RabbitMQ in `deploy/docker-compose.yaml` publishes no host port and uses `mnemonic` / `mnemonic_dev`. The egress proxy is reachable only inside that compose network, so a direct run cannot use it.
+To run the whole stack behind the gateway, export `MNEMONIC_OPENAI_API_EMBEDDINGS_KEY` in your shell and run `docker compose -f deploy/docker-compose.yaml up -d` (`docker compose -f deploy/docker-compose.yaml down` stops it). That file is [deploy/docker-compose.yaml](../deploy/docker-compose.yaml), which uses the images named by `MNEMONIC_API_IMAGE`, `MNEMONIC_MCP_IMAGE` and `MNEMONIC_ENRICHER_IMAGE`, defaulting to the `latest-dev` images on ghcr.io, and publishes the API on `http://localhost:8080`. To run the service directly (`go -C src run ./cmd/api`), copy [.env.example](../.env.example) to `.env` and use the databases from `db/docker-compose.yaml`. That file has no RabbitMQ, so run your own broker on `localhost:5672` (the `guest`/`guest` defaults in `.env.example`); the RabbitMQ in `deploy/docker-compose.yaml` publishes no host port and uses `mnemonic` / `mnemonic_dev`. The egress proxy is reachable only inside that compose network, so a direct run cannot use it.
 
 ### Configuration
 
@@ -112,7 +111,7 @@ Nested keys use underscores in environment variables. For example, `server.port`
 The root Makefile provides the supported test entry points:
 
 ```bash
-make tests-unit          # Unit tests with coverage
+make tests-unit          # Unit tests with the race detector
 make analyze             # Linters, formatters and security scanners
 make build-api           # Image build plus the full E2E suite
 ```

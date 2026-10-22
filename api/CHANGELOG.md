@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- 2026-10-22: `make local` and the `src/.bin` output directory; run a service from source with `go -C src run ./cmd/api`. `make tests-unit` now runs `go -C src test -race -count=1 ./...` and no longer writes a coverage file.
 - 2026-10-22: The Go integration tests (build tag `integration`); the end-to-end suite in `tests/integration` covers the behavior a client can observe. Scenarios no client can create are no longer tested.
 
 ## [v0.5.0] - 2026-10-16

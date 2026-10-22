@@ -84,17 +84,16 @@ with the Mnemonic schema, and an OpenAI API key for live enrichment.
 
 ### Building & running
 
-Build and run a local binary:
+Run the service directly from source:
 
 ```bash
 git clone https://github.com/twistingmercury/mnemonic.git
 cd mnemonic
-make local
 export MNEMONIC_DATABASE_POSTGRES_PASSWORD=mnemonic_dev
 export MNEMONIC_DATABASE_NEO4J_PASSWORD=mnemonic_dev
 export MNEMONIC_QUEUE_RABBITMQ_PASSWORD=guest
 export MNEMONIC_OPENAI_API_KEY=your-api-key
-./src/.bin/mnemonic-enricher
+go -C src run ./cmd/enricher
 ```
 
 `.env.example` at the repository root lists every setting for local runs. In the

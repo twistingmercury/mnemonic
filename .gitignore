@@ -1,5 +1,3 @@
-# Go build output (src/.bin/ is where the build scripts put binaries)
-.bin/
 /src/main
 
 # Go test and coverage output
