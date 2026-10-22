@@ -10,9 +10,6 @@ coverage.out
 .env.*
 !.env.example
 
-# Dev stack port-forward pid and log files (written by the Makefile)
-.k8s-forward/
-
 # Logs and scratch files
 *.log
 *.tmp
@@ -45,16 +42,6 @@ __pycache__/
 Thumbs.db
 Desktop.ini
 
-# TEMPORARY: migration leftovers. Remove this whole block when the migration is finished.
-/librarian-*/
-/librarian-monorepo-plan.md
-/mnemonic-monorepo-plan.md
-/CLAUDE.md
-/e2e-consolidation-plan.md
-/e2e-audit/
-/rename-to-mnemonic-plan.md
-/_import/
-/MIGRATION_NOTES.md
-
-# Implementation plans are local working files
+# Local working files: implementation plans and the session handoff
 /docs/plan/
+/CLAUDE.md
