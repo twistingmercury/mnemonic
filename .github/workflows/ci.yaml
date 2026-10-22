@@ -46,14 +46,7 @@ jobs:
           MNEMONIC_COMPONENT: ${{ inputs.component }}
         run: |
           set -euo pipefail
-          if [ -n "${MNEMONIC_COMPONENT}" ] && [ "${MNEMONIC_COMPONENT}" != all ]; then
-            names="${MNEMONIC_COMPONENT}"
-          else
-            names="$(build/changed-components.sh "${MNEMONIC_BASE_SHA}" "${GITHUB_SHA}")"
-          fi
-          components="$(jq -R -s -c 'split("\n") | map(select(. != ""))' <<<"${names}")"
-          printf 'components=%s\n' "${components}" >> "${GITHUB_OUTPUT}"
-          printf 'services=%s\n' "$(jq -c 'map(select(. == "api" or . == "mcp" or . == "enricher"))' <<<"${components}")" >> "${GITHUB_OUTPUT}"
+          build/detect-components.sh "${MNEMONIC_BASE_SHA}" "${GITHUB_SHA}" "${MNEMONIC_COMPONENT}" >> "${GITHUB_OUTPUT}"
 
   static:
     runs-on: ubuntu-24.04
@@ -63,47 +56,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: shellcheck
-        run: |
-          git ls-files -z '*.sh' '*.bash' ':!tests/bats/test_helper/bats-*' \
-            | xargs -0 docker run --rm -v "${PWD}:/repo:ro" -w /repo \
-              koalaman/shellcheck:v0.11.0@sha256:61862eba1fcf09a484ebcc6feea46f1782532571a34ed51fedf90dd25f925a8d
-
-      - name: hadolint
-        run: |
-          docker run --rm -v "${PWD}:/repo:ro" -w /repo \
-            hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d \
-            hadolint --failure-threshold warning build/*/*.Dockerfile db/*/Dockerfile
-
-      - name: markdownlint
-        run: |
-          git ls-files -z '*.md' \
-            | xargs -0 docker run --rm -v "${PWD}:/repo:ro" -w /repo \
-              ghcr.io/igorshubovych/markdownlint-cli:v0.49.1@sha256:905baf9f6bd11da2ede8c394882c616509385f24b8b8d54fff6e111be88f39de \
-              -c .markdownlint.json
-
-      - name: helm lint
-        run: |
-          docker run --rm -v "${PWD}:/repo:ro" -w /repo \
-            alpine/helm:4.3.1@sha256:e3f8d5c462d75470fbb1fce79ad5c20063657096d1f98c0fcea869e2600e2e5e \
-            lint --strict deploy/helm/mnemonic
-
-      # The BATS image has no git and the tests need it, so bats is mounted
-      # from its image into a Debian Go image, which has git and GNU grep. The
-      # db files listed are the ones that need no database; the migration and
-      # image tests run in the db job.
-      # --mount does not pull its source image, so it is pulled first.
-      - name: bats
-        run: |
-          docker pull bats/bats:1.14.0@sha256:5322b877351fda0cc435de8c6116de7d0a2ec79d7c680132a0ef329a633bc66f
-          docker run --rm -v "${PWD}:/repo:ro" -w /repo \
-            --mount type=image,source=bats/bats:1.14.0@sha256:5322b877351fda0cc435de8c6116de7d0a2ec79d7c680132a0ef329a633bc66f,target=/bats,readonly \
-            --entrypoint /bats/opt/bats/bin/bats \
-            golang:1.27.3-bookworm@sha256:972b4110ba0f47539a975c31e52c64765e1ff19f2d74469ae4a595c6676e80a5 \
-            tests/bats db/tests/bats/build-scripts.bats db/tests/bats/build-version.bats db/tests/bats/schema-entrypoint.bats
-
-      - name: e2e boundary check
-        run: build/check-e2e-boundary.sh
+      - name: Static checks
+        run: build/static-checks.sh
 
   # A matrix needs at least one entry, so the job is skipped when no service is
   # affected. The script builds the image, runs the e2e suite and never pushes.
