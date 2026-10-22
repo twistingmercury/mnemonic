@@ -299,8 +299,10 @@ jobs:
       contents: read
       packages: write
     steps:
+      # Full history and tags: version.sh reads the component tags on main.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       # Only the build jobs of affected components uploaded an image artifact.
@@ -329,8 +331,8 @@ jobs:
             repo="ghcr.io/twistingmercury/mnemonic-${image}"
             docker load --input "${RUNNER_TEMP}/images/image-${image}.tar"
             tags="$(build/publish-tags.sh "${MNEMONIC_BRANCH}" "${image}" "${GITHUB_SHA}")"
-            for tag in ${tags}; do
+            while IFS= read -r tag; do
               docker tag "${repo}:latest" "${repo}:${tag}"
               docker push "${repo}:${tag}" || { printf '::error::push of mnemonic-%s failed; permission_denied means twistingmercury/mnemonic lacks Write under Manage Actions access for that package\n' "${image}"; exit 1; }
-            done
+            done <<<"${tags}"
           done <<<"${images}"
