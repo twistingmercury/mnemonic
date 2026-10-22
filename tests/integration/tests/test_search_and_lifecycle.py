@@ -9,6 +9,7 @@ are tokens only the test's own patterns contain, so every other pattern in the
 shared database scores 0 and a threshold above 0 keeps it out of the results.
 """
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -46,7 +47,7 @@ def sections(titles: list[str]) -> str:
 @pytest.fixture(scope="module")
 def tokens() -> TokenPool:
     # Every word the test patterns have in common, tags and names included.
-    return TokenPool(body("") + " integ integration test go python")
+    return TokenPool(body("") + " integ integration test go python concepts")
 
 
 def name_with(token: str) -> str:
@@ -54,8 +55,9 @@ def name_with(token: str) -> str:
 
 
 def found(text: str, names: list[str]) -> list[str]:
-    """The names a search result lists, in the order it lists them."""
-    return sorted((n for n in names if f"## {n} (" in text), key=lambda n: text.index(f"## {n} ("))
+    """The names a search result lists as direct matches, in the order it lists them."""
+    starts = {n: m.start() for n in names if (m := re.search(rf"## {re.escape(n)} \(\d+% match\)", text))}
+    return sorted(starts, key=starts.__getitem__)
 
 
 @dataclass(frozen=True)
@@ -133,6 +135,49 @@ def test_search_filters_by_language_and_tags(
     assert search(tags=[tag_a, tag_b]) == {go_both, python_both}, "tags are an AND filter"
     assert search(tags=[tag_a, tag_b], language="go") == {go_both}
     assert search(tags=[tokens.new()]) == set(), "a tag no pattern carries matches nothing"
+
+
+def test_search_result_shows_section_tags_body_and_match(
+    api: ApiClient, mcp: McpClient, create_with: CreateWith, tokens: TokenPool
+) -> None:
+    query, tag = tokens.new(), tokens.new()
+    name = name_with(tokens.new())
+    wait.enriched(api, create_with(body(query), name=name, tags=[tag]).pattern().id)
+
+    text = mcp.call_ok("search_patterns", {"query": query, "threshold": THRESHOLD})
+
+    # The chunk has five words (integ, the name token, the tag, overview, the query word) and shares one: 1/sqrt(5).
+    assert f"## {name} (45% match)\n\n**Section:** Overview\n\n**Tags:** {tag}\n\n" in text
+    assert f"{tag}\n\n## Overview\n\n{query}\n" in text, f"the chunk body is not shown under its tags:\n{text}"
+
+
+def test_search_expands_through_the_graph_and_filters_the_expansion(
+    api: ApiClient, mcp: McpClient, create_with: CreateWith, tokens: TokenPool
+) -> None:
+    query, concept, filler, tag, other_tag = (tokens.new() for _ in range(5))
+    seed, neighbour = name_with(tokens.new()), name_with(tokens.new())
+    # The seed matches the query; the neighbour shares only the concept, so only the graph can lead to it.
+    seed_content = f"## Overview\n\n{query}\n\nConcepts: {concept}\n"
+    neighbour_content = f"## Overview\n\n{filler}\n\nConcepts: {concept}\n"
+    created = [
+        create_with(seed_content, name=seed, language="go", tags=[tag, other_tag]).pattern(),
+        create_with(neighbour_content, name=neighbour, language="python", tags=[tag]).pattern(),
+    ]
+    for pattern in created:
+        wait.enriched(api, pattern.id)
+
+    def search(**filters: object) -> str:
+        return mcp.call_ok("search_patterns", {"query": query, "threshold": THRESHOLD, **filters})
+
+    text = search()
+    assert found(text, [seed, neighbour]) == [seed], f"the neighbour must not be a direct match:\n{text}"
+    graph_section = text.partition("### Related Patterns (via graph)")[2]
+    want = f"## {neighbour} (similarity: 1.00)\n\n**Found via:** {seed}\n**Shared concepts:** {concept}\n"
+    assert want in graph_section, f"want the neighbour found via the seed:\n{text}"
+
+    assert neighbour not in search(language="go"), "the neighbour is python, so a go search must not expand to it"
+    assert neighbour not in search(tags=[other_tag]), "the neighbour lacks the tag, so the expansion must drop it"
+    assert neighbour in search(tags=[tag]), "setup: a tag both carry keeps the expansion"
 
 
 def update_held(api: ApiClient, stub: StubClient, pattern: Pattern, token: str) -> list[str]:
