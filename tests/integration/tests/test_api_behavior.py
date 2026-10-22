@@ -5,7 +5,7 @@ unique names, tags and tokens, so the tests share one stack in any order. Tests
 that inject a stub failure run serially: the stub's reset is global.
 """
 
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 from typing import Any
 
 import pytest
@@ -23,8 +23,10 @@ SEARCH_THRESHOLD = 0.1
 # The section_title column is varchar(255).
 OVERLONG_TITLE = "t" * 300
 
-# Creates a pattern with payload overrides (202 expected) and returns the response; deleted when the test ends.
+# The create_with fixture (conftest.py): payload overrides -> the create response.
 CreateWith = Callable[..., ApiResponse]
+# The listed_ids fixture (conftest.py): query parameters -> the listed pattern ids.
+ListedIds = Callable[..., set[str]]
 
 
 def body(token: str = "") -> str:
@@ -41,25 +43,6 @@ def two_section_content(first: str, second: str) -> str:
 def tokens() -> TokenPool:
     # Every word the test patterns have in common, tags and names included.
     return TokenPool(body("") + " " + two_section_content("one", "two") + " integ api behavior")
-
-
-@pytest.fixture
-def create_with(api: ApiClient) -> Iterator[CreateWith]:
-    """Create patterns with chosen description, tags and content; delete them when the test ends."""
-    created: list[str] = []
-
-    def create(content: str | None = None, **overrides: Any) -> ApiResponse:
-        name = wait.unique_name("integ-api")
-        response = api.create(pattern_payload(name, content if content is not None else body(), **overrides))
-        assert response.status == 202, f"create {name}: status {response.status}\nbody: {response.text}"
-        created.append(response.pattern().id)
-        return response
-
-    yield create
-
-    # Already gone (404) is fine.
-    for pattern_id in created:
-        api.delete(pattern_id)
 
 
 def fetch(api: ApiClient, pattern_id: str) -> ApiResponse:
@@ -86,12 +69,6 @@ def search_ids(api: ApiClient, query: str) -> list[str]:
     response = api.search(query, threshold=SEARCH_THRESHOLD)
     assert response.status == 200, f"API search {query!r}: status {response.status}\nbody: {response.text}"
     return response.pattern_ids()
-
-
-def listed_ids(api: ApiClient, **params: Any) -> set[str]:
-    response = api.list_patterns(**params)
-    assert response.status == 200, f"list {params}: status {response.status}\nbody: {response.text}"
-    return {p.id for p in response.patterns()}
 
 
 def failing_pattern(
@@ -144,17 +121,17 @@ def test_create_and_get_carry_the_submitted_fields(api: ApiClient, create_with: 
     assert created["enriched_at"] is None, f"create: enriched_at {created['enriched_at']!r} while pending"
 
 
-def test_list_filters(api: ApiClient, create_with: CreateWith, tokens: TokenPool) -> None:
+def test_list_filters(create_with: CreateWith, listed_ids: ListedIds, tokens: TokenPool) -> None:
     tag_a, tag_b, word = tokens.new(), tokens.new(), tokens.new()
     both = create_with(tags=[tag_a, tag_b]).pattern().id
     a_with_word = create_with(tags=[tag_a], description=f"mentions {word}").pattern().id
     word_only = create_with(tags=None, description=f"also mentions {word}").pattern().id
     create_with(tags=[tag_b])  # a decoy for every filter below
 
-    assert listed_ids(api, tags=f"{tag_a},{tag_b}") == {both}, "tags=a,b must need both tags"
-    assert listed_ids(api, tags=tag_a) == {both, a_with_word}, "tags=a must return every pattern tagged a"
-    assert listed_ids(api, search=word) == {a_with_word, word_only}, "search must match the description alone"
-    assert listed_ids(api, tags=tag_a, search=word) == {a_with_word}, "tags and search must both hold"
+    assert listed_ids(tags=f"{tag_a},{tag_b}") == {both}, "tags=a,b must need both tags"
+    assert listed_ids(tags=tag_a) == {both, a_with_word}, "tags=a must return every pattern tagged a"
+    assert listed_ids(search=word) == {a_with_word, word_only}, "search must match the description alone"
+    assert listed_ids(tags=tag_a, search=word) == {a_with_word}, "tags and search must both hold"
 
 
 def test_list_pagination_walks_every_page_once(api: ApiClient, create_with: CreateWith, tokens: TokenPool) -> None:

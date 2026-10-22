@@ -2,17 +2,21 @@
 
 import os
 from collections.abc import Callable, Iterator
+from typing import Any
 
 import pytest
 
+from mnemonic_e2e import wait
 from mnemonic_e2e.amqp import Amqp
-from mnemonic_e2e.api import ApiClient, Pattern, pattern_payload
+from mnemonic_e2e.api import ApiClient, ApiResponse, Pattern, pattern_payload
 from mnemonic_e2e.config import Settings
 from mnemonic_e2e.db import Graph, Pg
 from mnemonic_e2e.mcp import McpClient
 from mnemonic_e2e.stub import StubClient
 
 CreatePattern = Callable[[str, str], Pattern]
+CreateWith = Callable[..., ApiResponse]
+ListedIds = Callable[..., set[str]]
 
 
 @pytest.fixture(scope="session")
@@ -76,3 +80,35 @@ def injected_failures(stub: StubClient) -> Iterator[StubClient]:
     """The stub, with every injected failure cleared when the test ends so none leaks into another test."""
     yield stub
     stub.reset()
+
+
+@pytest.fixture
+def create_with(api: ApiClient) -> Iterator[CreateWith]:
+    """Create patterns with chosen name, tags, description and content (202 expected); delete them at test end."""
+    created: list[str] = []
+
+    def create(content: str | None = None, name: str | None = None, **overrides: Any) -> ApiResponse:
+        name = name or wait.unique_name("integ-api")
+        content = content or "## Overview\n\nAPI test pattern.\n"
+        response = api.create(pattern_payload(name, content, **overrides))
+        assert response.status == 202, f"create {name}: status {response.status}\nbody: {response.text}"
+        created.append(response.pattern().id)
+        return response
+
+    yield create
+
+    # Already gone (404) is fine.
+    for pattern_id in created:
+        api.delete(pattern_id)
+
+
+@pytest.fixture
+def listed_ids(api: ApiClient) -> ListedIds:
+    """List patterns with the given query parameters (200 expected) and return their ids."""
+
+    def listed(**params: Any) -> set[str]:
+        response = api.list_patterns(**params)
+        assert response.status == 200, f"list {params}: status {response.status}\nbody: {response.text}"
+        return {p.id for p in response.patterns()}
+
+    return listed
