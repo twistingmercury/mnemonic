@@ -57,3 +57,6 @@ Desktop.ini
 /rename-to-mnemonic-plan.md
 /_import/
 /MIGRATION_NOTES.md
+
+# Implementation plans are local working files
+/docs/plan/

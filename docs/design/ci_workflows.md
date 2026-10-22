@@ -1,7 +1,7 @@
 ---
-version: 2
+version: 4
 date: 2026-10-22
-notes: Settled the owner's questions on tags, versions, registry access, forks and the db, gateway and helm images; added the registry state, bootstrap and launch checklist.
+notes: Workflow steps run scripts and tools directly, never the Makefile, which is a local convenience; every tool runs from a pinned Docker image, nothing is installed on the runner.
 ---
 
 # CI Workflows
@@ -42,7 +42,7 @@ Non-goals (this phase):
 
 - Release tagging and the version scheme beyond what `build/version.sh` already does (Phase 4).
 - Dependabot and the wiki (Phase 5).
-- The Kubernetes end-to-end run (`make k8s-test`); it needs the real OpenAI key and stays a manual run by the owner.
+- The Kubernetes end-to-end run; it needs the real OpenAI key and stays a manual run by the owner.
 - Changing the `-dev` suffix. The owner is considering dropping it and decided to leave it as it is for now.
 
 Anti-goals:
@@ -55,6 +55,7 @@ Anti-goals:
 
 - Local and CI runs behave the same: an ephemeral clean runner, the same scripts, the same pinned images.
 - The `build/<n>/<n>.build.sh` scripts build the image and run the e2e suite, and never push. Pushing is a separate workflow step.
+- Nothing is installed on the runner. Every tool (shellcheck, hadolint, markdownlint, bats, helm, OPA, Envoy) runs from a Docker image pinned to a version tag and digest.
 - Pinned Go toolchain image: `ghcr.io/twistingmercury/golang-tooling:go1.27.3`, changed in one place.
 - No inline suppressions anywhere, workflows included.
 - hadolint runs with `--failure-threshold warning`.
@@ -99,18 +100,18 @@ A new script, `build/changed-components.sh`, prints the components to build for 
 
 Always run, on every trigger, without path filtering (they are cheap):
 
-- Static checks: shellcheck, hadolint, markdownlint and `helm lint --strict`, through the Makefile targets `lint-shell`, `lint-docker`, `lint-md` and `lint-helm`.
-- Build tooling tests: `make tests-bats`.
+- Static checks: shellcheck, hadolint, markdownlint and `helm lint --strict`, each run directly.
+- Build tooling tests: `bats tests/bats`.
 - Boundary check: `build/check-e2e-boundary.sh`.
 
 Run when their inputs changed:
 
 - One job per affected service: run `build/<n>/<n>.build.sh`. It builds the image from scratch, runs the quality gates and the full e2e suite inside containers.
-- `db/`: `make db-test` and build of the two database images.
-- `gateway/`: `make test-policy`, `make validate-envoy` and `make e2e-stub`.
+- `db/`: the two database test runners (`db/tests/postgres-test-runner.sh`, `db/tests/neo4j-test-runner.sh`) and build of the two database images.
+- `gateway/`: the OPA policy checks, the Envoy config validations and the stub-gateway e2e run.
 - `deploy/helm`: lint and template only.
 
-Not in CI: `make k8s-test`.
+Not in CI: the Kubernetes end-to-end run.
 
 ## Publishing images
 
@@ -169,7 +170,7 @@ These are the author's calls, not agreed with the owner:
 - Static checks run unfiltered on every run.
 - The manual run picks a component but never pushes.
 - `ci-gate` fails when the detection job fails or is cancelled, not only when a build fails.
-- The exact tested image reaches the publish job by save and load, which needs `build/build-lib.sh` to keep or export the image on success (today it removes the throwaway tag).
+- The exact tested image reaches the publish job by save and load. `build/build-lib.sh` already leaves the tagged image in place after the run (teardown removes only unnamed images), so the build job runs `docker save` on it and uploads the file as a workflow artifact.
 - Concurrency: pushes to `develop` and `main` queue and are never cancelled mid-publish; a newer run on the same pull request cancels the older one.
 
 ## Left to the builder

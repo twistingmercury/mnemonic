@@ -1,49 +1,15 @@
-# Build context is the repo root; the Go service Dockerfiles in build/<name>/
-# COPY only LICENSE and parts of src/. Keep everything else out of the context.
+# Build context is the repo root. Ignore everything, then admit only what the
+# service Dockerfiles in build/<name>/ COPY.
+*
 
-# VCS and the temporary fork references (the fork checkouts keep their old names)
-.git
-.gitignore
-.dockerignore
-/librarian-*/
-/_import/
-
-# Everything the Go services do not build from
-/admin/
-/api/
-/mcp/
-/enricher/
-/gateway/
-/db/
-/deploy/
-/docs/
-/tests/
-/web/
-/build/
-
-# Documentation and notes
-**/*.md
-/CLAUDE.md
-
-# Secrets and local environment
-**/.env
-**/.env.*
-**/*.env
-**/*.env.*
-**/*.enc
-**/*.key
-**/*.pem
-
-# Tool output and dependencies
-**/node_modules
-**/.bin
-**/bin
-**/coverage.out
-**/coverage
-**/*.log
-**/*.tmp
-
-# Editor and OS files
-**/.vscode
-**/.idea
-**/.DS_Store
+!LICENSE
+!src/go.mod
+!src/go.sum
+!src/.golangci.yml
+!src/cmd/api
+!src/cmd/mcp
+!src/cmd/enricher
+!src/internal/api
+!src/internal/mcp
+!src/internal/enricher
+!src/docs/api
