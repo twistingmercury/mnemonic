@@ -15,7 +15,7 @@ RUN chmod 0755 /startup/schema
 
 # Healthy only once the wrapper has applied the schema and written the marker.
 HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=5 \
-    CMD test -f /tmp/schema_ready
+    CMD ["test", "-f", "/tmp/schema_ready"]
 
 # Same tini wrapper as the base image, with the schema entrypoint in front of the base one.
 ENTRYPOINT ["tini", "-g", "--", "/startup/schema-entrypoint.sh"]
