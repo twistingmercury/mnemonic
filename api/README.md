@@ -113,14 +113,11 @@ The root Makefile provides the supported test entry points:
 
 ```bash
 make tests-unit          # Unit tests with coverage
-make tests-integration   # Tests tagged `integration`; needs running databases, see below
 make tests-bench         # Internal package benchmarks
 make build-api           # Image build plus the full E2E suite
 ```
 
 The E2E suite uses the pre-migrated PostgreSQL and Neo4j images and a local OpenAI stub (`tests/openai-stub`), and requires Docker. It never calls api.openai.com.
-
-`make tests-integration` does not start containers. Start the databases first with `docker compose -f db/docker-compose.yaml up -d --wait postgres neo4j`, then export `MNEMONIC_TEST_DATABASE_URL` (Postgres on port 5435) and `MNEMONIC_NEO4J_URI`, `MNEMONIC_NEO4J_USER`, `MNEMONIC_NEO4J_PASSWORD` and `MNEMONIC_NEO4J_DATABASE` (Neo4j Bolt on port 7690). The target fails and names any variable that is missing. It runs the tests tagged `integration` for the api, mcp and enricher packages, which `make tests-unit` skips.
 
 `make build-api` is the verification bar. A stack left running by `make up` keeps whatever image it began with, so testing against it says nothing about the current working tree.
 

@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - 2026-10-21: Renamed the project back to Mnemonic in the monorepo, dropping the placeholder name "Librarian": the Go module path is `github.com/twistingmercury/mnemonic`, the image is `ghcr.io/twistingmercury/mnemonic-mcp`, every environment variable uses the `MNEMONIC_` prefix and the host ports are the original ones (gateway 8080, 8081 and 8180).
 
+### Removed
+
+- 2026-10-22: The Go integration tests (build tag `integration`) and the `make tests-integration` target; the end-to-end suite in `tests/integration` covers the behavior a client can observe. Scenarios no client can create are no longer tested.
+
 ## [0.6.0] - 2026-10-16
 
 ### Changed

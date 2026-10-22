@@ -71,6 +71,10 @@ imports or reads service source. `build/check-e2e-boundary.sh` and
 | `test_mcp_edge.py` | MCP over the real listener: a pending pattern, a pattern with no graph node, unknown ids, cross-site `POST` returns 403, `GET` returns 405, a client sending no MCP headers |
 | `test_enricher_failures.py` | Jobs seeded in Postgres and published straight to RabbitMQ: a terminal OpenAI failure, a malformed message, an unknown job id |
 | `test_api_behavior.py` | API behavior that needs a real database and a running enricher: search excludes a pattern until it is enriched, `enrichment_error`, list filters, pagination, PUT replacement, a failed update keeps the prior state |
+| `test_api_list_and_limits.py` | List ordering and filters, the content size limit, and the 404 and 409 answers |
+| `test_api_concurrency.py` | Concurrent API writes, and a single `RELATED_TO` edge per pair under concurrent enrichment |
+| `test_graph_behavior.py` | Related patterns, concepts, and pruning after a delete or an update, seen through the API and MCP |
+| `test_search_and_lifecycle.py` | MCP search ranking and filters, and the create and update lifecycle of a pattern's chunks and jobs |
 
 Single-service behavior that needs no other service belongs in that service's
 Go tests, not here. The `src/mnemonic_e2e` package holds the helpers (HTTP,
@@ -88,6 +92,9 @@ services through `MNEMONIC_OPENAI_BASE_URL`, so runs are deterministic and free:
   the pattern content.
 - **`POST /control/fail?match=X&n=N`** fails the next N embedding requests
   whose input contains X.
+- **`POST /control/delay?match=X&ms=N`** delays embedding requests whose input
+  contains X by N milliseconds. `POST /control/reset` clears every injected
+  failure and delay.
 
 The enricher runs with `MNEMONIC_OPENAI_RETRY_ATTEMPTS=0` and
 `MNEMONIC_ENRICHMENT_RETRY_DELAY=1s` so one forced failure reaches its retry
@@ -144,7 +151,7 @@ The project uses `uv` and Python 3.14. From this directory:
 
 ```bash
 uv sync --frozen
-uv run --frozen pytest -q --ignore=tests/test_stack_flows.py --ignore=tests/test_smoke_images.py --ignore=tests/test_mcp_edge.py --ignore=tests/test_enricher_failures.py --ignore=tests/test_api_behavior.py
+uv run --frozen pytest -q --ignore=tests/test_stack_flows.py --ignore=tests/test_smoke_images.py --ignore=tests/test_mcp_edge.py --ignore=tests/test_enricher_failures.py --ignore=tests/test_api_behavior.py --ignore=tests/test_api_list_and_limits.py --ignore=tests/test_api_concurrency.py --ignore=tests/test_graph_behavior.py --ignore=tests/test_search_and_lifecycle.py
 ```
 
 ### Building & running
@@ -170,7 +177,7 @@ The files above are of two kinds:
   `test_stub.py`, `test_tokens.py`, `test_wait.py`, `test_smoke_scaffold.py`,
   `test_blackbox.py`) test the helper package and need no stack. Run them with
   the `--ignore` flags shown under Quick Start.
-- **Stack tests** (the five files in the table above) need the running compose
+- **Stack tests** (the nine files in the table above) need the running compose
   stack and run in the runner container.
 
 Before a change, run the gates: `uv run --frozen ruff format --check .`,

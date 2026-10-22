@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   MCP read path after a delete, related patterns found through shared
   concepts, and the enricher's retry sweep recovering a failed job.
 - A `pull_request` trigger, so changes to this suite are tested before merge.
+- 2026-10-22: Tests `test_api_list_and_limits.py`, `test_api_concurrency.py`, `test_graph_behavior.py` and `test_search_and_lifecycle.py`, which replace the Go integration tests of the api, mcp and enricher.
+- 2026-10-22: A `POST /control/delay?match=<substring>&ms=<n>` control on the OpenAI stub, cleared by `POST /control/reset`, and `StubClient.delay`.
 
 ### Changed
 

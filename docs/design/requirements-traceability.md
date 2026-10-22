@@ -19,8 +19,8 @@ This matrix maps each requirement to the architecture and design documents that 
 
 Paths are relative to each service repository's `src/` directory. Test suites:
 
-- **Unit/integration** — `*_test.go` next to the code (`make tests-unit`; database-backed `*_integration_test.go` via `make tests-integration` in the api service)
-- **End-to-end** — the Python black-box suite in `tests/integration/tests/` (`test_stack_flows.py`, `test_smoke_images.py`, `test_mcp_edge.py`, `test_enricher_failures.py`, `test_api_behavior.py`), run by each `build/<service>/<service>.build.sh` against the image just built, the other services' `latest-dev` images and an OpenAI stub
+- **Unit** — `*_test.go` next to the code (`make tests-unit`, run with `-race` in each Docker build). There is no Go integration tier; database-backed behavior is covered by the end-to-end suite
+- **End-to-end** — the Python black-box suite in `tests/integration/tests/` (`test_stack_flows.py`, `test_smoke_images.py`, `test_mcp_edge.py`, `test_enricher_failures.py`, `test_api_behavior.py`, `test_api_list_and_limits.py`, `test_api_concurrency.py`, `test_graph_behavior.py`, `test_search_and_lifecycle.py`), run by each `build/<service>/<service>.build.sh` against the image just built, the other services' `latest-dev` images and an OpenAI stub
 
 Status: **Implemented**, **Partial** (see note), **Not implemented**, or **Post-MVP** (deliberately deferred).
 
@@ -39,9 +39,9 @@ flowchart LR
         T --> PSV[service/pattern]
     end
     PUB -->|enrichment-jobs| W
-    IT[integration tests] -.-> API
-    IT -.-> MCP
-    IT -.-> ENR
+    E2E[e2e tests] -.-> API
+    E2E -.-> MCP
+    E2E -.-> ENR
 ```
 
 | Req  | Status          | Code                                                                                                                                                                                                                    | Tests                                                                                                                                                                                                                                                                          |
