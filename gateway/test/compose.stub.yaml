@@ -1,5 +1,5 @@
 # The gateway alone, with stub upstreams standing in for mnemonic-api and
-# mnemonic-mcp. Used by CI and `make e2e-stub`; needs no Mnemonic images,
+# mnemonic-mcp. Meant for CI (the workflows are not written yet) and `docker compose -f gateway/test/compose.stub.yaml up` (see gateway/README.md); needs no Mnemonic images,
 # databases or OpenAI key.
 
 services:

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # k8s-e2e.sh: end-to-end and isolation checks for the Mnemonic chart on the
 # mnemonic minikube profile. Talks to the gateway through the port-forwards
-# from `make k8s-forward`, enriches with the real OpenAI API through the egress
+# described in the Kubernetes section of gateway/README.md, enriches with the real OpenAI API through the egress
 # proxy, and proves the NetworkPolicies are enforced with short-lived probe
 # pods. Every isolation check has a positive control, so a probe that cannot
 # reach anything never passes as "blocked".
 #
-# Usage: make k8s-test, or MNEMONIC_KUBE_CONTEXT=mnemonic deploy/test/k8s-e2e.sh
+# Usage: MNEMONIC_KUBE_CONTEXT=mnemonic deploy/test/k8s-e2e.sh
 
 set -euo pipefail
 
@@ -120,12 +120,12 @@ validate_args() {
     done
 
     if ! kubectl config get-contexts "${MNEMONIC_KUBE_CONTEXT}" >/dev/null 2>&1; then
-        printf "ERROR: kubectl context %s not found; run make k8s-up\n" "${MNEMONIC_KUBE_CONTEXT}" >&2
+        printf "ERROR: kubectl context %s not found; create the minikube profile as described in the Kubernetes section of gateway/README.md\n" "${MNEMONIC_KUBE_CONTEXT}" >&2
         return 1
     fi
 
     if ! curl -fs -m 5 -o /dev/null "${MNEMONIC_API_URL}/version"; then
-        printf "ERROR: gateway not reachable at %s; run make k8s-forward\n" "${MNEMONIC_API_URL}" >&2
+        printf "ERROR: gateway not reachable at %s; start the port-forwards as described in the Kubernetes section of gateway/README.md\n" "${MNEMONIC_API_URL}" >&2
         return 1
     fi
 

@@ -1,12 +1,12 @@
 # Values for the local minikube deployment. deploy/docker-compose.yaml
 # is the reference stack; settings here mirror it unless noted.
 
-# `make k8s-images` loads a mnemonic-* image built on the host into the node
-# with `minikube image load` and replaces a stale copy. An image the host does
+# Loading a mnemonic-* image built on the host into the node (`minikube image
+# load`) replaces a stale copy; see the Kubernetes section of gateway/README.md. An image the host does
 # not have is not loaded, and with IfNotPresent the node pulls it from ghcr.io.
 imagePullPolicy: IfNotPresent
 
-# ConfigMaps created by `make k8s-config` straight from gateway/envoy/, gateway/opa/ and
+# ConfigMaps created by hand (see the Kubernetes section of gateway/README.md) straight from gateway/envoy/, gateway/opa/ and
 # gateway/keycloak/. The chart mounts them and never copies their content.
 configMaps:
   envoy: mnemonic-envoy            # gateway/envoy/envoy.yaml
@@ -16,7 +16,8 @@ configMaps:
   keycloakRealm: mnemonic-keycloak-realm  # gateway/keycloak/realm-mnemonic.json
 
 openai:
-  # Secret holding the real OpenAI key, created by `make k8s-secret`. Only the
+  # Secret holding the real OpenAI key, created by hand (see the Kubernetes section of
+  # gateway/README.md). Only the
   # egress pod mounts it; the services get the placeholder below.
   existingSecret: mnemonic-openai
   secretKey: api-key
@@ -127,8 +128,8 @@ keycloak:
   serviceName: keycloak
   port: 8080
   managementPort: 9000
-  # Public URL clients reach Keycloak on (kubectl port-forward, see
-  # make k8s-forward). Tokens carry it as their issuer, which must match the
+  # Public URL clients reach Keycloak on (kubectl port-forward, see the
+  # Kubernetes section of gateway/README.md). Tokens carry it as their issuer, which must match the
   # issuer in envoy/envoy.yaml.
   publicUrl: http://localhost:8180
   # start-dev runs a build step (kc.sh build-and-exit) before it serves, and

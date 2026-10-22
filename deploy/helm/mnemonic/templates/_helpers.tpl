@@ -39,7 +39,7 @@ helm.sh/chart: {{ include "mnemonic.chart" .ctx }}
 {{- end -}}
 
 {{/*
-Checksum of ConfigMaps created outside the chart (make k8s-config), so a
+Checksum of ConfigMaps created outside the chart (see the Kubernetes section of gateway/README.md), so a
 change to a repo config file restarts the pods that mount it on the next
 helm upgrade. lookup returns nothing under `helm template`, which only makes
 the checksum constant there.

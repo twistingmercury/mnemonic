@@ -2,8 +2,9 @@ Mnemonic is installed in namespace {{ .Release.Namespace }}.
 
 Reach it from the host (from the repository root):
 
-  make k8s-forward     # API edge localhost:8080, MCP edge localhost:8081, Keycloak localhost:8180
-  make k8s-test        # end-to-end and NetworkPolicy checks
+  Port-forward Envoy and Keycloak: API edge localhost:8080, MCP edge localhost:8081,
+  Keycloak localhost:8180. The end-to-end and NetworkPolicy checks are
+  deploy/test/k8s-e2e.sh. See the Kubernetes section of gateway/README.md.
 
 Tokens carry the issuer {{ .Values.keycloak.publicUrl }}/realms/mnemonic, so get them
 through the Keycloak port-forward.
