@@ -1,7 +1,7 @@
 ---
-version: 2
-date: 2026-10-21
-notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
+version: 3
+date: 2026-10-22
+notes: "Topology and interaction tables now include the Envoy gateway (JWT + OPA) and the egress proxy; \"no authentication\" replaced by the gateway's checks; MVP 4 status noted."
 ---
 
 # System Architecture
@@ -43,25 +43,33 @@ Mnemonic uses a decomposed service architecture with three independent services 
 All three services serve `/health` and `/version` on `server.port` (default 8080) and Prometheus metrics on `observability.metrics.port` (default 9090, path `/metrics`). Only the mcp service listens on 8081 (`mcp.port`).
 
 ```mermaid
+---
+title: Mnemonic topology (compose and Helm stacks)
+---
 flowchart LR
-    CC["Claude Code"] -- "Streamable HTTP<br/>POST /mcp :8081" --> MCP["mcp service<br/>(read-only tools)"]
-    Admin["Admin UI (not in this repo for now) / curl"] -- "REST /v1/api :8080" --> API["api service"]
+    CC["Claude Code"] -- "Streamable HTTP + JWT<br/>POST /mcp :8081" --> GW["Envoy gateway<br/>(JWT check, OPA)"]
+    Admin["Admin UI (not in this repo for now) / curl"] -- "REST + JWT<br/>/v1/api :8080" --> GW
+    GW -- "/mcp :8081" --> MCP["mcp service<br/>(read-only tools)"]
+    GW -- "/v1/api :8080" --> API["api service"]
     API -- "write pattern, chunks,<br/>enrichment jobs (one tx)" --> PG[("PostgreSQL<br/>+ pgvector")]
     API -- "publish job_id<br/>(traceparent header)" --> MQ[["RabbitMQ<br/>enrichment-jobs"]]
     MQ -- consume --> ENR["enricher service"]
     ENR -- "15s retry sweep<br/>(SKIP LOCKED)" --> PG
     ENR -- "chunk embeddings,<br/>job and pattern status" --> PG
     ENR -- "concepts, RELATED_TO" --> NEO[("Neo4j")]
-    ENR & API & MCP -- "embeddings / extraction" --> OAI(["OpenAI<br/>(openai.base_url)"])
+    ENR & API & MCP -- "embeddings / extraction<br/>(openai.base_url)" --> EGR["egress proxy<br/>(holds the OpenAI key)"]
+    EGR -- "HTTPS" --> OAI(["OpenAI"])
     MCP -- "vector search" --> PG
     MCP -- "graph traversal" --> NEO
     API -- "search, read" --> PG
     API -- "graph read,<br/>delete cleanup" --> NEO
 ```
 
-Only the enricher calls the extraction (chat completion) model; the API and MCP server call the embedding model to vectorize search queries. Every service also reports on OpenAI reachability in `/health`.
+Only the enricher calls the extraction (chat completion) model; the API and MCP server call the embedding model to vectorize search queries. Every service also reports on OpenAI reachability in `/health`; behind the egress proxy that check (`GET /models/<model>`) is refused with 403 and always reports a Warning.
 
-This is the MVP 2 topology. For the full evolution from monolith through cloud deployment, see diagrams [01](../../diagrams/01-concept-local-iteration.md) through [05](../../diagrams/05-concept-cloud-iteration.md).
+The services carry no authentication code. The compose stack (`deploy/docker-compose.yaml`) and the Helm chart (`deploy/helm/mnemonic`) publish only the Envoy edges (:8080 API, :8081 MCP) and Keycloak (:8180); the services, OPA and the data stores are reachable only inside the stack, and only the egress proxy reaches the internet. Run on their own, as in the e2e test stack, the services listen without any gateway. See [Security Architecture](01-security-architecture.md#current-state-local-phase).
+
+This is the MVP 2 topology plus the gateway and the Helm chart planned for MVP 4. For the full evolution from monolith through cloud deployment, see diagrams [01](../../diagrams/01-concept-local-iteration.md) through [05](../../diagrams/05-concept-cloud-iteration.md).
 
 ## Component Breakdown
 
@@ -82,7 +90,7 @@ The MCP server (the mcp service, MCP on port 8081) exclusively provides the read
 - Read-only access to all data stores (no writes to any database)
 - Streamable HTTP transport at `/mcp`, stateless mode, wrapped in `otelhttp` so incoming W3C trace context is continued
 - Lightweight service (calls the embedding API for query vectorization only)
-- No authentication (local, single-user phase)
+- No authentication in process; in the shipped stacks it is reached only through the Envoy MCP edge
 
 ### Mnemonic Admin API
 
@@ -100,7 +108,7 @@ The Admin API (the api service, port 8080) provides a REST interface for pattern
 
 - Returns 202 Accepted for pattern create (enrichment is async); `PUT` returns 204 No Content (ADR-006)
 - Best-effort RabbitMQ publish (ADR-009): if the publish fails after one reconnect and retry, the job row stays `pending` and the enricher's retry sweep claims it
-- No authentication (local, single-user phase)
+- No authentication in process; in the shipped stacks it is reached only through the Envoy API edge
 
 ### Mnemonic Enricher
 
@@ -144,9 +152,8 @@ For full tool definitions and parameters, see [MCP Tools](../mnemonic/08-mcp-too
 
 **Integration Characteristics:**
 
-- Read-only access via MCP over Streamable HTTP (`http://<host>:8081/mcp`)
-- Runs in a trusted environment (local, single user)
-- No authentication
+- Read-only access via MCP over Streamable HTTP (`http://<host>:8081/mcp`, the Envoy MCP edge in the shipped stacks)
+- Through the gateway, requests need a Keycloak token with audience `mnemonic-mcp`; `search_patterns` needs the `mcp:search` scope and the other tools `mcp:read`
 - Searches team knowledge for workflow patterns
 
 ## Data Flow
@@ -237,21 +244,21 @@ If a step fails, the Enricher marks the job (and the chunk and pattern) failed a
 
 ### Claude Code to MCP Server
 
-| Aspect            | Detail                                                 |
-| ----------------- | ------------------------------------------------------ |
-| Protocol          | MCP over Streamable HTTP (stateless), `/mcp` on :8081  |
-| Authentication    | None (local, single-user phase)                        |
-| Request contains  | MCP tool name, parameters                              |
-| Response contains | Markdown text content: search results, pattern details |
+| Aspect            | Detail                                                                                                          |
+| ----------------- | --------------------------------------------------------------------------------------------------------------- |
+| Protocol          | MCP over Streamable HTTP (stateless), `/mcp` on :8081                                                           |
+| Authentication    | At the Envoy MCP edge: Keycloak JWT (audience `mnemonic-mcp`), OPA checks the tool's scope; none in the service |
+| Request contains  | MCP tool name, parameters                                                                                       |
+| Response contains | Markdown text content: search results, pattern details                                                          |
 
 ### Admin Tools to REST API
 
-| Aspect            | Detail                                                                                              |
-| ----------------- | --------------------------------------------------------------------------------------------------- |
-| Protocol          | REST over HTTP, `/v1/api` on :8080 (TLS, if any, terminates at a reverse proxy)                     |
-| Authentication    | None (local phase); see [Security Architecture](01-security-architecture.md) for the planned design |
-| Request contains  | JSON payloads for CRUD operations                                                                   |
-| Response contains | Created/updated resources, or RFC 7807 problem details on error                                     |
+| Aspect            | Detail                                                                                                                                                                       |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Protocol          | REST over HTTP, `/v1/api` on :8080 (TLS, if any, terminates at a reverse proxy)                                                                                              |
+| Authentication    | At the Envoy API edge: Keycloak JWT (audience `mnemonic-api`), OPA checks `patterns:*` scopes; none in the service. See [Security Architecture](01-security-architecture.md) |
+| Request contains  | JSON payloads for CRUD operations                                                                                                                                            |
+| Response contains | Created/updated resources, or RFC 7807 problem details on error                                                                                                              |
 
 ### Admin API to Enricher
 
@@ -324,6 +331,8 @@ See [03-concept-local-iteration](../../diagrams/03-concept-local-iteration.md).
 ### MVP 4: Kubernetes
 
 Deploy application services to a local Kubernetes cluster and introduce authentication and authorization.
+
+> **Status (2026-10-22):** Built ahead of MVP 3. The Helm chart `deploy/helm/mnemonic` runs the services, the Envoy gateway, OPA, Keycloak, the egress proxy and the data stores (PostgreSQL, Neo4j, RabbitMQ in the cluster, not on AWS) on minikube; the same gateway runs in the compose stack.
 
 - Deploy MCP server, Admin API, and Enricher to local single-node Kubernetes (minikube)
 - Add Envoy as ingress/authN layer for MCP and Admin API traffic

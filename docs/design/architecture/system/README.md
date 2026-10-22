@@ -1,7 +1,7 @@
 ---
-version: 2
-date: 2026-10-21
-notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
+version: 3
+date: 2026-10-22
+notes: "Security Architecture row now names the built gateway (Envoy, OPA, Keycloak) instead of \"no auth\"."
 ---
 
 # Architecture
@@ -16,17 +16,17 @@ Start here:
 
 ## Architecture Documents
 
-| Document                                                       | Description                                                  |
-| -------------------------------------------------------------- | ------------------------------------------------------------ |
-| [Architectural Decisions](00-architectural-decisions.md)       | Key decision records (ADR-001 through ADR-009)               |
-| [Security Architecture](01-security-architecture.md)           | Current state (no auth, local phase) and planned authN/authZ |
-| [System Architecture](02-system-architecture.md)               | Topology, ports, components and data flow                    |
-| [Communication Patterns](03-communication-patterns.md)         | MCP, REST and AMQP patterns, retries and fallbacks           |
-| [Data Architecture](04-data-architecture.md)                   | Database schemas and data management                         |
-| [Database Integration Flow](05-database-integration-flow.md)   | End-to-end database interaction patterns                     |
-| [Deployment Architecture](06-deployment-architecture.md)       | Deployment topology and operations                           |
-| [Observability Architecture](07-observability-architecture.md) | Monitoring, logging, and tracing                             |
-| [MCP Tools](../mnemonic/08-mcp-tools.md)                       | Tool discovery, definitions, and response patterns           |
+| Document                                                       | Description                                                          |
+| -------------------------------------------------------------- | -------------------------------------------------------------------- |
+| [Architectural Decisions](00-architectural-decisions.md)       | Key decision records (ADR-001 through ADR-009)                       |
+| [Security Architecture](01-security-architecture.md)           | Built gateway (Envoy, OPA, Keycloak, egress) and planned authN/authZ |
+| [System Architecture](02-system-architecture.md)               | Topology, ports, components and data flow                            |
+| [Communication Patterns](03-communication-patterns.md)         | MCP, REST and AMQP patterns, retries and fallbacks                   |
+| [Data Architecture](04-data-architecture.md)                   | Database schemas and data management                                 |
+| [Database Integration Flow](05-database-integration-flow.md)   | End-to-end database interaction patterns                             |
+| [Deployment Architecture](06-deployment-architecture.md)       | Deployment topology and operations                                   |
+| [Observability Architecture](07-observability-architecture.md) | Monitoring, logging, and tracing                                     |
+| [MCP Tools](../mnemonic/08-mcp-tools.md)                       | Tool discovery, definitions, and response patterns                   |
 
 ## Design Documents
 

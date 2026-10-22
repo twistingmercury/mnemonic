@@ -1,7 +1,7 @@
 ---
-version: 1
-date: 2026-10-21
-notes: "Owner's design document copied into docs/design; frontmatter added only."
+version: 2
+date: 2026-10-22
+notes: "Statements about current code corrected: migration numbers (000009, next 000011), MNEMONIC_OPENAI_BASE_URL, Team and X-Team-ID (the gateway authorizes by token scope); old repo names mapped to the monorepo."
 ---
 
 # Mnemonic: From Coding Patterns to Any Knowledge
@@ -10,9 +10,11 @@ Oct 17, 2026 · @Jeremy Johnson
 
 ## Bottom line
 
-Mnemonic can hold any kind of document with changes to the existing core only: a handful of small fixes plus one rename of "pattern" to "document" through the engine and the MCP tools. The storage model is already generic: `patterns` and `pattern_chunks` hold Markdown, `entity_type` is a free kebab-case value, and `language` and `domain` columns already default to empty (mnemonic-dbs 000005). What keeps it code-only is validation, the chunking fallback, the extraction prompt and the wording agents read. `entity_type` becomes Kind: `policy`, `runbook`, `faq`, `contract`.
+Mnemonic can hold any kind of document with changes to the existing core only: a handful of small fixes plus one rename of "pattern" to "document" through the engine and the MCP tools. The storage model is already generic: `patterns` and `pattern_chunks` hold Markdown, `entity_type` is a free kebab-case value, and `language` and `domain` columns already default to empty (`db/postgres` migration 000009). What keeps it code-only is validation, the chunking fallback, the extraction prompt and the wording agents read. `entity_type` becomes Kind: `policy`, `runbook`, `faq`, `contract`.
 
 ## Minimal change set
+
+The repo names below are the pre-monorepo repositories. In this monorepo `mnemonic-api`, `mnemonic-mcp` and `mnemonic-enricher` are the packages under `src/internal/<service>/`, `mnemonic-dbs` is `db/`, and `mnemonic-gateway` is `gateway/`. `mnemonic-admin`, `mnemonic-patterns` and `mnemonic-docs` are not part of this checkout. Function and file names are checked against the current code.
 
 This is everything required to hold more than patterns. No new services, no connectors, no new tables.
 
@@ -38,13 +40,13 @@ The word appears about 5,400 times in roughly 150 source files across api, enric
 | MCP tools | `search_patterns`, `find_related_patterns`, `get_pattern`, `pattern_id` | `search_documents`, `find_related_documents`, `get_document`, `document_id` |
 | REST API | `/v1/api/patterns`, `/patterns/search`, `/patterns/{id}/chunks` | `/v1/api/documents/...`, keeping `/patterns` as an alias for one release so mnemonic-patterns' `load.sh` keeps working |
 | Go code | packages `pattern`; types `Pattern`, `PatternChunk`, `patternService`; `Concept` in the enricher | packages `document`; types `Document`, `Chunk`; `Term` |
-| PostgreSQL | tables `patterns`, `pattern_chunks`; columns `pattern_id`, `entity_type`, `related_patterns`, `section_title`; `enrichment_jobs.pattern_id` | `documents`, `document_chunks`; `document_id`, `kind`, `document_references`, `heading`, via a new migration 000007. `references` alone is a reserved word in SQL, hence the prefix |
+| PostgreSQL | tables `patterns`, `pattern_chunks`; columns `pattern_id`, `entity_type`, `related_patterns`, `section_title`; `enrichment_jobs.pattern_id` | `documents`, `document_chunks`; `document_id`, `kind`, `document_references`, `heading`, via a new migration 000011. `references` alone is a reserved word in SQL, hence the prefix |
 | Neo4j | labels `Pattern`, `Concept`; property `Concept.type`; constraints `pattern_id_unique`, `concept_name_unique`; indexes `pattern_name_index`, `pattern_content_fulltext`, `concept_type_index`, `concept_name_fulltext` | labels `Document`, `Term`; property `Term.category`; matching constraint and index names, via a new Cypher migration that relabels existing nodes |
 | Chunk marker | `[//]: pattern` | `[//]: chunk`, still accepting `[//]: pattern` for one release so existing files load unchanged |
-| Gateway | OPA `tool_scopes` lists the three tool names; api.rego matches `/v1/api/patterns`; scopes `patterns:read`, `patterns:write`, `patterns:admin` in the Keycloak realm | The same edits, with scopes `documents:read`, `documents:write`, `documents:admin`. Without them OPA denies the new names, because anything unlisted is denied |
+| Gateway | OPA `tool_scopes` lists the three tool names; api.rego matches `/v1/api/patterns`; scopes `patterns:read`, `patterns:write`, `patterns:admin` in the Keycloak realm (`gateway/opa/policy`, `gateway/keycloak/realm-mnemonic.json`) | The same edits, with scopes `documents:read`, `documents:write`, `documents:admin`. Without them OPA denies the new names, because anything unlisted is denied |
 | Admin UI | API client paths, labels, "Import pattern" | Documents throughout |
 
-The docs' migration rule (never rename directly; add, copy, then drop) exists for zero-downtime upgrades. The images are still `v1.0.0-dev` with no outside users, so a direct `ALTER TABLE ... RENAME` in 000007 is the simpler choice now; after a real release the three-step route applies.
+The docs' migration rule (never rename directly; add, copy, then drop) exists for zero-downtime upgrades. The images are still `v1.0.0-dev` with no outside users, so a direct `ALTER TABLE ... RENAME` in 000011 is the simpler choice now; after a real release the three-step route applies.
 
 ## How it fits together
 
@@ -68,7 +70,7 @@ flowchart TD
 
 Read it top down: content enters through the gateway, mnemonic-api chunks it, the enricher embeds the Chunks and extracts Terms, and mnemonic-mcp serves search and Relations to agents.
 
-Outbound calls to OpenAI go through one egress proxy, not from the services themselves. The services sit on a network with no route to the internet and point `OPENAI_BASE_URL` at an Envoy egress container. That container forwards only `POST /v1/embeddings` and `POST /v1/chat/completions` to `api.openai.com`, refuses everything else, and adds the API key itself, so the key exists only in that one container. The same pattern carries over to Azure OpenAI or Bedrock by changing the proxy's upstream, and to a Kubernetes egress gateway in production.
+Outbound calls to OpenAI go through one egress proxy, not from the services themselves. The services sit on a network with no route to the internet and point `MNEMONIC_OPENAI_BASE_URL` at an Envoy egress container. That container forwards only `POST /v1/embeddings` and `POST /v1/chat/completions` to `api.openai.com`, refuses everything else, and adds the API key itself, so the key exists only in that one container. The same pattern carries over to Azure OpenAI or Bedrock by changing the proxy's upstream, and to a Kubernetes egress gateway in production.
 
 ### Enrichment with concurrent workers
 
@@ -132,7 +134,7 @@ The two-transaction write keeps the graph correct, so nothing below is needed to
 
 ## Ubiquitous vocabulary (proposed)
 
-One word per idea, used identically in code, schema, graph, API, MCP tools, admin UI and docs. Each term has three parts. **Is** says what it is, **Is not** names the ideas it must not be confused with, and **Rules** states the invariants. Rules marked *today* are checked against mnemonic-dbs and the enricher's Cypher; rules marked *proposed* are new.
+One word per idea, used identically in code, schema, graph, API, MCP tools, admin UI and docs. Each term has three parts. **Is** says what it is, **Is not** names the ideas it must not be confused with, and **Rules** states the invariants. Rules marked *today* are checked against `db/` and the enricher's Cypher; rules marked *proposed* are new.
 
 ### Content
 
@@ -248,9 +250,9 @@ One word per idea, used identically in code, schema, graph, API, MCP tools, admi
 
 **Team**
 
-- Is: the group the gateway identifies with the `X-Team-ID` header.
-- Is not: an owner field on a Document. Core stores no team today.
-- Rules: the gateway authorizes requests by Team (*today*, per SEC-ADR-001 to 003). Per-Document ownership is a later decision.
+- Is: the group a caller belongs to, to be identified by the gateway (*proposed*).
+- Is not: an owner field on a Document. Core stores no team today, and the gateway has no Team concept: it authorizes by token scope (`mcp:read`, `patterns:write` and so on).
+- Rules: Team-based authorization does not exist yet (the security architecture document describes an `X-Team-ID` header that `gateway/` does not set). Per-Document ownership is a later decision.
 
 ### MCP verbs
 
@@ -268,7 +270,7 @@ OKF v0.2 ([SPEC.md](https://github.com/GoogleCloudPlatform/knowledge-catalog/blo
 
 - **Semantic search.** OKF offers navigation through `index.md` files and links. It has no chunks and no embeddings.
 - **An inferred graph.** OKF links are untyped and hand-written (§6.1). Mnemonic computes Terms, Mentions and Relations during Enrichment.
-- **Access control.** OKF's trust tiers are "advisory signals, not access control" (§5.3). Mnemonic authorizes by Team at the gateway.
+- **Access control.** OKF's trust tiers are "advisory signals, not access control" (§5.3). Mnemonic authorizes by token scope at the gateway.
 - **Serving.** Agents call MCP tools instead of cloning and parsing a bundle.
 
 ### What OKF has that Mnemonic lacks
@@ -313,7 +315,7 @@ Decisions already in mnemonic-docs/docs/ that shape both the minimal set and the
 | JSONB document model with CRC-64 change detection, designed but never built | ADR-003, design/data-storage | Reuse it for provenance, trust and lifecycle metadata and for selective re-embedding (later) |
 | Blended ranking 0.7 vector + 0.3 graph is planned; scale assumed at hundreds to tens of thousands of patterns, one team per deployment | system/05, design/pattern-processing; requirements Assumptions | Fold the blend into hybrid search (later). Business corpora break both assumptions, so requirements need restating |
 
-mnemonic-patterns' `load.sh` is already an out-of-core loader that only calls the API, which is the connector model. The docs (concept.md, the guides, the glossary, KM-1 and ADR-001) define Mnemonic as a coding-pattern store, and they still say Envoy and OPA are unbuilt although mnemonic-gateway exists.
+mnemonic-patterns' `load.sh` is already an out-of-core loader that only calls the API, which is the connector model. The docs (concept.md, the guides, the glossary, KM-1 and ADR-001) define Mnemonic as a coding-pattern store, and some of them still describe Envoy and OPA as unbuilt although `gateway/` exists.
 
 ## Later, if you want it
 
@@ -321,7 +323,7 @@ Nothing here is needed to hold more than patterns. It is what a large, multi-tea
 
 | Item | Today | What it adds | Why |
 | --- | --- | --- | --- |
-| Access by Team | The gateway authorizes per Team, but core stores no Team, so every authorized caller sees every Document (OPA api.rego, mcp.rego) | An owning Team on each Document and Chunk, filtered in every pgvector and Cypher query | Required before loading anything confidential |
+| Access by Team | The gateway authorizes per token scope, not per Team, and core stores no Team, so every authorized caller sees every Document (`gateway/opa/policy/api.rego`, `mcp.rego`) | An owning Team on each Document and Chunk, filtered in every pgvector and Cypher query | Required before loading anything confidential |
 | Provenance, trust and lifecycle | No source, author, verification or expiry fields | Optional Document fields modelled on OKF §5: `sources`, `generated`, `verified`, `status` and `stale_after`, stored in ADR-003's JSONB metadata | Agents can cite sources, prefer human-reviewed Documents and skip stale ones |
 | Connector contract | Content arrives only by POST | A versioned push API: upsert by source system and source id, delete, list ids for reconciliation, and a connector-scoped token. An OKF importer is the natural first connector | Keeps connectors outside core |
 | Hybrid search | Vector-only over Chunks; keyword search covers only name and description, in English | Full-text index on Chunk text fused with vector results, then the planned graph blend; pgvector iterative scans so filtered searches return full pages | Exact strings such as product codes and policy numbers are found |

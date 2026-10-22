@@ -1,7 +1,7 @@
 ---
-version: 2
-date: 2026-10-21
-notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
+version: 3
+date: 2026-10-22
+notes: "SE-2 notes the gateway implements authn/authz; SE-5 marked not implemented (no TLS configured)."
 ---
 
 # Mnemonic Requirements
@@ -91,13 +91,13 @@ a trusted network environment.
 
 <a id="se-2"></a>**SE-2.** In production (Post-MVP), the admin API must be protected by
 infrastructure-layer authentication and authorization. The MCP interface may remain unauthenticated
-within a trusted internal network.
+within a trusted internal network. (The `gateway/` component implements authentication and authorization with Envoy, OPA and Keycloak, for both the admin API and the MCP interface; TLS is not configured, see SE-5.)
 
 <a id="se-3"></a>**SE-3.** Mnemonic must never store user credentials or session tokens.
 
 <a id="se-4"></a>**SE-4.** The MCP interface must be read-only. No write operations may be performed through it.
 
-<a id="se-5"></a>**SE-5.** In production, all external traffic must be carried over TLS.
+<a id="se-5"></a>**SE-5.** In production, all external traffic must be carried over TLS. **Not implemented:** the gateway configuration defines no TLS listener.
 
 <a id="se-6"></a>**SE-6.** Database credentials must not be embedded in the deployed service. They must be injected
 from the runtime environment.

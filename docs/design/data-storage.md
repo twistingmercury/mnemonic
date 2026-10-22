@@ -1,7 +1,7 @@
 ---
-version: 2
-date: 2026-10-21
-notes: "Migration numbering and file tree corrected to the 10 real migrations; agent and skill tables and Agent graph schema marked as schema only; Neo4j schema applied at container start; SQL and Cypher copies synced with db/; spec path corrected. License footer corrected."
+version: 3
+date: 2026-10-22
+notes: "SyncPattern described as two write transactions; RELATED_TO written with MERGE as one canonical edge per pair (lower id to higher); concept matching by name in the RELATED_TO and related-pattern queries; api search options, job repository errors and HNSW tuning example corrected; broken System Architecture anchor fixed."
 ---
 
 # Data Storage Implementation
@@ -56,7 +56,7 @@ notes: "Migration numbering and file tree corrected to the 10 real migrations; a
 
 [Table of Contents](#table-of-contents)
 
-> **Architecture Reference:** [Data Architecture](architecture/system/04-data-architecture.md) | [System Architecture - Mnemonic](architecture/system/02-system-architecture.md#mnemonic-server)
+> **Architecture Reference:** [Data Architecture](architecture/system/04-data-architecture.md) | [System Architecture - Component Breakdown](architecture/system/02-system-architecture.md#component-breakdown)
 
 This document provides implementation details for the Mnemonic data storage layer. It translates the architectural specifications from [Data Architecture](architecture/system/04-data-architecture.md) into concrete SQL migrations, Cypher queries, and Go interface definitions.
 
@@ -88,7 +88,7 @@ flowchart LR
     API -->|"job id"| MQ[("RabbitMQ")]
     MQ --> ENR["enricher service"]
     ENR -->|"embeddings, statuses,<br/>job lifecycle"| PG
-    ENR -->|"SyncPattern<br/>(one write tx)"| NEO[("Neo4j")]
+    ENR -->|"SyncPattern<br/>(two write txs)"| NEO[("Neo4j")]
     API -.->|"read; DeletePattern"| NEO
     MCP["mcp service"] -.->|read| PG
     MCP -.->|read| NEO
@@ -728,16 +728,18 @@ HNSW was chosen over IVFFlat because IVFFlat builds its centroids from existing 
 **Tuning HNSW** (when recall or build time becomes a problem):
 
 ```sql
--- Rebuild with explicit parameters (higher m / ef_construction: better recall, more memory, slower build)
+-- Rebuild with explicit parameters. pgvector defaults are m = 16, ef_construction = 64;
+-- higher values give better recall, more memory and a slower build
+-- (ef_construction must be at least 2 * m).
 drop index if exists idx_pattern_chunks_embedding;
 create index idx_pattern_chunks_embedding
     on pattern_chunks using hnsw (embedding vector_cosine_ops)
-    with (m = 16, ef_construction = 64);
+    with (m = 24, ef_construction = 128);
 ```
 
 ### Similarity Search Queries
 
-Both the Admin API (`GET /v1/api/patterns/search`) and the MCP server (`search_patterns`) search chunks, not patterns, with one query joined to `patterns` for metadata. This is the Admin API's version (`internal/repository/chunk/repository.go`); the MCP version is the same `WHERE`/`ORDER BY` but selects only `pc.pattern_id, p.name, p.tags, pc.section_title, pc.content, similarity` and has no pattern-ID filter.
+Both the Admin API (`GET /v1/api/patterns/search`) and the MCP server (`search_patterns`) search chunks, not patterns, with one query joined to `patterns` for metadata. This is the Admin API's version (`internal/repository/chunk/repository.go`); the MCP version has the same `WHERE`/`ORDER BY`, selects only `pc.pattern_id, p.name, p.tags, pc.section_title, pc.content, similarity`, and always passes the tag filter as `($5::jsonb is null or p.tags @> $5::jsonb)` with the limit in `$6`. Neither version filters by pattern ID.
 
 ```sql
 -- $1: query embedding (vector(2000))
@@ -754,11 +756,10 @@ where pc.embedding is not null
   and 1 - (pc.embedding <=> $1) >= $2
   and ($3::text = '' or p.language = $3)
   and ($4::text = '' or p.domain = $4)
-  -- appended only when set:
-  --   and pc.pattern_id = any($5)     -- API only
-  --   and p.tags @> $6::jsonb         -- pattern must have all requested tags
+  -- appended only when tags are requested (pattern must have all of them):
+  --   and p.tags @> $5::jsonb
 order by pc.embedding <=> $1
-limit $7;  -- default 10
+limit $5;  -- $6 when the tag filter is present; the handler defaults limit to 10 (1-50)
 ```
 
 Other pattern queries the services run:
@@ -1104,7 +1105,7 @@ Concept names are lowercased and trimmed by the extraction service before they r
 
 **MENTIONED_IN (Concept to Pattern):** created with `MERGE (c)-[:MENTIONED_IN]->(p)` inside `SyncPattern`; no properties.
 
-**RELATED_TO (Pattern to Pattern):** created with `CREATE` by the RELATED_TO computation inside `SyncPattern`, with properties `similarity` (float, 0.0-1.0) and `updatedAt`. Each sync deletes the pattern's existing `RELATED_TO` edges (both directions) first, so edges are never updated in place. Edges are stored one way and always queried undirected.
+**RELATED_TO (Pattern to Pattern):** written with `MERGE` by the RELATED_TO computation inside `SyncPattern`, with properties `similarity` (float, 0.0-1.0) and `updatedAt` set on every write. Each related pair has one canonical edge, always directed from the pattern with the lower `id` to the one with the higher `id` (string comparison of the UUIDs), whichever pattern is being synced. Each sync first deletes the synced pattern's existing `RELATED_TO` edges in both directions; when both patterns of a pair compute their relation at the same time, `MERGE` makes the second computation update the edge instead of adding a duplicate. Edges are always queried undirected.
 
 **RELEVANT_FOR (Pattern to Agent):** Not implemented. The Cypher files index `RELEVANT_FOR.relevance`, but no service creates the relationship, and no service writes the `pattern_agent_associations` table it would sync from.
 
@@ -1112,9 +1113,16 @@ Concept names are lowercased and trimmed by the extraction service before they r
 
 **Sync Pattern (enricher `graph.Repository.SyncPattern`):**
 
-Called once per pattern, by the job that finds all of the pattern's chunks enriched, after concept extraction. All five statements run in one managed write transaction (`session.ExecuteWrite`), so a pattern's node, concepts and edges change together or not at all. Statement 3 is skipped when extraction returned no concepts.
+Called once per pattern, by the job that finds all of the pattern's chunks enriched, after concept extraction. The enricher rejects a nil pattern ID or an empty pattern name before opening a session. The five statements run in two managed write transactions (`session.ExecuteWrite`) in one session:
+
+- Transaction 1 (statements 1-3) writes the pattern node and replaces its concepts, and commits.
+- Transaction 2 (statements 4-5) then recomputes the pattern's `RELATED_TO` edges from the committed graph.
+
+Each transaction is atomic on its own, but the two are not: if the second fails, the new node and concepts stay committed with the pattern's `RELATED_TO` edges unchanged, and `SyncPattern` returns the error. The split exists because, under read committed, a sync cannot see another overlapping sync's uncommitted concepts; computing relations only after the concepts commit means the later of two overlapping syncs sees both patterns' concepts, so the pair is not missed. Statement 3 is skipped when extraction returned no concepts.
 
 ```cypher
+// --- transaction 1 ---
+
 // 1. Create/update pattern node
 MERGE (p:Pattern {id: $patternId})
 SET p.name = $patternName,
@@ -1136,7 +1144,9 @@ WITH c
 MATCH (p:Pattern {id: $patternId})
 MERGE (c)-[:MENTIONED_IN]->(p)
 
-// 4. Delete existing RELATED_TO edges for this pattern
+// --- transaction 2 ---
+
+// 4. Delete existing RELATED_TO edges for this pattern (both directions)
 MATCH (p:Pattern {id: $patternId})-[r:RELATED_TO]-()
 DELETE r
 
@@ -1151,15 +1161,17 @@ Recomputes pattern-to-pattern similarity edges from shared concepts. Only edges 
 
 ```cypher
 // Parameters: $patternId (UUID string), $minSimilarity (float, default 0.3)
-MATCH (p1:Pattern {id: $patternId})<-[:MENTIONED_IN]-(c:Concept)-[:MENTIONED_IN]->(p2:Pattern)
+// Shared concepts are matched by name, not by node
+MATCH (p1:Pattern {id: $patternId})<-[:MENTIONED_IN]-(c:Concept)
+MATCH (shared:Concept {name: c.name})-[:MENTIONED_IN]->(p2:Pattern)
 WHERE p1 <> p2
-WITH p1, p2, count(DISTINCT c) AS sharedCount
+WITH p1, p2, count(DISTINCT c.name) AS sharedCount
 
-// Count total concepts for each pattern
+// Count total concepts (distinct names) for each pattern
 OPTIONAL MATCH (c1:Concept)-[:MENTIONED_IN]->(p1)
-WITH p1, p2, sharedCount, count(DISTINCT c1) AS totalA
+WITH p1, p2, sharedCount, count(DISTINCT c1.name) AS totalA
 OPTIONAL MATCH (c2:Concept)-[:MENTIONED_IN]->(p2)
-WITH p1, p2, sharedCount, totalA, count(DISTINCT c2) AS totalB
+WITH p1, p2, sharedCount, totalA, count(DISTINCT c2.name) AS totalB
 
 // Compute similarity = sharedConcepts / max(totalConceptsA, totalConceptsB)
 WITH p1, p2, sharedCount,
@@ -1170,19 +1182,28 @@ WITH p1, p2, sharedCount,
      END AS similarity
 WHERE similarity >= $minSimilarity
 
-// Create RELATED_TO edge (one direction only; queries use undirected traversal)
-CREATE (p1)-[:RELATED_TO {similarity: similarity, updatedAt: datetime()}]->(p2)
+// One canonical edge per pair, directed from the lower id to the higher id
+WITH similarity,
+     CASE WHEN p1.id < p2.id THEN p1 ELSE p2 END AS low,
+     CASE WHEN p1.id < p2.id THEN p2 ELSE p1 END AS high
+MERGE (low)-[r:RELATED_TO]->(high)
+SET r.similarity = similarity, r.updatedAt = datetime()
 ```
+
+The computation and the related-pattern reads below match shared concepts by name rather than by node identity. With the `concept_name_unique` constraint in place there is one node per name and the two are the same; matching by name keeps the results correct against a Neo4j where the constraint is missing (for example one not started from the `mnemonic-neo4j` image), where overlapping syncs could each create their own node for the same concept.
 
 **Find Related Patterns (MCP server, read-only):**
 
-Uses pre-computed RELATED_TO edges and collects shared concept names. The Admin API reads related patterns only inside `GetPatternGraph`, whose query also returns `count(c) AS sharedConcepts`. See [service-layer.md "Resolving the find_related_patterns Data Gap"](service-layer.md#resolving-the-find_related_patterns-data-gap) for the design decision to use pre-computed edges rather than recomputing similarity at query time.
+Uses pre-computed RELATED_TO edges and collects the names of the concepts the two patterns share. The Admin API reads related patterns only inside `GetPatternGraph`, with the same query plus `size(conceptNames) AS sharedConcepts` in the `RETURN`. See [service-layer.md "Resolving the find_related_patterns Data Gap"](service-layer.md#resolving-the-find_related_patterns-data-gap) for the design decision to use pre-computed edges rather than recomputing similarity at query time.
 
 ```cypher
 MATCH (p1:Pattern {id: $patternId})-[r:RELATED_TO]-(p2:Pattern)
 WITH p1, p2, r.similarity AS similarity
-OPTIONAL MATCH (p1)<-[:MENTIONED_IN]-(c:Concept)-[:MENTIONED_IN]->(p2)
-WITH p2, similarity, collect(c.name) AS conceptNames
+OPTIONAL MATCH (c1:Concept)-[:MENTIONED_IN]->(p1)
+WITH p2, similarity, collect(DISTINCT c1.name) AS names
+OPTIONAL MATCH (c2:Concept)-[:MENTIONED_IN]->(p2)
+WHERE c2.name IN names
+WITH p2, similarity, collect(DISTINCT c2.name) AS conceptNames
 ORDER BY similarity DESC
 LIMIT $limit
 RETURN p2.id AS id, p2.name AS name, similarity, conceptNames
@@ -1213,7 +1234,7 @@ WITH c WHERE NOT (c)-[:MENTIONED_IN]->()
 DELETE c
 ```
 
-This is the Admin API's only graph write. A failure is logged as a warning and not retried.
+This is the Admin API's only graph write, run as one `neo4j.ExecuteQuery` call with writer routing (a managed write transaction, retried on transient errors). A failure is logged as a warning; the service does not retry it later.
 
 **Cleanup Orphaned Concepts (not implemented):**
 
@@ -1410,11 +1431,10 @@ type Repository interface {
 
 type SimilarityOptions struct {
     MinSimilarity float64
-    MaxResults    int         // defaults to 10 when <= 0
-    Language      string      // "" disables
-    Domain        string      // "" disables
-    PatternIDs    []uuid.UUID // empty disables
-    Tags          []string    // pattern must contain all; empty disables
+    MaxResults    int      // passed to LIMIT as is; the search handler defaults it to 10
+    Language      string   // "" disables
+    Domain        string   // "" disables
+    Tags          []string // pattern must contain all; empty disables
 }
 ```
 
@@ -1499,7 +1519,7 @@ type SkillFile struct {
 type Repository interface {
     // CreatePendingForChunks inserts one pending job per chunk (chunk_id set, pattern_id NULL,
     // max_attempts 3) in one INSERT ... SELECT FROM unnest and returns the job IDs in chunk order.
-    // A unique violation returns ErrJobAlreadyPending; a check violation ErrInvalidJobTarget.
+    // Database errors are returned wrapped; the package defines no sentinel errors.
     CreatePendingForChunks(ctx context.Context, chunkIDs []uuid.UUID) ([]uuid.UUID, error)
     WithTx(db repository.DBTX) Repository
 }
@@ -1581,9 +1601,10 @@ type Repository interface {
 
 ```go
 type Repository interface {
-    // SyncPattern merges the Pattern node, prunes stale MENTIONED_IN edges,
-    // merges concepts and MENTIONED_IN edges, and recomputes RELATED_TO
-    // (similarity >= minSimilarity), all in one write transaction.
+    // SyncPattern merges the Pattern node, prunes stale MENTIONED_IN edges and
+    // merges concepts and MENTIONED_IN edges in one write transaction, then
+    // recomputes RELATED_TO (similarity >= minSimilarity; one edge per pair,
+    // lower id to higher) in a second one.
     SyncPattern(ctx context.Context, pattern Pattern, concepts []Concept, minSimilarity float64) error
 }
 
@@ -1638,7 +1659,7 @@ type ListOptions struct {
 }
 ```
 
-Repository errors are defined per package, for example `pattern.ErrNotFound` and `pattern.ErrNameExists` (api), `enrichmentjob.ErrJobAlreadyPending` and `enrichmentjob.ErrInvalidJobTarget` (api), and `enrichmentjob.ErrUnavailable` and `enrichmentjob.ErrNotFound` (enricher). Check each package's `errors.go` for the full set.
+Repository errors are defined per package: `pattern.ErrNotFound` and `pattern.ErrNameExists` (api), `chunk.ErrNotFound` (api and enricher), `pattern.ErrNotFound` (enricher and mcp), and `enrichmentjob.ErrUnavailable` and `enrichmentjob.ErrNotFound` (enricher). The api `enrichmentjob` and `graph` packages export none. Check each package's `errors.go` for the full set.
 
 ## Connection Configuration
 

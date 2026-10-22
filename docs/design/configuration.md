@@ -294,7 +294,7 @@ export MNEMONIC_QUEUE_RABBITMQ_QUEUE="enrichment-jobs"
 
 # OpenAI (all three services embed text; the enricher also extracts concepts)
 export MNEMONIC_OPENAI_API_KEY="sk-..."
-export MNEMONIC_OPENAI_BASE_URL="http://openai-stub:8080/v1"   # e.g. the integration-test stub
+export MNEMONIC_OPENAI_BASE_URL="http://openai_stub:8090/v1"   # e.g. the e2e-test stub
 
 # Logging and tracing
 export MNEMONIC_LOGGING_LEVEL="debug"
@@ -317,7 +317,7 @@ In addition to `MNEMONIC_` prefixed variables, the otelx library reads the stand
 | `OTEL_EXPORTER_OTLP_INSECURE`                                                            | Overridden when `observability.tracing.otlp_insecure` is `true` (the default); set the key to `false` to let TLS settings from the environment apply |
 | `OTEL_TRACES_SAMPLER`, `OTEL_TRACES_SAMPLER_ARG`                                         | Ignored: the services always set `ParentBased(TraceIDRatioBased(observability.tracing.sample_rate))`                                                 |
 
-otelx v2 no longer has endpoint or insecure settings in its own config. Each service therefore builds the OTLP gRPC trace exporter itself from `observability.tracing.endpoint` and `otlp_insecure` and hands it to otelx, so the `MNEMONIC_` keys keep working (see `src/internal/telemetry/telemetry.go` in each service).
+otelx v2 no longer has endpoint or insecure settings in its own config. Each service therefore builds the OTLP gRPC trace exporter itself from `observability.tracing.endpoint` and `otlp_insecure` and hands it to otelx, so the `MNEMONIC_` keys keep working (see `src/internal/<service>/telemetry/telemetry.go`).
 
 ## otelx Dependency
 
@@ -391,7 +391,7 @@ The Services column shows which services define each key: **A** = the api servic
 | `database.neo4j.max_connection_pool_size`       | int      | `50`                        | `MNEMONIC_DATABASE_NEO4J_MAX_CONNECTION_POOL_SIZE`       | A, E, M  | Neo4j max connection pool size                                                              |
 | `database.neo4j.connection_acquisition_timeout` | duration | `60s`                       | `MNEMONIC_DATABASE_NEO4J_CONNECTION_ACQUISITION_TIMEOUT` | A, E, M  | Neo4j connection acquisition timeout                                                        |
 | `openai.api_key`                                | string   | `""`                        | `MNEMONIC_OPENAI_API_KEY`                                | A, E, M  | OpenAI API key (not checked at startup; a bad key shows as a Warning on `/health`)          |
-| `openai.base_url`                               | string   | `https://api.openai.com/v1` | `MNEMONIC_OPENAI_BASE_URL`                               | A, E, M  | OpenAI-compatible API root; must be an absolute URL. Integration tests point it at a stub   |
+| `openai.base_url`                               | string   | `https://api.openai.com/v1` | `MNEMONIC_OPENAI_BASE_URL`                               | A, E, M  | OpenAI-compatible API root; must be an absolute URL. The e2e suite uses a stub              |
 | `openai.embedding_model`                        | string   | `text-embedding-3-large`    | `MNEMONIC_OPENAI_EMBEDDING_MODEL`                        | A, E, M  | Embedding model                                                                             |
 | `openai.embedding_dimensions`                   | int      | `2000`                      | `MNEMONIC_OPENAI_EMBEDDING_DIMENSIONS`                   | A, E, M  | Requested embedding dimensions                                                              |
 | `openai.extraction_model`                       | string   | `gpt-4o-mini`               | `MNEMONIC_OPENAI_EXTRACTION_MODEL`                       | E        | Concept extraction model                                                                    |
@@ -602,7 +602,7 @@ Each service validates its configuration after loading (`Validate()` in `config.
 | Ports in range           | A, E, M  | `server.port`, `mcp.port`, `observability.metrics.port` (when metrics are enabled) in 1-65535 |
 | Port conflicts           | A, E, M  | `observability.metrics.port` and (M) `mcp.port` must differ from `server.port`                |
 | Positive durations       | A, E, M  | Server, MCP and enrichment timeouts; Neo4j acquisition timeout                                |
-| Required database fields | A, E, M  | Postgres host and database; Neo4j URI scheme `bolt://`, `bolt+s://`, `bolt+ssc://`, `neo4j://`, `neo4j+s://` or `neo4j+ssc://` |
+| Required database fields | A, E, M  | Postgres host and database; Neo4j URI scheme `bolt`, `neo4j` or their `+s`/`+ssc` variants    |
 | Pool sizes               | A, E, M  | `max_open_conns` >= 1, `0 <= min_conns <= max_open_conns`, Neo4j pool >= 1                    |
 | OpenAI values            | A, E, M  | `embedding_dimensions` >= 1, non-negative retries/delay, `base_url` absolute when set         |
 | TLS files exist          | E, M     | When `server.tls.enabled`, cert and key paths must be set and readable                        |

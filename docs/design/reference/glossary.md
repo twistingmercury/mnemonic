@@ -1,7 +1,7 @@
 ---
-version: 2
-date: 2026-10-21
-notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
+version: 3
+date: 2026-10-22
+notes: "MCP entry notes the gateway handles authentication."
 ---
 
 # Glossary
@@ -61,7 +61,7 @@ The combination of Neo4j graph relationships and PostgreSQL vector data that rep
 See also: [Agent](#agent), [Pattern](#pattern), [Enrichment](#enrichment)
 
 <a id="mcp-model-context-protocol"></a>**MCP (Model Context Protocol)**
-The protocol Claude Code uses to communicate with external tool servers. Mnemonic exposes three read-only MCP tools (`search_patterns`, `find_related_patterns`, `get_pattern`) via Streamable HTTP at `/mcp` on port 8081, served by the mcp service, with no authentication. Claude Code discovers and invokes these tools automatically during conversation.
+The protocol Claude Code uses to communicate with external tool servers. Mnemonic exposes three read-only MCP tools (`search_patterns`, `find_related_patterns`, `get_pattern`) via Streamable HTTP at `/mcp` on port 8081, served by the mcp service, which has no authentication of its own (the gateway handles it). Claude Code discovers and invokes these tools automatically during conversation.
 See also: [Streamable HTTP](#streamable-http)
 
 <a id="pattern"></a>**Pattern**

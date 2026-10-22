@@ -52,7 +52,7 @@ Each service follows the same `src/internal/<service>/` layout. Observability-re
 
 ```text
 src/
-├── cmd/main/main.go           # Flags (--version, --health; api, enricher: --config), config load, server.ListenAndServe
+├── cmd/<service>/main.go      # Flags (--version, --health; api, enricher: --config), config load, server.ListenAndServe
 └── internal/
     ├── config/                # Viper config incl. observability.* keys
     ├── telemetry/telemetry.go # builds otelx.Config and the OTLP exporter, returns *otelx.Telemetry
@@ -92,7 +92,7 @@ src/
 
 ### Required Dependencies
 
-From the services' `go.mod` (api v0.5.0, enricher v0.5.0, mcp v0.6.0):
+From `src/go.mod`, the one module all three services share:
 
 ```go
 require (
@@ -199,7 +199,7 @@ router.Use(otelgin.Middleware(version.Service, otelgin.WithFilter(func(r *http.R
 })))
 ```
 
-The same middleware records the standard HTTP server metrics (see [HTTP Request Metrics](#http-request-metrics)). The MCP endpoint is a separate `net/http` server on `mcp.port`; its only route is `mux.Handle("/mcp", otelhttp.NewHandler(mcpHandler, "/mcp"))`, which continues any incoming W3C trace context.
+The same middleware records the standard HTTP server metrics (see [HTTP Request Metrics](#http-request-metrics)). The MCP endpoint is a separate `net/http` server on `mcp.port`; its only route is `/mcp`, wrapped in `otelhttp.NewHandler(...)` (plus the MCP header and cross-origin handlers), which continues any incoming W3C trace context.
 
 ### Creating Child Spans in Handlers
 
@@ -216,9 +216,7 @@ res, err := next(ctx, method, req)
 // an IsError tool result counts as a failure too
 outcome := toolOutcome(toolErr) // ok | invalid_input | not_found | unavailable
 span.SetAttributes(attribute.String("mcp.tool.outcome", outcome))
-if toolMetrics != nil {
-    toolMetrics.Record(ctx, tool, outcome, time.Since(start))
-}
+toolMetrics.Record(ctx, tool, outcome, time.Since(start))
 ```
 
 ### Trace Propagation Across RabbitMQ
@@ -347,9 +345,7 @@ func (w *Worker) finish(ctx context.Context, span trace.Span, err error, outcome
         span.SetStatus(codes.Error, err.Error())
     }
     span.End()
-    if w.jobMetrics != nil {
-        w.jobMetrics.Record(ctx, outcome, time.Since(start))
-    }
+    w.jobMetrics.Record(ctx, outcome, time.Since(start))
 }
 ```
 

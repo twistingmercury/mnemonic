@@ -1,7 +1,7 @@
 ---
-version: 2
-date: 2026-10-21
-notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
+version: 3
+date: 2026-10-22
+notes: "Database image pins attributed to the compose files and the Helm chart, not the services. Earlier: renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
 ---
 
 # Data Architecture
@@ -601,7 +601,7 @@ If the graph query fails, the pattern is returned without `graph` and a warning 
 
 **Version Tracking:**
 
-Migration state is implicit in the Docker image tag — each image version contains a known set of migrations. The services currently pin `mnemonic-postgres:v1.0.0-dev` and `mnemonic-neo4j:v1.0.0-dev`. Rollback is accomplished by pulling a prior image tag.
+Migration state is implicit in the Docker image tag — each image version contains a known set of migrations. Both compose files (`deploy/docker-compose.yaml`, `tests/integration/docker-compose.yaml`) and the Helm chart currently pin `mnemonic-postgres:v1.0.0-dev` and `mnemonic-neo4j:v1.0.0-dev`; the services themselves reference no image. Rollback is accomplished by pulling a prior image tag.
 
 #### Forward-Compatible Migrations
 
@@ -638,7 +638,7 @@ Migration state is implicit in the Docker image tag — each image version conta
 
 #### Rollback Procedures
 
-No down migrations are maintained. To roll back, point the services at a prior `mnemonic-postgres` / `mnemonic-neo4j` image tag:
+No down migrations are maintained. To roll back, point the compose file or Helm values at a prior `mnemonic-postgres` / `mnemonic-neo4j` image tag:
 
 ```bash
 docker pull ghcr.io/twistingmercury/mnemonic-postgres:<previous-tag>
@@ -905,8 +905,8 @@ SELECT pg_reload_conf();
 
 All write operations log:
 
-- User ID (from X-User-ID header)
-- Team ID (from X-Team-ID header)
+- User ID (not implemented: the gateway injects no `X-User-ID` header and the services read none)
+- Team ID (not implemented: no `X-Team-ID` header either; see [Identity Headers](01-security-architecture.md#identity-headers))
 - Operation (create, update, delete)
 - Resource type and identifier
 - Timestamp

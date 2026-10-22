@@ -1,7 +1,7 @@
 ---
-version: 2
-date: 2026-10-21
-notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
+version: 3
+date: 2026-10-22
+notes: "Notes the gateway and egress proxy the diagram omits."
 ---
 
 # MVP 2
@@ -40,7 +40,7 @@ flowchart TB
   enricher -->|embeddings, concept extraction| openai
 ```
 
-MVP 2 is the current topology. For ports, protocols and the detailed flows, see [System Architecture](../architecture/system/02-system-architecture.md).
+MVP 2 is the application topology the code implements. The deployed stack adds the gateway (Envoy, OPA, Keycloak) in front of the api and mcp services and an egress proxy that holds the OpenAI key; the diagram omits both. For ports, protocols and the detailed flows, see [System Architecture](../architecture/system/02-system-architecture.md).
 
 ---
 

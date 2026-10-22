@@ -1,7 +1,7 @@
 ---
-version: 2
-date: 2026-10-21
-notes: "Single Go module and spec path corrected. License footer corrected."
+version: 3
+date: 2026-10-22
+notes: "Subscriber signature, related-patterns Cypher, handler and wiring excerpts, cursor type and two-transaction graph sync corrected."
 ---
 
 # Service Layer Design
@@ -85,7 +85,7 @@ The service layer does NOT:
 - Parse HTTP requests or MCP tool inputs (that is the handler layer)
 - Format HTTP responses or MCP markdown output (that is the handler layer)
 - Manage database connections (pools and drivers are created in `internal/server` and injected)
-- Run the enrichment worker goroutines (that is `internal/enricher.Worker`)
+- Run the enrichment worker goroutines (that is `enricher.Worker`, `internal/enricher/enrichment.go`)
 
 ```mermaid
 graph TB
@@ -462,8 +462,8 @@ type Delivery struct {
 }
 
 type Subscriber interface {
-    Subscribe(ctx context.Context) (<-chan Delivery, error) // closed when ctx is cancelled
-    Name() string                                           // queue name, for logs/metrics
+    Subscribe(ctx context.Context) <-chan Delivery // closed when ctx is cancelled; reconnects internally
+    Name() string                                  // queue name, for logs/metrics
     Close() error
 }
 ```
@@ -538,20 +538,25 @@ type RelatedPattern struct {
 MATCH (p1:Pattern {id: $patternId})-[r:RELATED_TO]-(p2:Pattern)
 WITH p1, p2, r.similarity AS similarity
 
-// Also collect shared concept names
-OPTIONAL MATCH (p1)<-[:MENTIONED_IN]-(c:Concept)-[:MENTIONED_IN]->(p2)
-WITH p2, similarity, collect(c.name) AS conceptNames
+// Also collect shared concept names: p1's concepts that p2 mentions too
+OPTIONAL MATCH (c1:Concept)-[:MENTIONED_IN]->(p1)
+WITH p2, similarity, collect(DISTINCT c1.name) AS names
+OPTIONAL MATCH (c2:Concept)-[:MENTIONED_IN]->(p2)
+WHERE c2.name IN names
+WITH p2, similarity, collect(DISTINCT c2.name) AS conceptNames
 
 ORDER BY similarity DESC
 LIMIT $limit
 RETURN p2.id AS id, p2.name AS name, similarity, conceptNames
 ```
 
+This is `relatedCypher` in `src/internal/mcp/repository/graph/repository.go`; the API's copy also returns `size(conceptNames) AS sharedConcepts`. Concepts are matched by name, not by node.
+
 Using stored similarity avoids recomputing it at query time and is consistent with [Pattern Processing - RELATED_TO Edge Computation](pattern-processing.md#related_to-edge-computation), where the enricher writes the edges.
 
 ### Service Layer Mapping
 
-This is the MCP query. The API reads related patterns only through `GetPatternGraph`, whose query also returns `count(c) AS sharedConcepts`.
+This is the MCP query. The API reads related patterns only through `GetPatternGraph`, whose query also returns `size(conceptNames) AS sharedConcepts`.
 
 Both services map `RelatedPattern` to `RelatedPatternResult` with `Relationship: "RELATED_TO"` and `SharedConcepts: r.ConceptNames`. The MCP version checks existence by reading the pattern name concurrently with the graph query:
 
@@ -675,7 +680,7 @@ for _, id := range jobIDs {
 
 Repository constructors accept the `DBTX` interface (`Exec`, `Query`, `QueryRow`), which both `*pgxpool.Pool` and `pgx.Tx` satisfy, and `WithTx(db DBTX)` returns a copy bound to the transaction.
 
-The enricher does not use multi-statement transactions; each repository call is one atomic statement (for example `MarkFailed` and `ClaimDue` are single `UPDATE`s), and the Neo4j sync is one write transaction.
+The enricher does not use multi-statement transactions; each repository call is one atomic statement (for example `MarkFailed` and `ClaimDue` are single `UPDATE`s), and the Neo4j sync is two write transactions (concepts, then RELATED_TO edges).
 
 ## Cross-Database Coordination
 
@@ -749,7 +754,7 @@ if err := s.graphRepo.DeletePattern(ctx, id); err != nil {
 
 The service layer defines its own sentinel errors in `internal/service/errors.go`. These are independent of repository-level errors and transport-level errors.
 
-**Note:** There is no authentication in the current local, single-user phase. Post-MVP, authentication and authorization are planned to be handled externally (Envoy and OPA) before requests reach the application, so service methods do not define sentinel errors for 401/403.
+**Note:** The Go services do no authentication themselves. The gateway (Envoy JWT verification, OPA scope checks, Keycloak) authenticates and authorizes requests before they reach the application (see [Security Architecture](architecture/system/01-security-architecture.md)), so service methods do not define sentinel errors for 401/403.
 
 ```go
 // Package: internal/service (the api service)
@@ -812,11 +817,8 @@ MCP handlers map service errors to the sentinels in `internal/mcpserver/errors.g
 ```go
 // REST handler (the api service internal/handlers/patterns)
 func (h *Handler) Get(c *gin.Context) {
-    id, err := uuid.Parse(c.Param("id"))
-    if err != nil {
-        handlers.RespondValidationError(c, "Invalid pattern ID format", []handlers.FieldError{
-            {Field: "id", Code: "INVALID_FORMAT", Message: "id must be a valid UUID"},
-        })
+    id, ok := parseID(c) // responds 400 INVALID_FORMAT ("id must be a valid UUID") itself
+    if !ok {
         return
     }
     pattern, graph, err := h.patternSvc.GetWithGraph(c.Request.Context(), id)
@@ -824,7 +826,7 @@ func (h *Handler) Get(c *gin.Context) {
         handlers.RespondError(c, err)
         return
     }
-    // ... add chunks, c.JSON(http.StatusOK, resp)
+    // ... add chunks (X-Warning on failure), c.JSON(http.StatusOK, resp)
 }
 ```
 
@@ -883,7 +885,7 @@ flowchart TD
     PFAIL --> DONE
     LOADP --> EXTRACT
     LOADP2 --> EXTRACT["6. Extract concepts<br/>ExtractionService.Extract"]
-    EXTRACT --> SYNC["7. GraphRepository.SyncPattern<br/>one Neo4j write tx"]
+    EXTRACT --> SYNC["7. GraphRepository.SyncPattern<br/>two Neo4j write txs"]
     SYNC --> ENRICHED["8. pattern enriched<br/>UpdateEnrichmentStatus"]
     ENRICHED --> DONE["9. MarkCompleted"]
     DONE --> OK([nil])
@@ -965,13 +967,15 @@ RELATED_TO edges are computed inside `GraphRepository.SyncPattern`, the enricher
 
 ```go
 // SyncPattern writes a pattern's node, replaces its MENTIONED_IN concepts,
-// and recomputes its RELATED_TO edges, all in one write transaction. Only
-// edges with similarity >= minSimilarity are created, where similarity is
-// shared_concepts / max(total_concepts_a, total_concepts_b).
+// and recomputes its RELATED_TO edges, in two write transactions (concepts
+// first, so the second sees every committed concept). Only edges with
+// similarity >= minSimilarity are created, where similarity is
+// shared_concepts / max(total_concepts_a, total_concepts_b). Each related pair
+// has one edge, directed from the lower pattern id to the higher.
 SyncPattern(ctx context.Context, pattern Pattern, concepts []Concept, minSimilarity float64) error
 ```
 
-`minSimilarity` is `enrichment.related_to_min_similarity` (default 0.3). The Cypher statements are listed in [Pattern Processing - Step 4](pattern-processing.md#step-4-create-relationships) and [RELATED_TO Edge Computation](pattern-processing.md#related_to-edge-computation).
+`minSimilarity` is `enrichment.related_to_min_similarity` (default 0.3). A failure in either transaction fails the job; the sync is idempotent, so the retry redoes both. The Cypher statements are listed in [Pattern Processing - Step 4](pattern-processing.md#step-4-create-relationships) and [RELATED_TO Edge Computation](pattern-processing.md#related_to-edge-computation).
 
 ### Enrichment Service Interface Usage
 
@@ -980,7 +984,7 @@ SyncPattern(ctx context.Context, pattern Pattern, concepts []Concept, minSimilar
 ```go
 // Simplified from Worker.Run
 semaphore := make(chan struct{}, cfg.WorkerCount)        // default 2
-deliveries, _ := sub.Subscribe(ctx)
+deliveries := sub.Subscribe(ctx)
 go w.runMaintenance(ctx)                                 // every 5 min: ReclaimStaleJobs,
                                                          // CleanupCompletedJobs, CleanupFailedJobs
 sweep := time.NewTicker(15 * time.Second)
@@ -1017,13 +1021,13 @@ The generated spec describes cursor-based pagination with opaque base64 cursors.
 The cursor is an opaque base64-encoded string encoding a simple offset (`src/internal/api/handlers/respond.go`):
 
 ```go
-type CursorPayload struct {
+type cursorPayload struct {
     Offset int `json:"o"`
 }
 
 // EncodeCursor creates an opaque cursor from an offset.
 func EncodeCursor(offset int) string {
-    data, _ := json.Marshal(CursorPayload{Offset: offset})
+    data, _ := json.Marshal(cursorPayload{Offset: offset})
     return base64.URLEncoding.EncodeToString(data)
 }
 
@@ -1043,7 +1047,7 @@ func (h *Handler) List(c *gin.Context) {
     limit, ok := handlers.ParseIntQueryStrict(c, "limit", 20, 1, 100)   // 400 if invalid
     offset, ok := handlers.DecodeCursorStrict(c.Query("cursor"))         // 400 if invalid
 
-    patterns, _, err := h.patternSvc.List(c.Request.Context(), filter, patternsvc.ListOptions{
+    patterns, err := h.patternSvc.List(c.Request.Context(), filter, patternsvc.ListOptions{
         Offset: offset,
         Limit:  limit + 1, // Fetch one extra to detect has_more
     })
@@ -1094,7 +1098,7 @@ func (s *patternService) List(ctx context.Context, filter patternRepo.Filter, op
 
 [Table of Contents](#table-of-contents)
 
-Each service wires its dependencies in `src/internal/<service>/server/server.go` (`wireDependencies`) after opening the database connections; `cmd/main/main.go` only parses flags, loads config and calls `server.ListenAndServe`. Dependencies are injected via constructor functions.
+Each service wires its dependencies in `src/internal/<service>/server/server.go` (`wireDependencies`) after opening the database connections; `cmd/<service>/main.go` only parses flags, loads config and calls `server.ListenAndServe`. Dependencies are injected via constructor functions.
 
 ```go
 // the api service
@@ -1106,7 +1110,7 @@ embeddingSvc := openaisvc.NewEmbeddingService(cfg.OpenAI)
 pub, err := rabbitmq.NewPublisher(cfg.Queue.RabbitMQ, otel.Meter("mnemonic/queue")) // config.RabbitMQConfig
 searchSvc := searchsvc.New(embeddingSvc, chunkRepo, registry.Patterns, logger)
 patternSvc := patternsvc.New(patternRepo, enrichmentJobRepo, graphRepo, pgPool, chunkRepo, pub, logger)
-// -> server.RegisterAPIRoutes(router, Services{Pattern: patternSvc, Search: searchSvc}, cfg.Vocabulary)
+// -> patternhandler.New(patternSvc, searchSvc, cfg.Vocabulary), registered on the router by the server
 ```
 
 ```go

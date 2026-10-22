@@ -1,7 +1,7 @@
 ---
-version: 2
-date: 2026-10-21
-notes: "Migration number corrected to 000010; Agent graph schema noted; spec path corrected. License footer corrected."
+version: 3
+date: 2026-10-22
+notes: "Graph sync described as two write transactions with low-to-high RELATED_TO edges; worker path, stale code excerpt, dimension-check claim and egress note corrected."
 ---
 
 # Pattern Enrichment
@@ -113,7 +113,8 @@ sequenceDiagram
     opt last chunk enriched
         Enricher->>PG: load pattern content
         Enricher->>OpenAI: extract concepts (chat completion)
-        Enricher->>Neo4j: one write tx: pattern, MENTIONED_IN, RELATED_TO
+        Enricher->>Neo4j: write tx 1: pattern, MENTIONED_IN
+        Enricher->>Neo4j: write tx 2: RELATED_TO
         Enricher->>PG: pattern enriched
     end
     Enricher->>PG: job completed
@@ -186,9 +187,9 @@ stateDiagram-v2
 
     state "4. Sync Graph" as CreateRelationships
     note right of CreateRelationships
-        Neo4j, one write transaction:
-        Pattern node, MENTIONED_IN,
-        RELATED_TO edges
+        Neo4j, two write transactions:
+        Pattern node and MENTIONED_IN,
+        then RELATED_TO edges
     end note
 
     CreateRelationships --> UpdateStatus
@@ -241,13 +242,7 @@ The example yields two chunks, "Wrapping Errors" and "Sentinel Errors".
 
 **Embedding (in the enricher).** Each chunk job embeds one chunk and stores the vector and `enrichment_status = 'enriched'` on its `pattern_chunks` row in one statement:
 
-```go
-// Simplified from service/enrichment.processChunkJob
-chunk := chunkRepo.Get(ctx, *job.ChunkID)                // chunk + pattern name and tags
-embedding := embeddingSvc.Embed(ctx, embedText(chunk))   // see format below
-chunkRepo.MarkEnriched(ctx, chunk.ID, embedding)
-progress := chunkRepo.PatternProgress(ctx, chunk.PatternID)
-```
+The steps are in `processChunkJob` (`src/internal/enricher/service/enrichment/service.go`): load the chunk with its pattern's name and tags, embed the text built as described below, mark the chunk enriched with the vector, then read the pattern's chunk progress.
 
 ##### Enriched Text Format for Embeddings
 
@@ -312,9 +307,10 @@ This LLM call adds 1-5 seconds of processing time per pattern, which is why enri
 
 #### Step 4: Create Relationships
 
-`GraphRepository.SyncPattern` (`src/internal/enricher/repository/graph/repository.go`) runs all graph writes for the pattern in **one Neo4j write transaction**, so a failure part way leaves the graph unchanged:
+`GraphRepository.SyncPattern` (`src/internal/enricher/repository/graph/repository.go`) writes the graph in **two Neo4j write transactions**. The first (statements 1-3) writes the pattern node and replaces its concepts; the second (statements 4-5) replaces its RELATED_TO edges. The split is deliberate: the second transaction reads the committed concepts of every pattern, so of two overlapping syncs the one that commits last still sees the other's concepts. A failure part way through a transaction leaves the graph as it was before that transaction; if the second fails, the first stays committed and the job is retried:
 
 ```cypher
+// Transaction 1
 // 1. Create/update the pattern node
 MERGE (p:Pattern {id: $patternId})
 SET p.name = $patternName, p.description = $patternDescription, p.updatedAt = datetime()
@@ -333,6 +329,7 @@ WITH c
 MATCH (p:Pattern {id: $patternId})
 MERGE (c)-[:MENTIONED_IN]->(p)
 
+// Transaction 2
 // 4. Delete this pattern's RELATED_TO edges
 MATCH (p:Pattern {id: $patternId})-[r:RELATED_TO]-()
 DELETE r
@@ -344,9 +341,9 @@ Agent nodes and `RELEVANT_FOR` edges are not written: agents are not implemented
 
 ### RELATED_TO Edge Computation
 
-RELATED_TO is a symmetric relationship. Edges are created in one direction only (from the pattern being enriched), and queries use direction-agnostic traversal (`MATCH (a)-[:RELATED_TO]-(b)`, no arrow). This is the standard Neo4j pattern for symmetric relationships.
+RELATED_TO is a symmetric relationship. Each related pair has one edge, always directed from the pattern with the lower id to the one with the higher id (two patterns can compute the same pair at the same time, and `MERGE` makes the second computation update the edge instead of adding another). Queries use direction-agnostic traversal (`MATCH (a)-[:RELATED_TO]-(b)`, no arrow). This is the standard Neo4j pattern for symmetric relationships.
 
-As the last statement of the sync transaction, the enricher computes direct RELATED_TO edges between the pattern and every other pattern that shares at least one concept:
+As the last statement of the second sync transaction, the enricher computes direct RELATED_TO edges between the pattern and every other pattern that shares at least one concept:
 
 1. Find other patterns sharing concepts via `MENTIONED_IN` traversal
 2. Compute a similarity score (0.0-1.0) based on concept overlap only:
@@ -442,7 +439,7 @@ flowchart LR
   enricher -->|"concepts, relationships"| neo4j[("Neo4j")]
 ```
 
-The enricher connects to RabbitMQ, Postgres, Neo4j, and the OpenAI API, and serves `/health` and `/version` on `server.port` (8080) and metrics on `:9090/metrics`. Inside, the `enricher.Worker` (`src/internal/enricher/enrichment.go`) runs three activities until shutdown:
+The enricher connects to RabbitMQ, Postgres, Neo4j, and the OpenAI API, and serves `/health` and `/version` on `server.port` (8080) and metrics on `:9090/metrics`. Inside, the `enricher.Worker` (`src/internal/enricher/enricher/enrichment.go`) runs three activities until shutdown:
 
 | Activity          | Trigger                                        | What it does                                                                      |
 | ----------------- | ---------------------------------------------- | --------------------------------------------------------------------------------- |
@@ -598,6 +595,8 @@ Additional LLM providers (Anthropic, Azure OpenAI) can be added post-MVP if need
 MNEMONIC_OPENAI_API_KEY=sk-...
 ```
 
+In the compose stack and the Helm chart the services carry the placeholder `proxy-managed` instead and send their OpenAI calls to the egress proxy through `MNEMONIC_OPENAI_BASE_URL`; only the egress service holds the real key (`deploy/docker-compose.yaml`).
+
 ### Application Configuration
 
 Configuration follows the patterns established in [configuration.md](configuration.md). Enricher settings relevant to enrichment, with their defaults (`src/internal/enricher/config/defaults.go`):
@@ -705,16 +704,16 @@ Before deploying pattern enrichment, verify:
 
 ### Failure Modes
 
-| Failure                                    | Impact                                                           | Mitigation                                                                            |
-| ------------------------------------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Invalid/missing API key                    | All enrichment jobs fail                                         | `/health` OpenAI model checks (Warning severity)                                      |
-| Rate limit exceeded                        | Temporary failures, 429 responses                                | Client retries, then job retry after `retry_delay` (3 attempts)                       |
-| OpenAI outage                              | Embedding/extraction unavailable                                 | Job retries; exhausted jobs need a pattern `PUT`                                      |
-| RabbitMQ unavailable at publish            | Message not sent; job row stays `pending`                        | Retry sweep claims it after the 2-minute grace (ADR-009)                              |
-| Neo4j unavailable                          | Graph sync fails; pattern stays `pending`                        | Job retry (the sync is one transaction, so no partial graph)                          |
-| Dimension mismatch                         | Vectors unusable for similarity search                           | Validate config at startup                                                            |
-| Network blocked                            | Cannot reach external APIs                                       | Verify egress rules                                                                   |
-| Enricher crash                             | Unacked messages redelivered; started jobs stuck in `processing` | Redelivery is a no-op for started jobs; maintenance reclaims them after `job_timeout` |
+| Failure                         | Impact                                                           | Mitigation                                                                                       |
+| ------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Invalid/missing API key         | All enrichment jobs fail                                         | `/health` OpenAI model checks (Warning severity)                                                 |
+| Rate limit exceeded             | Temporary failures, 429 responses                                | Client retries, then job retry after `retry_delay` (3 attempts)                                  |
+| OpenAI outage                   | Embedding/extraction unavailable                                 | Job retries; exhausted jobs need a pattern `PUT`                                                 |
+| RabbitMQ unavailable at publish | Message not sent; job row stays `pending`                        | Retry sweep claims it after the 2-minute grace (ADR-009)                                         |
+| Neo4j unavailable               | Graph sync fails; pattern stays `pending`                        | Job retry (each of the two sync transactions is all-or-nothing, and the sync is idempotent)      |
+| Dimension mismatch              | Vectors unusable for similarity search                           | Keep `openai.embedding_dimensions` and the column in step (startup only checks it is at least 1) |
+| Network blocked                 | Cannot reach external APIs                                       | Verify egress rules                                                                              |
+| Enricher crash                  | Unacked messages redelivered; started jobs stuck in `processing` | Redelivery is a no-op for started jobs; maintenance reclaims them after `job_timeout`            |
 
 ### Health Check Endpoint
 

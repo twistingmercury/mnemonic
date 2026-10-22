@@ -1,14 +1,14 @@
 ---
-version: 2
-date: 2026-10-21
-notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
+version: 3
+date: 2026-10-22
+notes: "Authentication is done by the gateway, not the service."
 ---
 
 # Mnemonic Service Architecture
 
 > Back to [Design Index](../../README.md)
 
-This subdirectory documents the MCP service component of the mnemonic system (the mcp service). The MCP service exposes 3 read-only pattern search tools to Claude Code over Streamable HTTP (stateless, unauthenticated) at `http://localhost:8081/mcp`.
+This subdirectory documents the MCP service component of the mnemonic system (the mcp service). The MCP service exposes 3 read-only pattern search tools to Claude Code over Streamable HTTP (stateless; authentication is done by the gateway, not by the service) at `http://localhost:8081/mcp`.
 
 ## Contents
 

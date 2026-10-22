@@ -1,7 +1,7 @@
 ---
-version: 2
-date: 2026-10-21
-notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
+version: 3
+date: 2026-10-22
+notes: "Enricher source path corrected."
 ---
 
 # POST /v1/api/patterns — Activity Diagram
@@ -66,7 +66,7 @@ flowchart TD
 
 ## Enricher: job to enriched pattern
 
-Source: the enricher service `src/internal/enricher/enrichment.go` (`Run`, `handleDelivery`, `handleRetry`), `src/internal/enricher/service/enrichment/service.go` (`processChunkJob`, `runGraphPipeline`), `src/internal/enricher/repository/enrichmentjob/repository.go` (`Start`, `ClaimDue`, `MarkFailed`).
+Source: the enricher service `src/internal/enricher/enricher/enrichment.go` (`Run`, `handleDelivery`, `handleRetry`), `src/internal/enricher/service/enrichment/service.go` (`processChunkJob`, `runGraphPipeline`), `src/internal/enricher/repository/enrichmentjob/repository.go` (`Start`, `ClaimDue`, `MarkFailed`).
 
 ```mermaid
 flowchart TD

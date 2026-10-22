@@ -1,7 +1,7 @@
 ---
-version: 2
-date: 2026-10-21
-notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
+version: 3
+date: 2026-10-22
+notes: "Health check users corrected: only the api image declares a Docker HEALTHCHECK; the e2e compose file runs --health for all three services and the Helm chart probes /health. Earlier: renamed to Mnemonic; license footer corrected to FSL-1.1-ALv2."
 ---
 
 # Observability Architecture
@@ -242,7 +242,7 @@ Jobs that the enricher's retry sweep claims from Postgres (failed jobs whose ret
 
 [Back to Table of Contents](#table-of-contents)
 
-Each service exposes `GET /health` on `server.port` (default `8080`; the MCP endpoint on `8081` has no health route). The handler comes from [`heartbeat`](https://github.com/twistingmercury/heartbeat) v2, which runs every dependency check concurrently with a 3-second timeout each. Health checks are used by container orchestration, load balancers and monitoring infrastructure to determine service availability; each binary's `--health` flag calls the endpoint for the container `HEALTHCHECK`.
+Each service exposes `GET /health` on `server.port` (default `8080`; the MCP endpoint on `8081` has no health route). The handler comes from [`heartbeat`](https://github.com/twistingmercury/heartbeat) v2, which runs every dependency check concurrently with a 3-second timeout each. Health checks are used by container orchestration, load balancers and monitoring infrastructure to determine service availability; each binary's `--health` flag calls the endpoint, which the api image uses as its Docker `HEALTHCHECK` and `tests/integration/docker-compose.yaml` uses for all three services; the Helm chart probes `/health` over HTTP.
 
 **Dependency checks:**
 

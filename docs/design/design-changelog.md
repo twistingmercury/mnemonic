@@ -1,7 +1,7 @@
 ---
-version: 2
-date: 2026-10-21
-notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
+version: 3
+date: 2026-10-22
+notes: "Added the entry for the review of the design documents against the monorepo code."
 ---
 
 # Mnemonic Design Change Log
@@ -29,6 +29,14 @@ Each entry includes:
 - **Justification**: Why the implementation differs
 
 ## Change Log
+
+### 2026-10-22: Design Documents Reviewed Against the Monorepo Code
+
+**Design Documents**: `architecture/system/` (README and 00 to 07), `architecture/dbs/`, `architecture/mnemonic/`, `configuration.md`, `data-storage.md`, `mcp-server.md`, `observability-implementation.md`, `pattern-processing.md`, `service-layer.md`, `requirements.md`, `requirements-traceability.md`, `reference/glossary.md`, `diagrams/`, `README.md`, `mnemonic_from_coding_patterns_to_any_knowledge.md`
+
+- **Original**: The documents described the system before the gateway and the egress proxy were built (no authentication, six containers, the services calling OpenAI directly), a graph sync in one write transaction with `RELATED_TO` created from the synced pattern, a Go integration-test tier, and CI that publishes images.
+- **Implementation**: Envoy checks the JWT, OPA checks scopes, Keycloak issues tokens and only the egress proxy holds the OpenAI key; the local stack is ten containers. `SyncPattern` runs two write transactions (concepts, then `RELATED_TO`), and each pair has one `MERGE`d edge directed from the lower pattern id to the higher. The Go integration tier was removed and the Python e2e suite in `tests/integration` runs inside every service build. The CI workflows are designed in `ci_workflows.md` but not written. The traceability matrix cites tests that exist today, TLS (SE-5) is marked not implemented, and claims about code that does not exist (an API search filter by pattern id, two API job errors, startup validation of embedding dimensions) were removed. Stale code excerpts were replaced by the current code or a file reference.
+- **Justification**: The documents had drifted from the code since the monorepo import. Each claim was checked against the repository, and the details are in the per-file frontmatter notes. The proposal in `mnemonic_from_coding_patterns_to_any_knowledge.md` stays a proposal; only its statements about the current code were corrected.
 
 ### 2026-10-16: MCP Server on Protocol 2026-07-28 (the mcp service v0.5.0)
 

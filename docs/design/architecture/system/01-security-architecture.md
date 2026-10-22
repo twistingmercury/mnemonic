@@ -1,14 +1,14 @@
 ---
-version: 2
-date: 2026-10-21
-notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
+version: 3
+date: 2026-10-22
+notes: "Current state now describes the built gateway (Envoy jwt_authn, OPA ext_authz, Keycloak, egress proxy); planned sections note where the build differs or what is not implemented."
 ---
 
 # Security Architecture
 
 > Back to [System Architecture](README.md) | [Design Index](../../README.md)
 
-**MVP stance:** The Mnemonic services run in a trusted network environment without authentication ([SE-1](../../requirements.md#se-1)). The MCP interface is read-only ([SE-4](../../requirements.md#se-4)) and database credentials are injected from the runtime environment ([SE-6](../../requirements.md#se-6)). Apart from [Current State](#current-state-local-phase), this document describes the **planned** Post-MVP production security architecture; none of Envoy, OPA, JWT, API keys or identity headers is implemented.
+**Stance:** The Mnemonic services carry no authentication code ([SE-1](../../requirements.md#se-1)). The MCP interface is read-only ([SE-4](../../requirements.md#se-4)) and database credentials are injected from the runtime environment ([SE-6](../../requirements.md#se-6)). The repository ships a gateway that adds authentication and authorization in front of both services: Envoy verifies a Keycloak-issued JWT and asks OPA whether to forward the request. The compose stack (`deploy/docker-compose.yaml`) and the Helm chart (`deploy/helm/mnemonic`) both run it. [Current State](#current-state-local-phase) describes what is built. The rest of this document is the original Post-MVP design; parts of it are built in a different shape, and each section says where. API keys, identity headers, team-scoped roles, policy bundles, the device code flow and the token store are not implemented.
 
 ## Table of Contents
 
@@ -34,21 +34,24 @@ notes: "Renamed to Mnemonic (environment variables, image names, ports, links); 
 
 ## Current State (Local Phase)
 
-This is what the code does today (the api service v0.5.0, the enricher service v0.5.0, the mcp service v0.6.0). The phase is a trusted, local, single-user environment.
+This is what the code and the shipped configuration do today (the api service v0.5.0, the enricher service v0.5.0, the mcp service v0.6.0). The gateway, its access rules and the dev realm are described in [gateway/README.md](../../../../gateway/README.md); this table summarizes them.
 
-| Surface                                                               | Current behavior                                                                                                                                                                        |
-| --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| MCP `/mcp` on :8081 (mcp service)                                     | No authentication. Streamable HTTP (MCP 2026-07-28), stateless, read-only tools only (`search_patterns`, `find_related_patterns`, `get_pattern`); cross-origin browser requests get 403 |
-| REST `/v1/api` and `/swagger` on :8080 (api service)                  | No authentication or authorization; any caller can create, update and delete patterns                                                                                                   |
-| `/health`, `/version` on :8080 and `/metrics` on :9090 (all services) | Unauthenticated                                                                                                                                                                         |
-| TLS                                                                   | None in process; the API removed `server.tls.*`, so TLS, if needed, terminates at a reverse proxy                                                                                       |
-| Secrets                                                               | `openai.api_key`, PostgreSQL, Neo4j and RabbitMQ passwords come from config or `MNEMONIC_*` environment variables (for example `MNEMONIC_OPENAI_API_KEY`); none are hard-coded          |
-| PostgreSQL                                                            | `database.postgres.ssl_mode`, default `prefer`                                                                                                                                          |
-| RabbitMQ                                                              | SASL PLAIN credentials passed separately from the connection URL                                                                                                                        |
-| Error responses                                                       | Public 500 and 503 bodies use fixed messages; private logs redact upstream bodies, URLs and credential fields                                                                           |
-| Data sent off-host                                                    | Pattern content and search queries go to the OpenAI API (`openai.base_url`) for embeddings and concept extraction                                                                       |
+| Surface                                  | Current behavior                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Services                                 | No authentication or authorization in process. Started on their own (as in the e2e test stack `tests/integration/docker-compose.yaml`), any caller that reaches them can call every endpoint                                                                                                                                                                                                                                                                                                              |
+| Gateway                                  | Envoy (`gateway/envoy/envoy.yaml`) publishes the API edge on :8080 and the MCP edge on :8081; Keycloak publishes :8180. `jwt_authn` verifies the token signature against Keycloak's JWKS, the issuer, the expiry and the audience (`mnemonic-api` or `mnemonic-mcp`, one per edge), then removes the token before forwarding. `ext_authz` asks OPA (`gateway/opa/policy/`), which decides from the `scope` claim, the method and the path. OPA runs as its own container or Deployment, not as a sidecar  |
+| REST `/v1/api` and `/swagger` (api edge) | Reads need `patterns:read`; create and update need `patterns:write`; delete and Swagger need `patterns:admin`. Scopes nest (admin includes write, write includes read). Anything else is denied                                                                                                                                                                                                                                                                                                           |
+| MCP `/mcp` (mcp edge)                    | Streamable HTTP (MCP 2026-07-28), stateless, read-only tools only (`search_patterns`, `find_related_patterns`, `get_pattern`). `tools/call` needs `mcp:search` for `search_patterns` and `mcp:read` for the other two; every `POST` must send `MCP-Protocol-Version: 2026-07-28`. An unauthenticated request gets 401 with an RFC 9728 `WWW-Authenticate` challenge. The mcp service itself answers cross-origin browser requests with 403                                                                |
+| `/health`, `/version` and `/metrics`     | Unauthenticated on the services (`/health` and `/version` on :8080, `/metrics` on :9090). Through the gateway, `GET /version` on the api edge is public, `GET /health` needs any valid `mnemonic-api` token, and nothing else of the operations ports is exposed                                                                                                                                                                                                                                          |
+| Network isolation                        | Compose: the services, OPA and the data stores sit on an internal network with no route out. Helm: NetworkPolicies deny all traffic by default and allow only the listed flows; they need a CNI that enforces policy, such as Calico                                                                                                                                                                                                                                                                      |
+| TLS                                      | Plain HTTP throughout the dev gateway. The api service has no in-process TLS; the mcp and enricher services can serve their operations port (:8080) over TLS when `server.tls.enabled` is true (off by default); the MCP listener (:8081) is plain HTTP                                                                                                                                                                                                                                                   |
+| Secrets                                  | The real OpenAI key is held only by the egress proxy (`MNEMONIC_OPENAI_API_EMBEDDINGS_KEY`, `gateway/envoy/envoy-egress.yaml`), which adds it to each forwarded request. In the shipped stacks the services get the placeholder `MNEMONIC_OPENAI_API_KEY=proxy-managed` and `MNEMONIC_OPENAI_BASE_URL=http://egress:8443/v1`. PostgreSQL, Neo4j and RabbitMQ passwords come from config or `MNEMONIC_*` environment variables; none are hard-coded. Keycloak uses fixed dev client secrets and a dev user |
+| PostgreSQL                               | `database.postgres.ssl_mode`, default `prefer` (the shipped stacks set `disable`)                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| RabbitMQ                                 | SASL PLAIN credentials passed separately from the connection URL                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Error responses                          | Public 500 and 503 bodies use fixed messages; private logs redact upstream bodies, URLs and credential fields                                                                                                                                                                                                                                                                                                                                                                                             |
+| Data sent off-host                       | Pattern content and search queries go to the OpenAI API for embeddings and concept extraction. In the shipped stacks they go through the egress proxy, which forwards only `POST /v1/embeddings` and `POST /v1/chat/completions` to `api.openai.com` and answers everything else with 403. The services' `/health` OpenAI check (`GET /models/<model>`) is one of the refused requests, so behind the proxy it always reports a Warning                                                                   |
 
-Everything below this section is planned.
+The sections below are the original Post-MVP design.
 
 ## Introduction
 
@@ -58,8 +61,8 @@ This approach follows the principle of separation of concerns: security infrastr
 
 **Security Scope:**
 
-- **Admin REST API** (`:8080`): Protected by Envoy + OPA for write operations (patterns)
-- **MCP Server** (`:8081`): Read-only access in trusted environment (no authentication today). The MVP 4 and MVP 5 concept diagrams place Envoy + OPA in front of MCP as well; which applies is not yet decided
+- **Admin REST API** (`:8080`): Protected by Envoy + OPA for write operations (patterns); the built gateway guards reads as well
+- **MCP Server** (`:8081`): Read-only access. The built gateway puts Envoy + OPA in front of MCP as well (its own edge and audience), as the MVP 4 and MVP 5 concept diagrams do
 
 ## Security Model Overview
 
@@ -75,6 +78,8 @@ The security stack consists of:
 - **Envoy Proxy**: Handles authentication (JWT validation, API keys, TLS termination)
 - **OPA Sidecar**: Handles authorization (fine-grained RBAC with Rego policies)
 - **Mnemonic**: Receives pre-validated identity via trusted headers
+
+> **Built (2026-10-22):** Envoy handles JWT validation only (no API keys, no TLS in the dev gateway). OPA runs as its own container or Deployment, not as a sidecar, and loads its policies from mounted files, not bundles. The services receive no identity: Envoy removes the token and adds no identity headers.
 
 ```mermaid
 graph TB
@@ -139,7 +144,11 @@ JWT tokens are the primary authentication mechanism, providing rich claims for a
 | Expiry     | Access token: 1 hour, Refresh token: 30 days |
 | Claims     | user_id, team_id, roles, exp, iat            |
 
+> **Built (2026-10-22):** The identity provider is Keycloak with the dev realm `gateway/keycloak/realm-mnemonic.json` (access tokens live 300 seconds). Policies read only `sub`, `aud` and `scope`; there are no `user_id`, `team_id` or `roles` claims. Service clients get tokens with the client credentials grant; the public client `mnemonic-mcp-client` uses authorization code with PKCE. There is no CLI.
+
 ### API Keys (Secondary)
+
+> **Not implemented.** Envoy accepts only Keycloak JWTs; automation uses a Keycloak client with the client credentials grant instead.
 
 API keys provide authentication for service-to-service communication and automation scenarios where interactive login is not possible.
 
@@ -170,11 +179,15 @@ Envoy supports standard OAuth2/OIDC identity providers for JWT validation. The c
 | Azure AD | Microsoft ecosystem     | Medium     | Native integration with Microsoft tools |
 | Okta     | Enterprise SSO          | Low        | Managed service, enterprise features    |
 
+The built gateway uses Keycloak.
+
 ## Authorization
 
 Authorization determines what authenticated users can do. OPA (Open Policy Agent) evaluates policies for every request.
 
 ### RBAC Model
+
+> **Not implemented as designed.** There are no teams or roles. The built gateway authorizes by OAuth scope per edge: `patterns:read`, `patterns:write` and `patterns:admin` on the API edge, `mcp:read` and `mcp:search` on the MCP edge. The rules are listed in [gateway/README.md](../../../../gateway/README.md#access-rules).
 
 Access control uses Role-Based Access Control with team-scoped resources.
 
@@ -206,6 +219,8 @@ graph TB
 ### OPA Policy Structure
 
 OPA policies are written in Rego and evaluated for each request. Policies are loaded from bundles that can be updated independently of deployments.
+
+> **Built (2026-10-22):** The policies in `gateway/opa/policy/` differ from the sketch below. The entry point is `envoy.authz` (`main.rego`), which delegates to `mnemonic.api` or `mnemonic.mcp` by the `edge` context extension that each Envoy route sets; `mnemonic.token` reads the verified JWT payload that Envoy passes as metadata. The policies return only allow or deny and inject no headers. OPA loads them from mounted files. A denied request gets 403; if OPA errors or does not answer within 0.5 s, Envoy returns 503 (fail-closed).
 
 ```rego
 package mnemonic.authz
@@ -255,6 +270,8 @@ sequenceDiagram
 ## Component Architecture
 
 The security components integrate with the existing Mnemonic architecture.
+
+> **Built (2026-10-22):** Unlike this diagram, the MCP server is inside the perimeter: Claude Code reaches it through the Envoy MCP edge. An egress proxy (Envoy) is the only component with a route to the internet and holds the OpenAI key. There is no token store and no policy bundle service.
 
 ```mermaid
 graph TB
@@ -317,7 +334,9 @@ graph TB
 
 ## Admin Authentication Flow (Post-MVP Only)
 
-> **Note:** This section describes authentication for the Admin REST API in Post-MVP (Production Deployment). MVP uses the Admin UI directly with no token-based authentication. The admin UI is not part of this repository for now.
+> **Note:** This section describes authentication for the Admin REST API in Post-MVP (Production Deployment). The admin UI is not part of this repository for now.
+>
+> **Not implemented.** There is no admin CLI, the dev realm does not enable the device authorization grant, and nothing stores tokens. Admin callers get tokens from Keycloak directly (see [gateway/README.md](../../../../gateway/README.md#getting-a-token)).
 
 ### Device Code Flow
 
@@ -383,6 +402,8 @@ stateDiagram-v2
 ```
 
 ## Identity Headers
+
+> **Not implemented.** Envoy removes the token (`forward: false`) and injects no identity headers; the services do not read any. Network isolation (compose internal network, Helm NetworkPolicies) keeps callers from bypassing Envoy.
 
 After successful authentication and authorization, Envoy injects identity headers that the Admin API trusts.
 
@@ -564,16 +585,18 @@ graph TB
 
 ### Failure Modes
 
-| Failure                   | Impact                                             | Mitigation                                         |
-| ------------------------- | -------------------------------------------------- | -------------------------------------------------- |
-| Envoy unavailable         | All requests fail                                  | Expected behavior, load balancer health checks     |
-| OPA unavailable           | All requests denied (fail-closed)                  | OPA sidecar per task, policy bundle caching        |
-| IdP unavailable           | New logins fail, existing tokens work until expiry | Token refresh, offline validation with cached JWKS |
-| Policy bundle unavailable | OPA uses cached policies                           | Bundle caching in OPA, durable S3 storage          |
+| Failure                   | Impact                                                           | Mitigation                                         |
+| ------------------------- | ---------------------------------------------------------------- | -------------------------------------------------- |
+| Envoy unavailable         | All requests fail                                                | Expected behavior, load balancer health checks     |
+| OPA unavailable           | All requests denied (fail-closed; the built gateway returns 503) | OPA sidecar per task, policy bundle caching        |
+| IdP unavailable           | New logins fail, existing tokens work until expiry               | Token refresh, offline validation with cached JWKS |
+| Policy bundle unavailable | OPA uses cached policies                                         | Bundle caching in OPA, durable S3 storage          |
 
 ## Migration Path
 
 Security can be added incrementally to an existing deployment.
+
+> **Status (2026-10-22):** The built gateway went straight to enforcement: Envoy, JWT authentication and OPA authorization are all on, with no pass-through or permissive stage, and the services are reachable only through Envoy. TLS termination is not set up.
 
 ```mermaid
 graph LR

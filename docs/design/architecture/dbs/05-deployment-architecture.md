@@ -1,7 +1,7 @@
 ---
-version: 2
-date: 2026-10-21
-notes: "Renamed to Mnemonic; Neo4j build corrected (schema applied at every container start, no docker commit); migration count corrected to 10; CI section rewritten because no workflows exist yet; license footer corrected."
+version: 3
+date: 2026-10-22
+notes: "Rollback example no longer cites a tag that does not exist in the registry."
 ---
 
 # Database Images — Deployment Architecture
@@ -78,10 +78,10 @@ Every Cypher file is idempotent, so restarting a container against an existing v
 
 The CI workflows are not written yet: the repository has no `.github/workflows/` directory, so nothing builds or pushes the database images automatically. This page therefore describes only what exists:
 
-- `db/postgres/build.sh` and `db/neo4j/build.sh` build and tag the images locally. They never push.
+- `db/postgres/build.sh` and `db/neo4j/build.sh` build and tag the images locally. They never push. Always set `MNEMONIC_VERSION` (for example `MNEMONIC_VERSION=v1.0.0 bash db/postgres/build.sh`): without it the build fails because the newest git tag of any component contains a slash (issue [#26](https://github.com/twistingmercury/mnemonic/issues/26)).
 - `db/tests/postgres-test-runner.sh`, `db/tests/neo4j-test-runner.sh` and the BATS suites under `db/tests/bats/` test the schema; see the [db README](../../../../db/README.md) for how to run them.
 
-The intended flow for every component, as set out in the monorepo plan, is that the build script builds the image and runs its tests, and CI then logs in to GHCR and pushes the result. Per-component triggers, job names and tag rules are not settled and are not documented here until the workflows exist.
+The intended flow for every component, as set out in the monorepo plan, is that the build script builds the image and runs its tests, and CI then logs in to GHCR and pushes the result. The triggers, jobs and tag rules are settled in [ci_workflows.md](../../ci_workflows.md): a push to develop publishes `latest-dev` and `sha-<short>`; publishing runs on a push to develop or main, not on a tag.
 
 ## Image Tagging Strategy
 
@@ -98,16 +98,16 @@ Application services pin a specific tag rather than a floating one: the compose 
 1. Add or modify SQL/Cypher files in `db/postgres/` or `db/neo4j/`
 2. Update BATS tests to cover the new schema state
 3. Run the test runners in `db/tests/` and build the images with the build scripts
-4. Tag the component release (`db/vX.Y.Z`); CI is expected to publish the images from it once the workflows exist
+4. Tag the component release (`db/vX.Y.Z`); publishing is done by CI on a push to develop or main, not by the tag (see [ci_workflows.md](../../ci_workflows.md))
 5. Update image references in `deploy/docker-compose.yaml`, `tests/integration/docker-compose.yaml` and `deploy/helm/mnemonic/values.yaml`
 
 **Rollback:**
 Pull a prior image tag. Because the schema ships inside the image, rolling back means pointing the application at an older tag. No down migration scripts are maintained.
 
 ```bash
-# Roll back to a specific version
-docker pull ghcr.io/twistingmercury/mnemonic-postgres:v1.0.0
-docker pull ghcr.io/twistingmercury/mnemonic-neo4j:v1.0.0
+# Roll back to a prior tag (for example v1.0.0-dev, the tag consumers pin today)
+docker pull ghcr.io/twistingmercury/mnemonic-postgres:<prior-tag>
+docker pull ghcr.io/twistingmercury/mnemonic-neo4j:<prior-tag>
 ```
 
 **Next:** [Data Architecture](08-data-architecture.md)

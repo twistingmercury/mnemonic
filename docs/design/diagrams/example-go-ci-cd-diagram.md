@@ -1,7 +1,7 @@
 ---
-version: 3
-date: 2026-10-21
-notes: "The legacy e2e note now names the Python suite in tests/integration. Earlier: rewritten for what exists: the build script flow is described from the code, no CI workflow exists yet so the push step is marked as intended; image names renamed to Mnemonic; license footer corrected."
+version: 4
+date: 2026-10-22
+notes: "Links the CI workflows design."
 ---
 
 # Build Pipeline Diagram
@@ -10,7 +10,7 @@ notes: "The legacy e2e note now names the Python suite in tests/integration. Ear
 
 This diagram shows how each Go service's build script (`build/<service>/<service>.build.sh`) builds the image and runs the service's end-to-end suite. The steps below are from the api service (`build/api/api.build.sh`, `build/api/api.Dockerfile`, and the shared steps in `build/build-lib.sh`). The mcp and enricher services differ only in image name (`ghcr.io/twistingmercury/mnemonic-mcp` and `ghcr.io/twistingmercury/mnemonic-enricher`), Dockerfile and end-to-end service names.
 
-The build scripts never push. Pushing is the job of CI, but no CI workflow is written yet (the repository has no `.github/workflows/`), so the last steps in the diagram are the intended flow, shown dashed, not something that runs today. The end-to-end suite is the Python suite in `tests/integration/`; each build script runs all of it against the image it just built.
+The build scripts never push. Pushing is the job of CI, but no CI workflow is written yet (the repository has no `.github/workflows/`; see [CI Workflows](../ci_workflows.md) for the design), so the last steps in the diagram are the intended flow, shown dashed, not something that runs today. The end-to-end suite is the Python suite in `tests/integration/`; each build script runs all of it against the image it just built.
 
 ```mermaid
 ---

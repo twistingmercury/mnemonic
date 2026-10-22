@@ -1,7 +1,7 @@
 ---
-version: 2
-date: 2026-10-21
-notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
+version: 3
+date: 2026-10-22
+notes: "MCP and REST channels now pass through the Envoy gateway (JWT + OPA); OpenAI calls go through the egress proxy; gateway timeouts and failures added; \"no authentication\" corrected."
 ---
 
 # Communication Patterns
@@ -42,6 +42,8 @@ graph LR
     REST -->|"3. AMQP publish job_id<br/>queue enrichment-jobs<br/>traceparent in headers"| RMQ
     RMQ -->|"Consume"| ENR
 ```
+
+In the compose and Helm stacks, channels 1 and 2 pass through the Envoy gateway: Envoy verifies a Keycloak JWT for the edge's audience and asks OPA before it forwards the request to the service, and the services' OpenAI calls go through the egress proxy. See [Security Architecture](01-security-architecture.md#current-state-local-phase).
 
 ## Claude Code to MCP Server Communication
 
@@ -99,8 +101,7 @@ Graph matches are appended as a separate "Related Patterns (via graph)" section 
 - Synchronous request-response via MCP protocol, Streamable HTTP in stateless mode (no MCP session state)
 - Read-only access (no mutations)
 - The `/mcp` handler is wrapped in `otelhttp`, so an incoming W3C `traceparent` is continued and each tool call gets a child span
-- Runs on localhost in a trusted environment
-- No authentication (local, single-user phase)
+- In the shipped stacks, requests reach the server only through the Envoy MCP edge, which needs a Keycloak token (audience `mnemonic-mcp`, scope `mcp:search` or `mcp:read` per tool) and `MCP-Protocol-Version: 2026-07-28` on every `POST`; the server itself has no authentication
 
 ### Response Structure
 
@@ -132,6 +133,8 @@ Claude Code must handle MCP server errors gracefully.
 | Server error       | Mnemonic unavailable  | Continue without team knowledge |
 | Timeout            | Request took too long | Display timeout, suggest retry  |
 
+Through the gateway, a missing or expired token gets 401 with an RFC 9728 `WWW-Authenticate` challenge; a missing scope or an unsupported `MCP-Protocol-Version` gets 403 (the 403 challenge carries `insufficient_scope`); a wrong-audience token is denied with 401 or 403 (`gateway/test/e2e/gateway_test.go` accepts either). None of these reaches the MCP server.
+
 ## Admin to REST API Communication
 
 Admin tools (Admin UI, curl, scripts) communicate with Mnemonic via the REST API under `/v1/api` on port 8080. The REST API manages patterns only: `POST`/`GET /patterns`, `GET /patterns/search`, `GET`/`PUT`/`DELETE /patterns/:id`, and `GET /patterns/:id/chunks`. Swagger UI is served at `/swagger/index.html`. The admin UI is not part of this repository for now.
@@ -159,7 +162,7 @@ sequenceDiagram
 - Synchronous request-response
 - JSON payloads for all operations; errors are RFC 7807 problem details carrying the active `traceId`
 - `X-Request-ID` is echoed when valid (up to 128 ASCII letters, digits, `.`, `_`, `-`) and generated otherwise
-- No authentication (local, single-user phase); see [Security Architecture](01-security-architecture.md) for the planned design
+- In the shipped stacks, requests reach the API only through the Envoy API edge, which needs a Keycloak token (audience `mnemonic-api`) with `patterns:read`, `patterns:write` or `patterns:admin` depending on the route; the API itself has no authentication. See [Security Architecture](01-security-architecture.md)
 - `PUT` is a full replacement and returns 204 No Content ([ADR-006](00-architectural-decisions.md#adr-006)); `PUT` and `DELETE` are idempotent
 
 ## Admin API to Enricher Communication
@@ -206,12 +209,13 @@ sequenceDiagram
 
 Each communication channel has timeout considerations.
 
-| Channel            | Timeout Strategy                                                                                                |
-| ------------------ | --------------------------------------------------------------------------------------------------------------- |
-| Claude Code to MCP | `mcp.read_timeout` / `mcp.write_timeout` 30s, `mcp.idle_timeout` 120s                                           |
-| Admin to REST API  | `server.read_timeout` / `server.write_timeout` 30s; pattern creation returns 202 without waiting for enrichment |
-| Enrichment job     | `enrichment.job_timeout` 5m: a job left in `processing` longer is returned to `pending` by maintenance          |
-| Enricher shutdown  | `enrichment.drain_timeout` 30s for in-flight jobs before their contexts are cancelled                           |
+| Channel            | Timeout Strategy                                                                                                                             |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Claude Code to MCP | `mcp.read_timeout` / `mcp.write_timeout` 30s, `mcp.idle_timeout` 120s; the Envoy MCP route sets no deadline (responses may be SSE streams)   |
+| Admin to REST API  | `server.read_timeout` / `server.write_timeout` 30s, Envoy API route timeout 35s; pattern creation returns 202 without waiting for enrichment |
+| Gateway to OPA     | 0.5s per authorization check; an error or timeout returns 503                                                                                |
+| Enrichment job     | `enrichment.job_timeout` 5m: a job left in `processing` longer is returned to `pending` by maintenance                                       |
+| Enricher shutdown  | `enrichment.drain_timeout` 30s for in-flight jobs before their contexts are cancelled                                                        |
 
 ### Retry Logic
 
@@ -247,17 +251,19 @@ When components are unavailable:
 | Neo4j unavailable      | `GET /v1/api/patterns/:id` returns the pattern without graph context; `search_patterns` returns vector matches without graph expansion; `/health` reports Neo4j as Critical |
 | OpenAI unavailable     | API search returns 503 Service Unavailable; enrichment jobs fail and are retried                                                                                            |
 | PostgreSQL unavailable | Requests fail with 500; `/health` reports PostgreSQL as Critical                                                                                                            |
+| OPA unavailable        | The gateway denies every request with 503 (fail-closed)                                                                                                                     |
+| Keycloak unavailable   | No new tokens are issued; Envoy verifies tokens against the JWKS it last fetched, which it caches for 300s                                                                  |
 
 ## Security Considerations
 
 ### Data in Transit
 
-| Channel              | Security Requirement                                                                                                                                                         |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Claude Code to MCP   | Plain HTTP on the local machine (no TLS in the local phase)                                                                                                                  |
-| Admin to REST API    | Plain HTTP; the API has no in-process TLS, so TLS, if needed, terminates at a reverse proxy. See [Security Architecture](01-security-architecture.md) for the planned design |
-| Services to RabbitMQ | AMQP with SASL PLAIN credentials from config (`queue.rabbitmq.user` / `password`)                                                                                            |
-| Services to OpenAI   | HTTPS to `openai.base_url` (default `https://api.openai.com/v1`) with `openai.api_key`                                                                                       |
+| Channel              | Security Requirement                                                                                                                                                                                                                                              |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Claude Code to MCP   | Plain HTTP to the Envoy MCP edge with a bearer token (the dev gateway has no TLS)                                                                                                                                                                                 |
+| Admin to REST API    | Plain HTTP to the Envoy API edge with a bearer token; the API has no in-process TLS and the dev gateway terminates none. See [Security Architecture](01-security-architecture.md)                                                                                 |
+| Services to RabbitMQ | AMQP with SASL PLAIN credentials from config (`queue.rabbitmq.user` / `password`)                                                                                                                                                                                 |
+| Services to OpenAI   | To `openai.base_url` (default `https://api.openai.com/v1`) with `openai.api_key`. In the shipped stacks: plain HTTP to the egress proxy (`http://egress:8443/v1`, placeholder key `proxy-managed`), which adds the real key and calls `api.openai.com` over HTTPS |
 
 ### Sensitive Data Handling
 
@@ -278,7 +284,7 @@ graph TB
 - User credentials never leave Claude Code
 - Patterns are team-shared (no user-specific secrets); do not store secrets in pattern content, because it is sent to the OpenAI API
 - MCP read-only access prevents accidental data modification
-- No authentication in the local phase. Planned: authentication and authorization handled externally by Envoy and OPA.
+- The services have no authentication code; in the compose and Helm stacks, Envoy (JWT verification) and OPA (scope checks) handle authentication and authorization in front of them
 - Claude Code's own LLM calls go directly from Claude Code to the Anthropic API; Mnemonic never proxies them
 
 **Next:** [Data Architecture](04-data-architecture.md)

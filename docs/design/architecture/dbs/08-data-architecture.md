@@ -1,7 +1,7 @@
 ---
-version: 2
-date: 2026-10-21
-notes: "Migration numbers corrected; unused agent and skill tables documented; Neo4j schema applied at every container start. License footer corrected."
+version: 3
+date: 2026-10-22
+notes: "Enricher graph write described as two transactions, as in SyncPattern."
 ---
 
 # Database Images — Data Architecture
@@ -22,22 +22,22 @@ notes: "Migration numbers corrected; unused agent and skill tables documented; N
 
 **Purpose:** Relational store for patterns, their semantic search chunks, and enrichment jobs. PGVector provides the `vector` extension for embedding storage and HNSW similarity search. The schema also defines `agents`, `pattern_agent_associations`, `skills` and `skill_files` (migrations 000002, 000004, 000007 and 000008; see [Data Storage Implementation](../../data-storage.md#jsonb-document-model)); no service reads or writes them.
 
-| Criterion | Requirement | How It Is Met |
-| --- | --- | --- |
-| Semantic search | Vector similarity over pattern chunk embeddings | `vector` extension with HNSW index on `pattern_chunks.embedding` |
-| Relational integrity | FK constraints between entities | Native Postgres foreign keys |
-| Enrichment tracking | Job state and retry tracking | `enrichment_jobs` table with status column |
-| Flexible metadata | Tags and related-pattern names as JSON arrays | `jsonb` columns; tag filters use `?&` (list) and `@>` (search) |
+| Criterion            | Requirement                                     | How It Is Met                                                    |
+| -------------------- | ----------------------------------------------- | ---------------------------------------------------------------- |
+| Semantic search      | Vector similarity over pattern chunk embeddings | `vector` extension with HNSW index on `pattern_chunks.embedding` |
+| Relational integrity | FK constraints between entities                 | Native Postgres foreign keys                                     |
+| Enrichment tracking  | Job state and retry tracking                    | `enrichment_jobs` table with status column                       |
+| Flexible metadata    | Tags and related-pattern names as JSON arrays   | `jsonb` columns; tag filters use `?&` (list) and `@>` (search)   |
 
 ### Neo4j (`neo4j:5` Community Edition)
 
 **Purpose:** Knowledge graph projection of Postgres data. The services use `Pattern` and `Concept` nodes joined by `MENTIONED_IN` (concept to pattern) and `RELATED_TO` (pattern to pattern) relationships, for graph traversal queries that are impractical in SQL (e.g. "find patterns related to X via concept graph"). The Cypher files also define an `Agent` uniqueness constraint (and, on Enterprise Edition, an existence constraint) and an index on `RELEVANT_FOR.relevance`; no service creates `Agent` nodes or `RELEVANT_FOR` relationships.
 
-| Criterion | Requirement | How It Is Met |
-| --- | --- | --- |
-| Graph traversal | Multi-hop relationship queries | Native Neo4j Cypher traversal |
+| Criterion        | Requirement                             | How It Is Met                            |
+| ---------------- | --------------------------------------- | ---------------------------------------- |
+| Graph traversal  | Multi-hop relationship queries          | Native Neo4j Cypher traversal            |
 | Full-text search | Natural language pattern/concept lookup | Fulltext indexes on name and description |
-| Uniqueness | One-to-one correspondence with Postgres | Uniqueness constraints on `id` / `name` |
+| Uniqueness       | One-to-one correspondence with Postgres | Uniqueness constraints on `id` / `name`  |
 
 ## PostgreSQL Schema
 
@@ -146,18 +146,18 @@ Pattern chunk embeddings use `vector(2000)` (OpenAI text-embedding-3-large with 
 
 ### Node Types
 
-| Label | Unique Constraint | Description |
-| --- | --- | --- |
-| `Pattern` | `pattern_id_unique` on `id` | Graph projection of a Postgres pattern row; properties `id` (UUID string), `name`, `description`, `updatedAt` |
-| `Concept` | `concept_name_unique` on `name` | Concept extracted during enrichment; `name` (lowercase, trimmed), `type` (`technology`, `practice` or `domain`), `createdAt` |
-| `SchemaVersion` | — | Tracks applied migration version (`v.version`, `v.migratedAt`) |
+| Label           | Unique Constraint               | Description                                                                                                                  |
+| --------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `Pattern`       | `pattern_id_unique` on `id`     | Graph projection of a Postgres pattern row; properties `id` (UUID string), `name`, `description`, `updatedAt`                |
+| `Concept`       | `concept_name_unique` on `name` | Concept extracted during enrichment; `name` (lowercase, trimmed), `type` (`technology`, `practice` or `domain`), `createdAt` |
+| `SchemaVersion` | —                               | Tracks applied migration version (`v.version`, `v.migratedAt`)                                                               |
 
 ### Relationships
 
-| Relationship | From → To | Properties | Purpose |
-| --- | --- | --- | --- |
-| `MENTIONED_IN` | `Concept → Pattern` | — | Concepts extracted from a pattern's content |
-| `RELATED_TO` | `Pattern → Pattern` | `similarity` (float), `updatedAt` | Pre-computed edges between patterns that share concepts; stored in one direction, queried undirected |
+| Relationship   | From → To           | Properties                        | Purpose                                                                                              |
+| -------------- | ------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `MENTIONED_IN` | `Concept → Pattern` | —                                 | Concepts extracted from a pattern's content                                                          |
+| `RELATED_TO`   | `Pattern → Pattern` | `similarity` (float), `updatedAt` | Pre-computed edges between patterns that share concepts; stored in one direction, queried undirected |
 
 `RELATED_TO.similarity` is `sharedConcepts / max(conceptsA, conceptsB)`; the enricher only creates edges at or above `enrichment.related_to_min_similarity` (default 0.3).
 
@@ -171,12 +171,12 @@ graph LR
 
 ### Indexes
 
-| Index | Type | On | Purpose |
-| --- | --- | --- | --- |
-| `pattern_name_index` | B-tree | `Pattern.name` | Name-based pattern lookup |
-| `concept_type_index` | B-tree | `Concept.type` | Filter concepts by category |
+| Index                      | Type     | On                                    | Purpose                         |
+| -------------------------- | -------- | ------------------------------------- | ------------------------------- |
+| `pattern_name_index`       | B-tree   | `Pattern.name`                        | Name-based pattern lookup       |
+| `concept_type_index`       | B-tree   | `Concept.type`                        | Filter concepts by category     |
 | `pattern_content_fulltext` | Fulltext | `Pattern.name`, `Pattern.description` | Natural language pattern search |
-| `concept_name_fulltext` | Fulltext | `Concept.name` | Natural language concept lookup |
+| `concept_name_fulltext`    | Fulltext | `Concept.name`                        | Natural language concept lookup |
 
 Auto-created indexes from uniqueness constraints: `Pattern.id`, `Concept.name` (and `Agent.name`, unused). `003_create_indexes.cypher` also creates `rel_relevant_for_relevance` on `RELEVANT_FOR.relevance`, a relationship no service creates.
 
@@ -196,11 +196,11 @@ Current version: **3** (set by `003_create_indexes.cypher`; the image skips 002,
 
 The schema is shared by three services with different access. This is what their repository code (`src/internal/<service>/repository/`) actually does:
 
-| Service          | PostgreSQL                                                                                                                                                                                           | Neo4j                                                                                                                                                                       |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| api service      | Reads and writes `patterns`; inserts and deletes `pattern_chunks`; inserts `enrichment_jobs` (one pending job per chunk, in the same transaction as the pattern and chunks); chunk similarity search | Reads `RELATED_TO` and `MENTIONED_IN` for pattern detail; on pattern delete, removes the `Pattern` node and any of its concepts no other pattern mentions. Creates nothing. |
-| enricher service | Reads patterns and chunks; writes chunk embeddings and status, pattern enrichment status; claims, updates and deletes `enrichment_jobs`                                                              | Writes: merges the `Pattern` node, its `Concept` nodes and `MENTIONED_IN` edges, and recomputes `RELATED_TO`, all in one write transaction                                  |
-| mcp service      | Read-only: chunk similarity search, pattern lookups                                                                                                                                                  | Read-only: concepts and `RELATED_TO` lookups                                                                                                                                |
+| Service          | PostgreSQL                                                                                                                                                                                           | Neo4j                                                                                                                                                                                                     |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| api service      | Reads and writes `patterns`; inserts and deletes `pattern_chunks`; inserts `enrichment_jobs` (one pending job per chunk, in the same transaction as the pattern and chunks); chunk similarity search | Reads `RELATED_TO` and `MENTIONED_IN` for pattern detail; on pattern delete, removes the `Pattern` node and any of its concepts no other pattern mentions. Creates nothing.                               |
+| enricher service | Reads patterns and chunks; writes chunk embeddings and status, pattern enrichment status; claims, updates and deletes `enrichment_jobs`                                                              | Writes: merges the `Pattern` node, its `Concept` nodes and `MENTIONED_IN` edges, and recomputes `RELATED_TO`, in two write transactions (concepts first, then the edges, once the concepts are committed) |
+| mcp service      | Read-only: chunk similarity search, pattern lookups                                                                                                                                                  | Read-only: concepts and `RELATED_TO` lookups                                                                                                                                                              |
 
 ```mermaid
 flowchart LR
@@ -225,7 +225,7 @@ flowchart LR
     ENR -->|"claim / update / delete"| T3
     ENR -->|"embedding + status"| T2
     ENR -->|status| T1
-    ENR -->|"sync (one write tx)"| G1
+    ENR -->|"sync (two write tx)"| G1
     MCP -.->|read| T1
     MCP -.->|read| T2
     MCP -.->|read| G1

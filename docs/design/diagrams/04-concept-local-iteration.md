@@ -1,7 +1,7 @@
 ---
-version: 2
-date: 2026-10-21
-notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
+version: 3
+date: 2026-10-22
+notes: "States this is a planned iteration and what the repo implements of it."
 ---
 
 # MVP 4
@@ -15,6 +15,8 @@ MVP 4 introduces local Kubernetes deployment and explicit authentication/authori
 3. Add OPA policies as the authZ checkpoint before requests reach service handlers.
 4. Begin Helm charts for repeatable local cluster deployment.
 5. Keep data and queue infrastructure on managed AWS services.
+
+This is a planned iteration, not a description of the current deployment. The Helm chart in `deploy/helm/mnemonic` and the gateway in `gateway/` implement the Envoy, OPA and Kubernetes parts, with PostgreSQL, Neo4j and RabbitMQ running in the cluster rather than on AWS.
 
 ```mermaid
 ---

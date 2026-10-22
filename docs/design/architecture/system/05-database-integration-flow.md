@@ -1,7 +1,7 @@
 ---
-version: 2
-date: 2026-10-21
-notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
+version: 3
+date: 2026-10-22
+notes: "Key takeaway on write ownership corrected: the API and the enricher both write PostgreSQL, and the API also deletes from Neo4j. Earlier: renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
 ---
 
 # Database Integration Flow
@@ -650,7 +650,7 @@ This is a post-MVP feature. The database-level operations work; admin tooling ad
 - **Enrichment is asynchronous** - The Admin API publishes to RabbitMQ and returns immediately; the Enricher processes independently to avoid write-path latency
 - **Pattern search uses vector similarity plus graph expansion** - PGVector ranks chunks by cosine similarity in one query joined to `patterns`; the MCP server adds related patterns from Neo4j `RELATED_TO` edges. Blended scoring is planned post-MVP.
 - **PostgreSQL is source of truth** - Other databases contain projections and derived data
-- **One writer per store** - The Admin API writes patterns, chunks and jobs; the Enricher writes embeddings, statuses and the graph; the MCP server only reads
+- **Clear write ownership** - The Admin API writes patterns, chunks and jobs (and deletes a deleted pattern's graph node); the Enricher writes embeddings, statuses and the graph; the MCP server only reads
 - **Graph relationships add context** - Neo4j expands beyond similarity to include explicit knowledge connections
 
 **Next Steps:**

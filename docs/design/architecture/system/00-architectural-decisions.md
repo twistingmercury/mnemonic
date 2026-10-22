@@ -1,7 +1,7 @@
 ---
-version: 2
-date: 2026-10-21
-notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
+version: 3
+date: 2026-10-22
+notes: "ADR-001 amendment corrected (the agent and association tables exist in db/, unused); ADR-007 amended (no config.yaml ships, the cited review is not in this repository)."
 ---
 
 # Architectural Decisions
@@ -64,7 +64,9 @@ Core capabilities:
 - Pattern_agent_associations table retained to support "which agents use this pattern" queries
 - Users must understand that Mnemonic provides knowledge, not routing decisions
 
-> **Amendment (2026-10-15):** "Single server with two listeners" was superseded by the service decomposition in [ADR-008](#adr-008): the mcp, api and enricher services are separate services. None of the current services (v0.4.0) reads or writes agent associations; the services manage patterns only. The `pattern_agent_associations` table was never created: `db/` has no agent or skill tables.
+> **Amendment (2026-10-15):** "Single server with two listeners" was superseded by the service decomposition in [ADR-008](#adr-008): the mcp, api and enricher services are separate services. None of the current services (v0.4.0) reads or writes agent associations; the services manage patterns only.
+>
+> **Correction (2026-10-22):** The amendment above first said the `pattern_agent_associations` table was never created. It is created by `db/postgres` migration 000004 (and `agents` by 000002), so the table exists in the schema, but no service (api v0.5.0, mcp v0.6.0, enricher v0.5.0) uses it.
 
 ## <a id="adr-002"></a>ADR-002: MCP Protocol for Claude Code Integration
 
@@ -226,17 +228,17 @@ Patterns are the core knowledge artifacts in Mnemonic. Unlike entities (agents, 
 
 ## Decision Summary
 
-| Decision | Choice                               | Rationale                                                                                      | Status     |
-| -------- | ------------------------------------ | ---------------------------------------------------------------------------------------------- | ---------- |
-| ADR-001  | Team knowledge graph                 | Solve knowledge isolation silos                                                                | ACTIVE     |
-| ADR-002  | MCP protocol integration             | Native Claude Code integration, dual protocol architecture                                     | ACTIVE     |
-| ADR-003  | JSONB document model                 | Schema-agnostic entity storage, CRC-64 change detection (no entities implemented as of v0.4.0) | ACTIVE     |
-| ADR-004  | Pattern storage + enrichment         | Relational columns for vectors, Postgres-backed async queue                                    | ACTIVE     |
-| ADR-005  | Open vocabulary for language/domain  | Kebab-case format only; vocabulary governed externally                                         | SUPERSEDED |
-| ADR-006  | 204 No Content on PUT                | Full-replacement PUT with no body; client issues GET if needed                                 | ACTIVE     |
-| ADR-007  | Config-driven vocabulary enforcement | Allow-lists in config; handler enforces; empty list = open                                     | ACTIVE     |
-| ADR-008  | RabbitMQ for enrichment dispatch     | Decouple enricher from API server; best-effort publish with PG safety net                      | ACTIVE     |
-| ADR-009  | Best-effort publish                  | Failed publish logs warning; PG `pending` status is recovery source                            | ACTIVE     |
+| Decision | Choice                               | Rationale                                                                         | Status     |
+| -------- | ------------------------------------ | --------------------------------------------------------------------------------- | ---------- |
+| ADR-001  | Team knowledge graph                 | Solve knowledge isolation silos                                                   | ACTIVE     |
+| ADR-002  | MCP protocol integration             | Native Claude Code integration, dual protocol architecture                        | ACTIVE     |
+| ADR-003  | JSONB document model                 | Schema-agnostic entity storage, CRC-64 change detection (no entities implemented) | ACTIVE     |
+| ADR-004  | Pattern storage + enrichment         | Relational columns for vectors; RabbitMQ dispatch, Postgres jobs (ADR-008)        | ACTIVE     |
+| ADR-005  | Open vocabulary for language/domain  | Kebab-case format only; vocabulary governed externally                            | SUPERSEDED |
+| ADR-006  | 204 No Content on PUT                | Full-replacement PUT with no body; client issues GET if needed                    | ACTIVE     |
+| ADR-007  | Config-driven vocabulary enforcement | Allow-lists in config; handler enforces; both lists required, empty rejects all   | ACTIVE     |
+| ADR-008  | RabbitMQ for enrichment dispatch     | Decouple enricher from API server; best-effort publish with PG safety net         | ACTIVE     |
+| ADR-009  | Best-effort publish                  | Failed publish logs warning; PG `pending` status is recovery source               | ACTIVE     |
 
 ## <a id="adr-005"></a>ADR-005: Open Vocabulary for language and domain Fields
 
@@ -348,6 +350,8 @@ Additionally, operators want to constrain deployments to their team's supported 
 - Defaults ship with 38 languages and 10 domains in `defaults.go`.
 
 > **Amendment (2026-10-15):** The defaults now ship 42 languages and 14 domains (`DefaultVocabularyLanguages` and `DefaultVocabularyDomains` in the api service (`src/internal/api/config/defaults.go`)). The runtime bypass was removed: `validatePatternFields` always checks membership, so an empty list rejects every value, and startup still requires both lists to be non-empty. This resolves the F-04 tension noted below in favor of keeping the startup check.
+>
+> **Amendment (2026-10-22):** The api service ships no `config.yaml`; its vocabulary defaults live only in `defaults.go`, which a deployment overrides through a config file it supplies or the `MNEMONIC_VOCABULARY_*` variables. The review file `review-cycles-7-12-vocabulary.md` cited below is not in this repository.
 
 ### Consequences
 

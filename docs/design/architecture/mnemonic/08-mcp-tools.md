@@ -1,7 +1,7 @@
 ---
-version: 2
-date: 2026-10-21
-notes: "Renamed to Mnemonic (environment variables, image names, ports, links); license footer corrected to FSL-1.1-ALv2."
+version: 3
+date: 2026-10-22
+notes: "Typo fixed; authentication note names the gateway; table alignment."
 ---
 
 # MCP Tools
@@ -19,11 +19,11 @@ notes: "Renamed to Mnemonic (environment variables, image names, ports, links); 
 
 ## Overview
 
-Mnemonic exposes 3 read-only MCP tools for pattern search: `search_patterns`, `find_related_patterns`, and `get_pattern`. These tools are called during conversation when Claude Code needs team knowledge. They are served by the the mcp service service; the MCP service has no write tools (patterns are managed through the REST API).
+Mnemonic exposes 3 read-only MCP tools for pattern search: `search_patterns`, `find_related_patterns`, and `get_pattern`. These tools are called during conversation when Claude Code needs team knowledge. They are served by the mcp service; the MCP service has no write tools (patterns are managed through the REST API).
 
 ## Tool Discovery
 
-The MCP server speaks MCP protocol version **2026-07-28** over Streamable HTTP at `http://localhost:8081/mcp` (port from `mcp.port`). There is **no authentication** in the current local, single-user phase, so the port should not be exposed beyond localhost.
+The MCP server speaks MCP protocol version **2026-07-28** over Streamable HTTP at `/mcp`. In the shipped stacks `http://localhost:8081/mcp` is the gateway's MCP edge (the Envoy `mcp_edge` listener); the service's own listener is set by `mcp.port` (default 8081) and is internal to the stack. The mcp service itself has **no authentication**; the gateway (`gateway/`, Envoy plus OPA) is what authenticates and authorizes callers in front of it, so do not expose the service port directly.
 
 The 2026-07-28 protocol has no `initialize` handshake and no sessions. Every request is one HTTP POST that stands on its own:
 
@@ -33,11 +33,11 @@ The 2026-07-28 protocol has no `initialize` handshake and no sessions. Every req
 
 Each request carries its protocol version, client info and client capabilities in `params._meta`, and mirrors them into headers:
 
-| Header                 | Value                   | Required for                              |
-| ---------------------- | ----------------------- | ----------------------------------------- |
-| `MCP-Protocol-Version` | `2026-07-28`            | every request                             |
-| `Mcp-Method`           | the JSON-RPC `method`   | every request                             |
-| `Mcp-Name`             | the tool name           | `tools/call`                              |
+| Header                 | Value                                 | Required for                                             |
+| ---------------------- | ------------------------------------- | -------------------------------------------------------- |
+| `MCP-Protocol-Version` | `2026-07-28`                          | every request                                            |
+| `Mcp-Method`           | the JSON-RPC `method`                 | every request                                            |
+| `Mcp-Name`             | the tool name                         | `tools/call`                                             |
 | `Accept`               | `application/json, text/event-stream` | every request (the response may be an SSE `data:` event) |
 
 ```json
@@ -180,14 +180,14 @@ For not-found conditions, validation failures, and backend unavailability, Mnemo
 
 For protocol problems, the MCP SDK rejects the request before any tool runs:
 
-| HTTP | Body                                    | Cause                                                                                  |
-| ---- | --------------------------------------- | -------------------------------------------------------------------------------------- |
-| 400  | plain text `malformed payload: ...`     | Malformed JSON, or not a JSON-RPC 2.0 message                                          |
-| 400  | JSON-RPC error `-32020` HeaderMismatch  | `MCP-Protocol-Version`, `Mcp-Method` or `Mcp-Name` missing or not matching the body    |
+| HTTP | Body                                               | Cause                                                                                 |
+| ---- | -------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| 400  | plain text `malformed payload: ...`                | Malformed JSON, or not a JSON-RPC 2.0 message                                         |
+| 400  | JSON-RPC error `-32020` HeaderMismatch             | `MCP-Protocol-Version`, `Mcp-Method` or `Mcp-Name` missing or not matching the body   |
 | 400  | JSON-RPC error `-32022` UnsupportedProtocolVersion | Unknown protocol version; `error.data.supported` lists the versions the server speaks |
-| 403  | plain text                              | Cross-origin browser request                                                           |
-| 404  | JSON-RPC error `-32601` Method not found | Unknown method, including `ping` and `logging/setLevel`, which 2026-07-28 removed     |
-| 405  | plain text                              | `GET` or `DELETE` on `/mcp`                                                            |
+| 403  | plain text                                         | Cross-origin browser request                                                          |
+| 404  | JSON-RPC error `-32601` Method not found           | Unknown method, including `ping` and `logging/setLevel`, which 2026-07-28 removed     |
+| 405  | plain text                                         | `GET` or `DELETE` on `/mcp`                                                           |
 
 Arguments that do not match a tool's input schema (for example a number where `id` expects a string, a `limit` or `threshold` outside its `minimum`/`maximum`, or an explicit `null`) are not a transport error: the SDK returns a tool result with `isError: true` and a `validating "arguments": ...` message. The tool metrics count these, like any other argument-validation failure, under the `invalid_input` outcome.
 

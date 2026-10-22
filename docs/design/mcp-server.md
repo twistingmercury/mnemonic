@@ -47,7 +47,7 @@ All 3 tools are stateless: each invocation is a standalone request/response with
 
 The server speaks MCP protocol version 2026-07-28 (sessionless, no `initialize`, per-request `_meta`), and 2025-11-25 and earlier for older clients. The SDK handles `server/discover`, header validation and version negotiation; see [MCP Tools: Tool Discovery](architecture/mnemonic/08-mcp-tools.md#tool-discovery) for the wire format.
 
-**Authentication:** none. The MCP endpoint is unauthenticated in the current local, single-user phase. Do not expose port 8081 beyond localhost.
+**Authentication:** none in the service itself: the `/mcp` endpoint accepts any request that reaches it. In the compose stack the service sits on the internal network only, and the Envoy gateway's `mcp_edge` listener (port 8081) verifies the caller's JWT and asks OPA before forwarding (`gateway/envoy/envoy.yaml`). Do not publish the service's own port 8081 to untrusted networks.
 
 **SDK:** `github.com/modelcontextprotocol/go-sdk/mcp` v1.8.0 (see `src/go.mod`). The Go module for all three services is `github.com/twistingmercury/mnemonic` (rooted at `src/`); the mcp service lives under `internal/mcp`.
 
@@ -491,19 +491,19 @@ No custom implementation exists for transport-level errors.
 2. Calls the next handler.
 3. Derives the tool error from the returned error or, since the SDK turns handler errors into results, from a `CallToolResult` with `IsError` set.
 4. Maps it to an outcome: `ok`, `invalid_input` (`ErrInvalidInput` or any SDK argument-validation failure), `not_found` or `unavailable`; sets `mcp.tool.outcome` on the span and records the error. Only `unavailable` marks the span status as Error, because invalid input and unknown patterns are caller mistakes.
-5. Records `mnemonic.mcp.tool_calls` and `mnemonic.mcp.tool_duration` by `tool` and `outcome` (when the metrics registry is non-nil).
+5. Records `mnemonic.mcp.tool_calls` and `mnemonic.mcp.tool_duration` by `tool` and `outcome`.
 
 ### Tracing
 
 The MCP server runs on plain `net/http`, not Gin. Spans per request:
 
-| Span                         | Source                     | Attributes                                                                         |
-| ---------------------------- | -------------------------- | ---------------------------------------------------------------------------------- |
-| `POST /mcp` (server)         | `otelhttp.NewHandler`      | standard HTTP server attributes, `mcp.method.name`, `mcp.protocol.version`; continues incoming W3C `traceparent`/`tracestate` |
-| `tools/call <tool>`          | `toolTelemetry` middleware | `mcp.tool.name`, `mcp.tool.outcome`; parented from `_meta.traceparent` when present |
-| `neo4j <Operation>` (client) | graph repository           | `db.system.name`, `db.namespace`, `db.operation.name`                              |
-| PostgreSQL query spans       | otelpgx                    | otelpgx defaults                                                                   |
-| OpenAI embedding HTTP span   | `otelhttp.NewTransport`    | retries add an `openai.embed.retry` span event                                     |
+| Span                         | Source                     | Attributes                                                                                     |
+| ---------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------- |
+| `POST /mcp` (server)         | `otelhttp.NewHandler`      | HTTP server attributes, `mcp.method.name`, `mcp.protocol.version`; continues W3C `traceparent` |
+| `tools/call <tool>`          | `toolTelemetry` middleware | `mcp.tool.name`, `mcp.tool.outcome`; parented from `_meta.traceparent` when present            |
+| `neo4j <Operation>` (client) | graph repository           | `db.system.name`, `db.namespace`, `db.operation.name`                                          |
+| PostgreSQL query spans       | otelpgx                    | otelpgx defaults                                                                               |
+| OpenAI embedding HTTP span   | `otelhttp.NewTransport`    | retries add an `openai.embed.retry` span event                                                 |
 
 When the caller sends no trace context, the `/mcp` span is the trace root.
 
@@ -556,15 +556,15 @@ src/internal/mcp/mcpserver/
 
 **File responsibilities:**
 
-| File           | Contents                                                                                                                                                                                 |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| File           | Contents                                                                                                                                                                                             |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `server.go`    | `Services`, `NewMCPServer` (creates `mcp.Server`, adds middleware, registers tools), `NewMCPHTTPHandler` (stateless Streamable HTTP), `NewMCPHTTPServer` (`net/http.Server` with otelhttp at `/mcp`) |
-| `tools.go`     | `searchPatternsTool`, `findRelatedPatternsTool`, `getPatternTool`, limit constants, `setRange`                                                                                           |
-| `handlers.go`  | `handleSearchPatterns`, `handleFindRelatedPatterns`, `handleGetPattern`, `mapServiceError`                                                                                               |
-| `input.go`     | `SearchPatternsInput`, `FindRelatedPatternsInput`, `GetPatternInput`                                                                                                                     |
-| `format.go`    | `formatSearchResults`, `formatRelatedPatterns`, `formatPattern`                                                                                                                          |
-| `errors.go`    | `ErrPatternNotFound`, `ErrInvalidInput`, `ErrServiceUnavailable`                                                                                                                         |
-| `telemetry.go` | `toolTelemetry`, `toolOutcome`, `withTrace`                                                                                                                                              |
+| `tools.go`     | `searchPatternsTool`, `findRelatedPatternsTool`, `getPatternTool`, limit constants, `setRange`                                                                                                       |
+| `handlers.go`  | `handleSearchPatterns`, `handleFindRelatedPatterns`, `handleGetPattern`, `mapServiceError`                                                                                                           |
+| `input.go`     | `SearchPatternsInput`, `FindRelatedPatternsInput`, `GetPatternInput`                                                                                                                                 |
+| `format.go`    | `formatSearchResults`, `formatRelatedPatterns`, `formatPattern`                                                                                                                                      |
+| `errors.go`    | `ErrPatternNotFound`, `ErrInvalidInput`, `ErrServiceUnavailable`                                                                                                                                     |
+| `telemetry.go` | `toolTelemetry`, `toolOutcome`, `withTrace`                                                                                                                                                          |
 
 Other packages in the service: `internal/service/search` and `internal/service/pattern` (read-side services), `internal/service/openai` (embedding client only), `internal/repository/{chunk,pattern,graph}` (read-only repositories), plus `config`, `database`, `health`, `handlers/operations`, `metrics`, `server`, `telemetry` and `version`.
 
