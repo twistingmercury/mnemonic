@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -258,4 +259,77 @@ func TestControlReset_ClearsInjectedFailures(t *testing.T) {
 	assert.Equal(t, 0, remaining(t, srv, "boom"))
 	assert.Equal(t, 0, remaining(t, srv, "bang"))
 	assert.Equal(t, http.StatusOK, embedRequest(t, srv, "boom bang", 8).StatusCode)
+}
+
+func TestControlDelay_OnlyMatchingInputsAreDelayed(t *testing.T) {
+	t.Parallel()
+	const delay = 50 * time.Millisecond
+	tests := []struct {
+		name    string
+		input   string
+		delayed bool
+	}{
+		{name: "matching input", input: "a slow input", delayed: true},
+		{name: "matching again", input: "slow", delayed: true},
+		{name: "non-matching input", input: "a quick input", delayed: false},
+		{name: "match is case-sensitive", input: "SLOW", delayed: false},
+	}
+	srv := newTestServer(t)
+	set := do(t, http.MethodPost, srv.URL+"/control/delay?match=slow&ms=50", "", false)
+	require.Equal(t, http.StatusNoContent, set.StatusCode)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			start := time.Now()
+			resp := embedRequest(t, srv, tt.input, 8)
+			elapsed := time.Since(start)
+
+			assert.Equal(t, http.StatusOK, resp.StatusCode)
+			if tt.delayed {
+				assert.GreaterOrEqual(t, elapsed, delay)
+			}
+		})
+	}
+}
+
+func TestControlDelay_NonMatchingIsNotHeldBehindDelay(t *testing.T) {
+	t.Parallel()
+	srv := newTestServer(t)
+	do(t, http.MethodPost, srv.URL+"/control/delay?match=slow&ms=2000", "", false)
+
+	start := time.Now()
+	resp := embedRequest(t, srv, "a quick input", 8)
+	elapsed := time.Since(start)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Less(t, elapsed, time.Second, "a non-matching request must not wait for the 2s rule")
+}
+
+func TestControlDelay_RejectsBadParameters(t *testing.T) {
+	t.Parallel()
+	srv := newTestServer(t)
+
+	for _, query := range []string{"ms=1", "match=x", "match=x&ms=-1", "match=x&ms=abc"} {
+		t.Run(query, func(t *testing.T) {
+			t.Parallel()
+			resp := do(t, http.MethodPost, srv.URL+"/control/delay?"+query, "", false)
+
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		})
+	}
+}
+
+func TestControlReset_ClearsInjectedDelays(t *testing.T) {
+	t.Parallel()
+	srv := newTestServer(t)
+	do(t, http.MethodPost, srv.URL+"/control/delay?match=slow&ms=2000", "", false)
+
+	reset := do(t, http.MethodPost, srv.URL+"/control/reset", "", false)
+	start := time.Now()
+	resp := embedRequest(t, srv, "slow", 8)
+	elapsed := time.Since(start)
+
+	assert.Equal(t, http.StatusNoContent, reset.StatusCode)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Less(t, elapsed, time.Second, "reset must clear the delay")
 }

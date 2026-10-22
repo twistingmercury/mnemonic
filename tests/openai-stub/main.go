@@ -11,12 +11,16 @@
 //   - POST or GET /control/fail?match=X&n=N makes the next N embedding
 //     requests whose input contains X fail with 500. GET
 //     /control/fail?match=X, without n, returns how many remain.
-//   - POST /control/reset clears every injected failure.
+//   - POST /control/delay?match=X&ms=N makes every embedding request whose
+//     input contains X wait N milliseconds before answering normally, until
+//     reset.
+//   - POST /control/reset clears every injected failure and delay.
 //
 // Every /v1/* route requires an Authorization header, like the real API.
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"hash/fnv"
 	"log"
@@ -31,15 +35,17 @@ import (
 
 const defaultDimensions = 2000
 
-// stub holds the injected failures: an input substring mapped to how many
-// more embedding requests containing it must fail.
+// stub holds the injected failures (an input substring mapped to how many
+// more embedding requests containing it must fail) and the injected delays
+// (an input substring mapped to how long every request containing it waits).
 type stub struct {
 	mu       sync.Mutex
 	failures map[string]int
+	delays   map[string]time.Duration
 }
 
 func newStub() *stub {
-	return &stub{failures: map[string]int{}}
+	return &stub{failures: map[string]int{}, delays: map[string]time.Duration{}}
 }
 
 func (s *stub) routes() http.Handler {
@@ -49,6 +55,7 @@ func (s *stub) routes() http.Handler {
 	mux.HandleFunc("GET /v1/models/{model}", s.handleModel)
 	mux.HandleFunc("POST /control/fail", s.handleSetFailures)
 	mux.HandleFunc("GET /control/fail", s.handleFailures)
+	mux.HandleFunc("POST /control/delay", s.handleSetDelay)
 	mux.HandleFunc("POST /control/reset", s.handleReset)
 	mux.HandleFunc("GET /healthz", handleHealthz)
 	return mux
@@ -84,6 +91,9 @@ func (s *stub) handleEmbeddings(w http.ResponseWriter, r *http.Request) {
 	}
 	if s.shouldFail(req.Input) {
 		http.Error(w, `{"error":"forced failure"}`, http.StatusInternalServerError)
+		return
+	}
+	if !s.wait(r.Context(), req.Input) {
 		return
 	}
 	if req.Dimensions <= 0 {
@@ -146,6 +156,38 @@ func (s *stub) shouldFail(input string) bool {
 	return false
 }
 
+// delayFor returns the longest delay among the rules whose match the input
+// contains, or zero.
+func (s *stub) delayFor(input string) time.Duration {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var longest time.Duration
+	for match, d := range s.delays {
+		if strings.Contains(input, match) {
+			longest = max(longest, d)
+		}
+	}
+	return longest
+}
+
+// wait sleeps for the delay that applies to input and reports false when the
+// client gave up first.
+func (s *stub) wait(ctx context.Context, input string) bool {
+	d := s.delayFor(input)
+	if d == 0 {
+		return true
+	}
+
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+
 func (s *stub) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 	if !authorized(w, r) {
 		return
@@ -204,6 +246,20 @@ func (s *stub) handleSetFailures(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (s *stub) handleSetDelay(w http.ResponseWriter, r *http.Request) {
+	match := r.URL.Query().Get("match")
+	ms, err := strconv.Atoi(r.URL.Query().Get("ms"))
+	if match == "" || err != nil || ms < 0 {
+		http.Error(w, "match and a non-negative ms are required", http.StatusBadRequest)
+		return
+	}
+
+	s.mu.Lock()
+	s.delays[match] = time.Duration(ms) * time.Millisecond
+	s.mu.Unlock()
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // handleFailures sets a failure when n is present (so a browser or curl GET
 // works) and otherwise reports how many failures remain for match.
 func (s *stub) handleFailures(w http.ResponseWriter, r *http.Request) {
@@ -221,6 +277,7 @@ func (s *stub) handleFailures(w http.ResponseWriter, r *http.Request) {
 func (s *stub) handleReset(w http.ResponseWriter, _ *http.Request) {
 	s.mu.Lock()
 	clear(s.failures)
+	clear(s.delays)
 	s.mu.Unlock()
 	w.WriteHeader(http.StatusNoContent)
 }
