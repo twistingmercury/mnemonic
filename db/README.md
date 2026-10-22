@@ -40,13 +40,13 @@ Both images are self-initializing — the schema is applied by the container its
 
 - `002_create_existence_constraints.cypher` is skipped at startup on Community Edition — existence constraints require Neo4j Enterprise Edition
 - `.down.sql` files are not included; rollback is handled by rebuilding from a prior image tag
-- The build scripts tag each image with the version and `latest`; which tags CI publishes is decided when its workflows are written
+- The build scripts tag each image with the version and `latest`; CI publishes `latest-dev` and `sha-<short>` from `develop` (see the [root README](../README.md#continuous-integration))
 
 ## Development Considerations
 
 ### Quick Start
 
-Requires Docker 27+ and Docker Compose 2.32+. The test runners run `bats` and `psql` from pinned images (`db/tests/run-bats.sh`), so neither needs installing.
+Requires Docker Engine 28+ (the test runners use `--mount type=image`) and Docker Compose 2.32+. The test runners run `bats` and `psql` from pinned images (`db/tests/run-bats.sh`), so neither needs installing.
 
 Build the images locally from the repository root (each script tags the image with the version and `latest`):
 
