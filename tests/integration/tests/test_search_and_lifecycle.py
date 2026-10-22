@@ -211,11 +211,11 @@ def test_failed_create_frees_the_name(api: ApiClient, pg: Pg, create_with: Creat
 
 
 def test_created_pattern_has_one_job_per_chunk_with_no_attempts(pg: Pg, create_with: CreateWith) -> None:
-    created = create_with(sections([f"Section {i}" for i in range(SECTIONS)])).pattern()
+    created = create_with(sections(["Alpha", "Beta", "Gamma"])).pattern()
 
     chunks = pg.chunks_for_pattern(created.id)
     jobs = pg.jobs_for_pattern(created.id)
 
-    assert len(chunks) == SECTIONS
-    assert sorted(j.chunk_id or "" for j in jobs) == sorted(c.id for c in chunks), "not exactly one job per chunk"
+    assert len(chunks) == len(jobs) == 3
+    assert {j.chunk_id for j in jobs} == {c.id for c in chunks}, "not exactly one job per chunk"
     assert {j.attempts for j in jobs} == {0}, "no enrichment has failed, so no job has an attempt"
