@@ -83,3 +83,11 @@ def test_update_of_unknown_id_is_404(api: ApiClient, tokens: TokenPool) -> None:
     response = api.update(unknown, pattern_payload(f"integ-api-{tokens.new()}", "## Overview\n\nAPI test pattern.\n"))
 
     assert response.status == 404, f"update of unknown id {unknown}: status {response.status}\nbody: {response.text}"
+
+
+def test_delete_of_unknown_id_is_404(api: ApiClient) -> None:
+    unknown = str(uuid.uuid4())
+
+    response = api.delete(unknown)
+
+    assert response.status == 404, f"delete of unknown id {unknown}: status {response.status}\nbody: {response.text}"
