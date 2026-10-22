@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
-# Runs the repo's static checks, in order, stopping at the first failure:
-# shellcheck, hadolint, markdownlint, helm lint, bats, e2e boundary.
+# Runs the repo's static checks in this order, stopping at the first failure.
+# They lint the shell, the Dockerfiles, the markdown and the Helm chart, then run the
+# BATS tests and the e2e boundary check.
 # Usage: static-checks.sh
 # Every tool runs from a pinned image, so only Docker and git are needed. CI and
 # a local run are the same command and work from any directory.
