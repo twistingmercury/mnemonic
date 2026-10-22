@@ -1,7 +1,7 @@
 ---
-version: 4
+version: 5
 date: 2026-10-22
-notes: Workflow steps run scripts and tools directly, never the Makefile, which is a local convenience; every tool runs from a pinned Docker image, nothing is installed on the runner.
+notes: Pushes no longer queue; each push runs on its own concurrency group so no commit is dropped. Workflow steps run scripts and tools directly, never the Makefile, which is a local convenience; every tool runs from a pinned Docker image, nothing is installed on the runner.
 ---
 
 # CI Workflows
@@ -171,7 +171,7 @@ These are the author's calls, not agreed with the owner:
 - The manual run picks a component but never pushes.
 - `ci-gate` fails when the detection job fails or is cancelled, not only when a build fails.
 - The exact tested image reaches the publish job by save and load. `build/build-lib.sh` already leaves the tagged image in place after the run (teardown removes only unnamed images), so the build job runs `docker save` on it and uploads the file as a workflow artifact.
-- Concurrency: pushes to `develop` and `main` queue and are never cancelled mid-publish; a newer run on the same pull request cancels the older one.
+- Concurrency: a newer run on the same pull request cancels the older one. Pushes do not queue: GitHub keeps one pending run per concurrency group and cancels older pending ones even without `cancel-in-progress`, which would drop a commit that is never built or published (the next run's base is `event.before`). So each push gets its own group, keyed on the commit SHA, and nothing is dropped or cancelled. The cost: runs of quick successive pushes can finish out of order, so `latest-dev` can briefly point at an older commit; `sha-<short>` is always right.
 
 ## Left to the builder
 

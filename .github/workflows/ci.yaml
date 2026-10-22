@@ -16,10 +16,11 @@ on:
 permissions:
   contents: read
 
-# A newer run on the same pull request replaces the older one; pushes queue so
-# a publish is never cancelled half way.
+# A newer run on the same pull request replaces the older one. A push gets its
+# own group: GitHub drops older pending runs of a shared group, and the next
+# run's base is the previous push, so a dropped commit would never be built.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -88,8 +89,10 @@ jobs:
       # from its image into a Debian Go image, which has git and GNU grep. The
       # db files listed are the ones that need no database; the migration and
       # image tests run in the db job.
+      # --mount does not pull its source image, so it is pulled first.
       - name: bats
         run: |
+          docker pull bats/bats:1.14.0@sha256:5322b877351fda0cc435de8c6116de7d0a2ec79d7c680132a0ef329a633bc66f
           docker run --rm -v "${PWD}:/repo:ro" -w /repo \
             --mount type=image,source=bats/bats:1.14.0@sha256:5322b877351fda0cc435de8c6116de7d0a2ec79d7c680132a0ef329a633bc66f,target=/bats,readonly \
             --entrypoint /bats/opt/bats/bin/bats \
