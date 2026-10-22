@@ -278,3 +278,59 @@ jobs:
         run: |
           set -euo pipefail
           jq -e 'all(.[]; .result != "failure" and .result != "cancelled")' <<<"${MNEMONIC_NEEDS}"
+
+  # Pushes the images the build jobs tested and saved: the same bytes, retagged.
+  # The only job with packages: write. It runs only on a push to develop or
+  # main when every job it needs succeeded or was skipped (detection included),
+  # and only when an image was built (a gateway or helm change alone has none).
+  publish:
+    needs: [detect, static, service, db, gateway, helm]
+    if: >-
+      always()
+      && github.event_name == 'push'
+      && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
+      && needs.detect.result == 'success'
+      && !contains(needs.*.result, 'failure')
+      && !contains(needs.*.result, 'cancelled')
+      && (needs.detect.outputs.services != '[]' || contains(fromJSON(needs.detect.outputs.components), 'db'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Only the build jobs of affected components uploaded an image artifact.
+      - name: Download the images
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: image-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/images
+
+      - name: Log in to GHCR
+        env:
+          MNEMONIC_GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: docker login ghcr.io --username "${GITHUB_ACTOR}" --password-stdin <<<"${MNEMONIC_GHCR_TOKEN}"
+
+      # The db component is the postgres and neo4j images; gateway and helm have
+      # none. Each tar holds only the :latest tag, so every tag is made from it.
+      - name: Tag and push the images
+        env:
+          MNEMONIC_COMPONENTS: ${{ needs.detect.outputs.components }}
+          MNEMONIC_BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          images="$(jq -r '.[] | if . == "db" then "postgres", "neo4j" elif . == "gateway" or . == "helm" then empty else . end' <<<"${MNEMONIC_COMPONENTS}")"
+          while IFS= read -r image; do
+            repo="ghcr.io/twistingmercury/mnemonic-${image}"
+            docker load --input "${RUNNER_TEMP}/images/image-${image}.tar"
+            tags="$(build/publish-tags.sh "${MNEMONIC_BRANCH}" "${image}" "${GITHUB_SHA}")"
+            for tag in ${tags}; do
+              docker tag "${repo}:latest" "${repo}:${tag}"
+              docker push "${repo}:${tag}" || { printf '::error::push of mnemonic-%s failed; permission_denied means twistingmercury/mnemonic lacks Write under Manage Actions access for that package\n' "${image}"; exit 1; }
+            done
+          done <<<"${images}"
