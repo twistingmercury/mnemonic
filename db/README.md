@@ -55,7 +55,7 @@ MNEMONIC_VERSION=v1.0.0 bash db/postgres/build.sh
 MNEMONIC_VERSION=v1.0.0 bash db/neo4j/build.sh
 ```
 
-Always set `MNEMONIC_VERSION` (with a `v` prefix, like the existing `v1.0.0-dev` tags). Without it the scripts fall back to `git describe --tags --abbrev=0`, which returns the newest tag of any component (for example `api/v0.5.0`); that contains a slash, so the build fails with an invalid image reference (see [#26](https://github.com/twistingmercury/mnemonic/issues/26)). These scripts do not push and, unlike the service build scripts, do not pass `--no-cache --pull`.
+Without `MNEMONIC_VERSION` the scripts tag the image `v<version>`, where `<version>` is what `build/version.sh db` prints (`v1.0.0` with the tag `db/v1.0.0`, `v0.0.0-dev` when no `db/v*` tag exists). These scripts do not push and, unlike the service build scripts, do not pass `--no-cache --pull`.
 
 ### Testing
 
@@ -73,7 +73,7 @@ Environment variables (all optional):
 
 | Variable | Default | Used by |
 | --- | --- | --- |
-| `MNEMONIC_VERSION` | newest git tag of any component, else `dev` | `build.sh` scripts: image tag |
+| `MNEMONIC_VERSION` | `v` plus the output of `build/version.sh db` | `build.sh` scripts: image tag |
 | `MNEMONIC_MAX_RETRIES` | `30` | test runners: readiness attempts |
 | `MNEMONIC_RETRY_INTERVAL` | `1` | test runners: seconds between attempts |
 | `MNEMONIC_NEO4J_USER` / `MNEMONIC_NEO4J_PASSWORD` | `neo4j` / `mnemonic_dev` | Neo4j test runner and BATS |
@@ -90,4 +90,4 @@ Variables defined by the third-party tools keep their names: `NEO4J_AUTH`, `POST
 
 This project follows [Semantic Versioning 2.0.0](https://semver.org/).
 
-The `build.sh` scripts take the image version from `MNEMONIC_VERSION`, or else from `git describe --tags --abbrev=0`, which returns the newest tag of any component. Releases are tagged per component (`db/v1.0.0`; `build/version.sh db` reads it), and a prefixed tag such as `db/v1.0.0` contains a slash, which Docker does not allow in an image tag. Until the scripts use `build/version.sh`, always set `MNEMONIC_VERSION` (for example `MNEMONIC_VERSION=v1.0.0`); without it the build fails because the newest tag contains a slash ([#26](https://github.com/twistingmercury/mnemonic/issues/26)).
+The `build.sh` scripts take the image version from `MNEMONIC_VERSION`, or else from `build/version.sh db`, which reads the newest `db/v*` tag and the scripts prefix with `v` (`db/v1.0.0` gives the image tag `v1.0.0`). Tags of other components never affect it.

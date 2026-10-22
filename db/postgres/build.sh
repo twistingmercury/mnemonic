@@ -3,12 +3,14 @@
 #
 # Usage: bash db/postgres/build.sh
 #
-# The image is tagged with both the current git version and 'latest'.
-# Set the MNEMONIC_VERSION environment variable to override the git-derived version.
+# The image is tagged with both the db component version (from build/version.sh)
+# and 'latest'. Set the MNEMONIC_VERSION environment variable to override that
+# version.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJ_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 # ---------------------------------------------------------------------------
 # Logging helpers
@@ -28,7 +30,7 @@ log_error() {
 # ---------------------------------------------------------------------------
 # Version
 # ---------------------------------------------------------------------------
-MNEMONIC_VERSION="${MNEMONIC_VERSION:-$(git describe --tags --abbrev=0 2>/dev/null || echo 'dev')}"
+MNEMONIC_VERSION="${MNEMONIC_VERSION:-v$("${PROJ_ROOT}/build/version.sh" db)}"
 
 IMAGE_BASE="ghcr.io/twistingmercury/mnemonic-postgres"
 IMAGE_VERSIONED="${IMAGE_BASE}:${MNEMONIC_VERSION}"
