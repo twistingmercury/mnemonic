@@ -2,13 +2,10 @@
 # Stage 1: Run linters, formatters, security scanners, 
 # unit tests, then build binary
 #------------------------------------------------------------
-ARG BUILDPLATFORM
-FROM --platform=${BUILDPLATFORM} ghcr.io/twistingmercury/golang-tooling:go1.27.3 AS build
+FROM ghcr.io/twistingmercury/golang-tooling:go1.27.3 AS build
 
-ARG TARGETOS=linux
-ARG TARGETARCH=amd64
-
-ENV CGO_ENABLED=0
+ENV GOARCH=amd64 \
+    GOOS=linux
 
 ARG BUILD_VER=dev
 ARG BUILD_DATE=unknown
@@ -24,23 +21,21 @@ COPY src/internal/api ./internal/api
 COPY src/docs/api ./docs/api
 
 # Generate Swagger 2.0 docs (required before linters/build — routes.go imports the generated package)
-RUN go install github.com/swaggo/swag/cmd/swag@v1.16.6
 RUN swag init -g cmd/api/main.go -o docs/api/swagger --parseInternal
 
 # Run linters, formatters, security scanners, etc
 RUN goimports -w .
-RUN golangci-lint run
-RUN govulncheck ./cmd/... ./internal/...
-RUN gosec -quiet -exclude-dir=tests ./...
-RUN go test -v ./cmd/api/... ./internal/... -coverprofile=coverage.out
+RUN CGO_ENABLED=0 golangci-lint run
+RUN CGO_ENABLED=0 govulncheck ./cmd/... ./internal/...
+RUN CGO_ENABLED=0 gosec -quiet -exclude-dir=tests ./...
+RUN CGO_ENABLED=1 go test -race -v ./cmd/api/... ./internal/... -coverprofile=coverage.out
 
 ARG LD_FLAGS="-s -w \
     -X 'github.com/twistingmercury/mnemonic/internal/api/version.version=${BUILD_VER}' \
     -X 'github.com/twistingmercury/mnemonic/internal/api/version.buildDate=${BUILD_DATE}' \
     -X 'github.com/twistingmercury/mnemonic/internal/api/version.commit=${BUILD_COMMIT}'"
 
-RUN GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" \
-    go build --ldflags "${LD_FLAGS}" -o /out/mnemonic-api ./cmd/api
+RUN CGO_ENABLED=0 go build --ldflags "${LD_FLAGS}" -o /out/mnemonic-api ./cmd/api
 
 
 #------------------------------------------------------------

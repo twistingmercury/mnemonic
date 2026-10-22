@@ -4,8 +4,7 @@
 #------------------------------------------------------------
 FROM ghcr.io/twistingmercury/golang-tooling:go1.27.3 AS build
 
-ENV CGO_ENABLED=0 \
-    GOARCH=amd64 \
+ENV GOARCH=amd64 \
     GOOS=linux
 
 ARG BUILD_VER=dev
@@ -22,17 +21,17 @@ COPY src/internal/enricher ./internal/enricher
 
 # Run linters, formatters, security scanners, etc
 RUN goimports -w .
-RUN golangci-lint run
-RUN govulncheck ./cmd/... ./internal/...
-RUN gosec -quiet -exclude-dir=tests ./...
-RUN go test -v ./cmd/enricher/... ./internal/... -coverprofile=coverage.out
+RUN CGO_ENABLED=0 golangci-lint run
+RUN CGO_ENABLED=0 govulncheck ./cmd/... ./internal/...
+RUN CGO_ENABLED=0 gosec -quiet -exclude-dir=tests ./...
+RUN CGO_ENABLED=1 go test -race -v ./cmd/enricher/... ./internal/... -coverprofile=coverage.out
 
 ARG LD_FLAGS="-s -w \
     -X 'github.com/twistingmercury/mnemonic/internal/enricher/version.version=${BUILD_VER}' \
     -X 'github.com/twistingmercury/mnemonic/internal/enricher/version.buildDate=${BUILD_DATE}' \
     -X 'github.com/twistingmercury/mnemonic/internal/enricher/version.commit=${BUILD_COMMIT}'"
 
-RUN go build --ldflags "${LD_FLAGS}" -o /out/mnemonic-enricher ./cmd/enricher
+RUN CGO_ENABLED=0 go build --ldflags "${LD_FLAGS}" -o /out/mnemonic-enricher ./cmd/enricher
 
 
 #------------------------------------------------------------
