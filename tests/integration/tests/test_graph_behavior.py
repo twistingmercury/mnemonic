@@ -50,6 +50,11 @@ def positions(text: str, names: list[str], marker: str) -> list[int]:
     return [text.index(marker + name) for name in names]
 
 
+def entry_of(text: str, name: str) -> str:
+    """The one entry of a find_related_patterns result that is headed by this pattern name."""
+    return next(e for e in text.split("\n---\n\n") if e.startswith(f"## {name} ("))
+
+
 @pytest.fixture
 def enriched(api: ApiClient, create_with: CreateWith) -> Enriched:
     """Create a pattern whose concepts are exactly the ones given and return it once enriched."""
@@ -76,11 +81,17 @@ def test_related_patterns_are_ordered_by_similarity_and_limited(
 
     related = graph_context(api, source.id)["related_patterns"]
     assert [r["id"] for r in related] == [three.id, two.id, one.id]
-    assert [r["strength"] for r in related] == sorted((r["strength"] for r in related), reverse=True)
+    # The 1/3 relation sits just above the enricher's related_to_min_similarity default of 0.3.
+    assert [r["strength"] for r in related] == pytest.approx([1.0, 2 / 3, 1 / 3], abs=1e-6)
 
     text = mcp.call_ok("find_related_patterns", {"pattern_id": source.id})
     where = positions(text, [three.name, two.name, one.name], "## ")
     assert where == sorted(where), f"find_related_patterns is not ordered by similarity:\n{text}"
+
+    shared = entry_of(text, one.name)
+    assert f"**Shared concepts:** {a}\n" in shared, f"want only {a} shared:\n{shared}"
+    assert b not in shared
+    assert c not in shared
 
     limited = mcp.call_ok("find_related_patterns", {"pattern_id": source.id, "limit": 2})
     assert three.name in limited
