@@ -79,6 +79,21 @@ def test_concurrent_updates_all_succeed(api: ApiClient, create_with: CreateWith)
     assert {p.id: api.get(p.id).pattern().name for p in patterns} == renamed
 
 
+def test_concurrent_updates_to_one_pattern_all_succeed(
+    api: ApiClient, create_with: CreateWith, tokens: TokenPool
+) -> None:
+    tok = tokens.new()
+    pattern = create_with().pattern()
+    payloads = [pattern_payload(pattern.name, f"Updated content {i} {tok}", tags=[f"{tok}-{i}"]) for i in range(10)]
+
+    responses = concurrently([partial(api.update, pattern.id, payload) for payload in payloads])
+
+    assert [r.status for r in responses] == [204] * 10, [r.text for r in responses if r.status != 204]
+    stored = api.get(pattern.id).json()
+    # The last writer wins whole: content and tags come from the same request.
+    assert (stored["content"], stored["tags"]) in [(p["content"], p["tags"]) for p in payloads], stored
+
+
 def test_concurrent_related_patterns_get_one_edge_per_pair(
     api: ApiClient, graph: Graph, create_with: CreateWith, tokens: TokenPool
 ) -> None:
