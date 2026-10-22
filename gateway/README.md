@@ -86,20 +86,39 @@ Unauthenticated MCP requests get `401` with `WWW-Authenticate: Bearer resource_m
 
 ## Running it
 
-Run these from the repository root. Requirements: Docker, Go 1.24, and [OPA](https://www.openpolicyagent.org/docs/latest/#running-opa) for the policy tests.
+Run these from the repository root. Requirements: Docker, and Go 1.24 for the e2e tests. OPA and Envoy run from pinned images, so neither needs a host install. The pins are the `openpolicyagent/opa:1.4.2-envoy-static` and `envoyproxy/envoy:v1.34.1` images of [`deploy/docker-compose.yaml`](../deploy/docker-compose.yaml).
+
+Policy tests (`opa fmt`, `check` and `test`):
 
 ```sh
-make test-policy     # opa fmt, check and test
-make validate-envoy  # envoy --mode validate
-make e2e-stub        # gateway + stub services, run the e2e tests, tear down
+OPA=openpolicyagent/opa:1.4.2-envoy-static
+docker run --rm -v "$PWD/gateway/opa/policy:/policy:ro" $OPA fmt --list --fail /policy
+docker run --rm -v "$PWD/gateway/opa/policy:/policy:ro" $OPA check --strict /policy
+docker run --rm -v "$PWD/gateway/opa/policy:/policy:ro" $OPA test -v /policy
+```
+
+Envoy config validation (the egress config reads the OpenAI key variable, so give it a dummy value):
+
+```sh
+docker run --rm -v "$PWD/gateway/envoy:/cfg:ro" envoyproxy/envoy:v1.34.1 envoy --mode validate -c /cfg/envoy.yaml
+docker run --rm -v "$PWD/gateway/envoy:/cfg:ro" -e MNEMONIC_OPENAI_API_EMBEDDINGS_KEY=validate-only envoyproxy/envoy:v1.34.1 envoy --mode validate -c /cfg/envoy-egress.yaml
+```
+
+The gateway with stub services, which needs no Mnemonic images, databases or OpenAI key:
+
+```sh
+docker compose -f gateway/test/compose.stub.yaml up -d --build --wait --wait-timeout 240
+(cd gateway/test/e2e && go test -count=1 -v ./...)
+docker compose -f gateway/test/compose.stub.yaml down
 ```
 
 For the full stack, which pulls the published `latest-dev` images from ghcr.io:
 
 ```sh
 export MNEMONIC_OPENAI_API_EMBEDDINGS_KEY=...
-make up
-make e2e
+docker compose -f deploy/docker-compose.yaml up -d --wait
+(cd gateway/test/e2e && go test -count=1 -v ./...)
+docker compose -f deploy/docker-compose.yaml down
 ```
 
 To use images you built with `make build` (`make build-api`, `make build-mcp`, `make build-enricher`), point the stack at them:
@@ -107,7 +126,8 @@ To use images you built with `make build` (`make build-api`, `make build-mcp`, `
 ```sh
 MNEMONIC_API_IMAGE=ghcr.io/twistingmercury/mnemonic-api:latest \
 MNEMONIC_MCP_IMAGE=ghcr.io/twistingmercury/mnemonic-mcp:latest \
-MNEMONIC_ENRICHER_IMAGE=ghcr.io/twistingmercury/mnemonic-enricher:latest make up
+MNEMONIC_ENRICHER_IMAGE=ghcr.io/twistingmercury/mnemonic-enricher:latest \
+docker compose -f deploy/docker-compose.yaml up -d --wait
 ```
 
 The e2e tests in `gateway/test/e2e` read these optional variables, so they can also target a stack that is not on the default ports:
@@ -118,7 +138,7 @@ The e2e tests in `gateway/test/e2e` read these optional variables, so they can a
 | `MNEMONIC_GATEWAY_MCP_URL` | `http://localhost:8081` | MCP edge the tests call |
 | `MNEMONIC_KEYCLOAK_URL` | `http://localhost:8180` | Keycloak that issues the test tokens |
 
-The stub services of `make e2e-stub` (`gateway/test/stub`) read `MNEMONIC_STUB_NAME`, the name they answer with, and `MNEMONIC_STUB_LISTEN`, a comma-separated list of listen addresses. `gateway/test/compose.stub.yaml` sets both.
+The stub services of `gateway/test/compose.stub.yaml` (`gateway/test/stub`) read `MNEMONIC_STUB_NAME`, the name they answer with, and `MNEMONIC_STUB_LISTEN`, a comma-separated list of listen addresses. `gateway/test/compose.stub.yaml` sets both.
 
 ### Getting a token
 
@@ -142,22 +162,9 @@ For interactive MCP clients, the public client `mnemonic-mcp-client` uses author
 
 ## Kubernetes (minikube)
 
-The same stack also runs on a local minikube cluster, from the Helm chart in `deploy/helm/mnemonic/`. It gets its own minikube profile, `mnemonic`, and every `kubectl` and `helm` call names that context, so your current context and other clusters are left alone.
+The same stack runs on a local minikube cluster from the Helm chart in `deploy/helm/mnemonic/`; [`deploy/test/k8s-e2e.sh`](../deploy/test/k8s-e2e.sh) holds the end-to-end and isolation checks. The root Makefile no longer has `k8s-*` targets, so nothing automates the cluster steps today: creating the minikube profile (with a CNI that enforces NetworkPolicies, such as Calico), loading the images, creating the ConfigMaps and the Secret, and port-forwarding Envoy and Keycloak are manual. Keep your current kubectl and Helm context unchanged by naming the context in every call.
 
-Requirements: Docker, minikube, kubectl, Helm 4, `jq`, the OpenAI key in `MNEMONIC_OPENAI_API_EMBEDDINGS_KEY`. On Linux, set `fs.inotify.max_user_instances` to at least 512, or kube-proxy can fail with `too many open files`.
-
-```sh
-make k8s-up            # profile (Calico CNI), image load, ConfigMaps, Secret, helm upgrade --install --wait
-make k8s-forward       # port-forwards in the background
-make k8s-test          # end-to-end and isolation checks (real OpenAI calls)
-make k8s-forward-stop  # stop the port-forwards
-make k8s-down          # uninstall the chart and delete the namespace
-make k8s-delete        # delete the whole mnemonic profile
-```
-
-The `mnemonic-*` images (`latest-dev` for the services, `v1.0.0-dev` for Postgres and Neo4j) are loaded from the host's Docker cache when you have built them; any image the host does not have is pulled by the node. `make k8s-up` runs `k8s-cluster`, `k8s-images`, `k8s-config` and `k8s-secret` first. You can also run each one on its own.
-
-`k8s-images` compares each image's build time on the host with the copy in the cluster. If you rebuilt an image under the same tag, it replaces the stale copy and restarts only the workloads that use it; otherwise it reports "up to date". (Plain `minikube image load` keeps the old copy when the tag already exists.)
+The chart expects the ConfigMaps named under `configMaps` in `values.yaml` (built from `gateway/envoy/envoy.yaml`, `gateway/envoy/envoy-egress.yaml`, `gateway/opa/config.yaml`, `gateway/opa/policy/` and `gateway/keycloak/realm-mnemonic.json`) and the Secret named in `openai.existingSecret` (key `api-key`). Services are reached through port-forwards on the same ports as the compose stack, so the token and `curl` examples above work unchanged:
 
 | Service | URL |
 | --- | --- |
@@ -165,11 +172,19 @@ The `mnemonic-*` images (`latest-dev` for the services, `v1.0.0-dev` for Postgre
 | MCP edge | `localhost:8081` |
 | Keycloak | `localhost:8180` |
 
-These are the same ports as the compose stack, so the token and `curl` examples above work unchanged. Tokens keep the issuer `http://localhost:8180/realms/mnemonic` (`keycloak.publicUrl` in `values.yaml`). Envoy fetches the JWKS over the in-cluster `keycloak` Service.
+Tokens keep the issuer `http://localhost:8180/realms/mnemonic` (`keycloak.publicUrl` in `values.yaml`). Envoy fetches the JWKS over the in-cluster `keycloak` Service.
 
-The chart doesn't copy any config. `make k8s-config` builds ConfigMaps from `gateway/envoy/envoy.yaml`, `gateway/envoy/envoy-egress.yaml`, `gateway/opa/` and `gateway/keycloak/realm-mnemonic.json`, and the chart mounts them by name. Pods carry a checksum of their ConfigMaps, so after you edit a file, `make k8s-up` restarts the pods that use it. The Service names match the compose service names, so `envoy.yaml` works in both stacks without changes.
+The Service names match the compose service names, so `envoy.yaml` works in both stacks without changes.
 
-**The OpenAI key.** `make k8s-secret` pipes the key into the Secret `mnemonic-openai`. It never shows up as a command-line argument, in a file, or in the chart's values. Only the `egress` pod mounts that Secret. The API, MCP and enricher get the placeholder `proxy-managed` and send their OpenAI calls to `http://egress:8443/v1`. After rotating the key, run `kubectl --context mnemonic -n mnemonic rollout restart deployment/egress`. The dev credentials for Postgres, Neo4j, RabbitMQ and the Keycloak admin are the compose ones, and they're kept in a chart-managed Secret too.
+**The OpenAI key.** Create the Secret `mnemonic-openai` from the host variable `MNEMONIC_OPENAI_API_EMBEDDINGS_KEY` by piping the key on stdin, so it never shows up as a command-line argument, in a file, or in the chart's values:
+
+```bash
+printf '%s' "$MNEMONIC_OPENAI_API_EMBEDDINGS_KEY" | kubectl --context mnemonic -n mnemonic create secret generic mnemonic-openai --from-file=api-key=/dev/stdin
+```
+
+Do not use `--from-literal`: it puts the key on the command line and in shell history.
+
+Only the `egress` pod mounts that Secret. The API, MCP and enricher get the placeholder `proxy-managed` and send their OpenAI calls to `http://egress:8443/v1`. After rotating the key, run `kubectl --context mnemonic -n mnemonic rollout restart deployment/egress`. The dev credentials for Postgres, Neo4j, RabbitMQ and the Keycloak admin are the compose ones, and they're kept in a chart-managed Secret too.
 
 **Isolation.** Calico enforces NetworkPolicies, which minikube's default CNI does not. The namespace denies all ingress and egress by default. Every pod may query kube-dns. Beyond that, these are the only allowed flows:
 
@@ -182,7 +197,7 @@ The chart doesn't copy any config. `make k8s-config` builds ConfigMaps from `gat
 | enricher | Postgres, Neo4j, RabbitMQ, egress |
 | egress | the internet on TCP 443, excluding private and link-local ranges |
 
-`make k8s-test` proves the policies hold. It starts short-lived curl pods that carry a component's policy labels, or no labels at all, and checks four things. A pod with the enricher's labels can't reach `api.openai.com`, while one with the egress labels can. A pod with no labels reaches none of the data stores or services. The services can't reach each other. Only the egress pod reaches the internet. Each of these checks comes with a positive control, such as an API-labelled pod reaching Postgres, so a probe that can't connect anywhere never counts as "blocked". To switch the policies off for debugging, run `make k8s-up K8S_HELM_ARGS="--set networkPolicy.enabled=false"`.
+`deploy/test/k8s-e2e.sh` proves the policies hold. It starts short-lived curl pods that carry a component's policy labels, or no labels at all, and checks four things. A pod with the enricher's labels can't reach `api.openai.com`, while one with the egress labels can. A pod with no labels reaches none of the data stores or services. The services can't reach each other. Only the egress pod reaches the internet. Each of these checks comes with a positive control, such as an API-labelled pod reaching Postgres, so a probe that can't connect anywhere never counts as "blocked". To switch the policies off for debugging, install the chart with `--set networkPolicy.enabled=false`.
 
 The admin UI (`mnemonic-admin`) isn't part of this deployment.
 

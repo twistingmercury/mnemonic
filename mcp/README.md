@@ -1,4 +1,4 @@
-# Mnemonic
+# mnemonic-mcp
 
 > **Maturity Level**: Emerging — MCP search server functional, Admin REST API in a separate service (`mnemonic-api`)
 > **Version**: v0.6.0
@@ -11,7 +11,7 @@
 
 ## Table of Contents
 
-- [Mnemonic](#mnemonic)
+- [mnemonic-mcp](#mnemonic-mcp)
   - [Table of Contents](#table-of-contents)
   - [Usage](#usage)
   - [How it works](#how-it-works)
@@ -60,7 +60,7 @@ are pre-configured with the required schema, so no migration step is needed.
 The gateway checks a Keycloak token on each request; see the
 [gateway README](../gateway/README.md).
 
-To run the add the mcp server to Claude: `claude mcp add --transport http --scope user mnemonic http://localhost:8081/mcp`
+To add the mcp server to Claude Code: `claude mcp add --transport http --scope user mnemonic http://localhost:8081/mcp`
 
 ## Key Considerations
 
@@ -68,8 +68,11 @@ To run the add the mcp server to Claude: `claude mcp add --transport http --scop
   lives in `mnemonic-api`
 - **Current enrichment**: The Admin API publishes jobs to RabbitMQ for the
   separate `mnemonic-enricher` worker; this service reads the resulting data
-- **MVP security**: Local, trusted, single-user deployment without authentication
-- **Post-MVP**: Authentication, authorization, and production deployment
+- **Security**: The service has no authentication code; the gateway checks a
+  Keycloak token before a request reaches it. Run it only behind the gateway or
+  an equivalent proxy
+- **Ports**: MCP listens on 8081 (`MNEMONIC_MCP_PORT`), health and version on
+  8080 and Prometheus metrics on 9090
 
 ## Development Considerations
 
@@ -88,15 +91,15 @@ make tests-unit
 `make build-mcp` runs `build/mcp/mcp.build.sh`: it builds
 `ghcr.io/twistingmercury/mnemonic-mcp` with the current version and `latest`
 tags, then runs the whole end-to-end suite in [`tests/integration`](../tests/integration/README.md)
-in containers. It never pushes; CI does. The suite points `openai.base_url` (`MNEMONIC_OPENAI_BASE_URL`, default
+in containers. It never pushes; publishing is planned for CI, which is not written yet. The suite points `openai.base_url` (`MNEMONIC_OPENAI_BASE_URL`, default
 `https://api.openai.com/v1`) at the local stub in `tests/openai-stub`, so no
 E2E test calls OpenAI. See the [build guide](../build/mcp/README.md).
 
 To run the whole local stack, export `MNEMONIC_OPENAI_API_EMBEDDINGS_KEY` in
-your shell (only the egress proxy reads it) and run `make up`; `make down` stops
-it. The stack uses the images named by `MNEMONIC_API_IMAGE`,
+your shell (only the egress proxy reads it) and run `docker compose -f deploy/docker-compose.yaml up -d`;
+`docker compose -f deploy/docker-compose.yaml down` stops it. The stack uses the images named by `MNEMONIC_API_IMAGE`,
 `MNEMONIC_MCP_IMAGE` and `MNEMONIC_ENRICHER_IMAGE`, defaulting to the
-`latest-dev` images on ghcr.io, and `make up` does not build or retag images.
+`latest-dev` images on ghcr.io, and `docker compose up` does not build or retag images.
 
 ### Testing
 

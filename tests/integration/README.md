@@ -74,7 +74,7 @@ imports or reads service source. `build/check-e2e-boundary.sh` and
 | `test_api_list_and_limits.py` | List ordering and filters, the content size limit, and the 404 and 409 answers |
 | `test_api_concurrency.py` | Concurrent API writes, and a single `RELATED_TO` edge per pair under concurrent enrichment |
 | `test_graph_behavior.py` | Related patterns, concepts, and pruning after a delete or an update, seen through the API and MCP |
-| `test_search_and_lifecycle.py` | MCP search ranking and filters, and the create and update lifecycle of a pattern's chunks and jobs |
+| `test_search_and_lifecycle.py` | MCP search ranking, filters and graph-expanded results, and the create and update lifecycle of a pattern's chunks and jobs |
 
 Single-service behavior that needs no other service belongs in that service's
 Go tests, not here. The `src/mnemonic_e2e` package holds the helpers (HTTP,
@@ -147,7 +147,7 @@ script of each changed component, the same as a local run.
 
 ### Quick Start
 
-The project uses `uv` and Python 3.14. From this directory:
+The project uses `uv` and Python 3.13 or later (the runner image uses 3.14). From this directory:
 
 ```bash
 uv sync --frozen

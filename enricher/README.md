@@ -116,11 +116,10 @@ Run unit tests:
 make tests-unit
 ```
 
-From the repository root, run benchmarks or the Docker-first build and end-to-end
-pipeline used by CI:
+From the repository root, run the Docker-first build and end-to-end pipeline
+(CI will run the same script; the workflows are not written yet):
 
 ```bash
-make tests-bench
 make build-enricher
 ```
 

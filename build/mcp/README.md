@@ -38,7 +38,7 @@ The build runs in this order:
 
 1. Docker builds the `mcp.Dockerfile` `build` stage with the project source.
 2. The build stage runs `goimports`, `golangci-lint`, `govulncheck`, `gosec`,
-   and Go tests for `cmd/mcp` and `internal`.
+   and the Go tests for `cmd/mcp` and `internal` (run with `-race`).
 3. The build stage compiles the statically linked `/mnemonic` binary with
    version, build date, and commit metadata.
 4. The `final` scratch stage copies the binary and CA certificates into the

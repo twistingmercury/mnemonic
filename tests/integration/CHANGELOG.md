@@ -27,12 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Cross-service tests for re-enrichment after an update, removal from every
   MCP read path after a delete, related patterns found through shared
   concepts, and the enricher's retry sweep recovering a failed job.
-- A `pull_request` trigger, so changes to this suite are tested before merge.
 - 2026-10-22: Tests `test_api_list_and_limits.py`, `test_api_concurrency.py`, `test_graph_behavior.py` and `test_search_and_lifecycle.py`, which replace the Go integration tests of the api, mcp and enricher.
+- 2026-10-22: Tests for graph-expanded search and the fields of a search result, the strengths and shared concepts of related patterns as MCP shows them, and a 404 when deleting an unknown pattern id.
 - 2026-10-22: A `POST /control/delay?match=<substring>&ms=<n>` control on the OpenAI stub, cleared by `POST /control/reset`, and `StubClient.delay`.
 
 ### Changed
 
+- 2026-10-22: README corrected: Python version, the suite's modules and the commands to run it.
 - 2026-10-21: The Compose file uses the Mnemonic service names, runs the Python
   runner instead of the Go one, and is started by each component's build
   script (`build/<n>/<n>.build.sh`), which also removes what it created.
@@ -50,14 +51,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   single service's own E2E coverage (API CRUD, MCP tool validation, per-service
   version checks) are removed; health is one table-driven test that checks
   every dependency is `OK`.
-- Tests run in the stock `golang:1.27.2-alpine` image with `src/` mounted,
-  replacing the 708 MB test-runner image and its readiness script.
-- All tests are in one package with no third-party dependencies.
-- `make build` is now `make test`.
-- Go 1.27.2.
 
 ### Removed
 
+- 2026-10-22: The Go integration tier (build tag `integration`, `make tests-integration`) of the api, mcp and enricher; the Python suite replaces it.
 - 2026-10-21: The Go test suite in this directory and the per-service Go e2e
   suites that were kept under `tests/legacy/`, replaced by the Python suite
   above. Nine legacy tests were dropped on purpose because they did not test

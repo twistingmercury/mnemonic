@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - 2026-10-21: Renamed the project back to Mnemonic in the monorepo, dropping the placeholder name "Librarian": the Go module path is `github.com/twistingmercury/mnemonic`, the image is `ghcr.io/twistingmercury/mnemonic-api`, every environment variable uses the `MNEMONIC_` prefix and the host ports are the original ones (gateway 8080, 8081 and 8180).
+- 2026-10-22: The Docker build runs the Go unit tests with the race detector (`CGO_ENABLED=1 go test -race`), and the Docker build context is an allowlist in `.dockerignore`.
+- 2026-10-22: The README no longer names `make` targets that were removed (`up`, `down`, `tests-bench`, `docs-swagger`); it gives the `docker compose` command or the current target (`make openapi`) instead, and says CI publishing is not written yet.
 
 ### Removed
 
@@ -49,7 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- The pattern repository integration test expected a 10KB content CHECK that migration 000005 in mnemonic-dbs dropped. It now checks that 100,000 bytes, the API's limit, are stored.
+- The pattern repository integration test expected a 10KB content CHECK that migration 000009 in mnemonic-dbs dropped. It now checks that 100,000 bytes, the API's limit, are stored.
 
 ## [v0.4.0] - 2026-10-15
 

@@ -1,7 +1,7 @@
 # Mnemonic
 
 > **Maturity Level**: Emerging - the services work end to end, but the repository is still being consolidated into a monorepo and expects breaking changes.
-> **Version**: v0.0.1 (no release tags yet)
+> **Version**: versioned per component (see [Versioning](#versioning))
 
 Mnemonic is a shared knowledge base for a team that uses Claude Code. The team curates patterns (conventions, decisions, how things are done here), and Claude Code retrieves them over MCP when it needs context. It runs as a small set of services behind an authenticating gateway.
 
@@ -34,17 +34,17 @@ Three services share one database layer: an admin REST **api** (the only write p
 
 ### Quick Start
 
-Run `make help` for the gateway and Kubernetes targets. Each service image is built by its own script, `build/<name>/<name>.build.sh` (`api`, `mcp`, `enricher`), which builds the image and runs the end-to-end tests in containers; CI does the pushing. Details are in the component READMEs below.
+Run `make help` to list the targets. Each service image is built by its own script, `build/<name>/<name>.build.sh` (`api`, `mcp`, `enricher`), which builds the image and runs the end-to-end tests in containers and never pushes. Publishing is planned for CI, whose workflows are not written yet ([design](docs/design/ci_workflows.md)). Details are in the component READMEs below.
 
 ### Testing
 
-Go unit tests run from `src/` with `go test ./...`. The BATS tests for the build tooling run with `bats tests/bats`. The database images and the gateway have their own test instructions in their READMEs.
+Go unit tests run with `make tests-unit` (or `go -C src test ./...`). The BATS tests for the build tooling run with `bats tests/bats`. The database images and the gateway have their own test instructions in their READMEs.
 
 ### Versioning
 
 This project follows [Semantic Versioning 2.0.0](https://semver.org/).
 
-Components are released independently with prefixed tags (for example `api/v0.5.1`). With no tags yet, the version falls back to `v0.0.1`. The version of a component is determined from its tags:
+Components are released independently with prefixed tags (for example `api/v0.5.1`). A component with no tag yet reports `0.0.0-dev`. The version of a component is determined from its tags:
 
 ```bash
 build/version.sh api

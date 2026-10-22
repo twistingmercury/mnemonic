@@ -78,7 +78,7 @@ cd mnemonic
 make build-api
 ```
 
-`make build-api` runs `build/api/api.build.sh`. It builds `ghcr.io/twistingmercury/mnemonic-api` (runs the unit tests in the Docker build), then runs the whole Docker Compose E2E suite in [`tests/integration`](../tests/integration/README.md) against it. It never pushes; CI does.
+`make build-api` runs `build/api/api.build.sh`. It builds `ghcr.io/twistingmercury/mnemonic-api` (runs the unit tests in the Docker build), then runs the whole Docker Compose E2E suite in [`tests/integration`](../tests/integration/README.md) against it. It never pushes; publishing is planned for CI, which is not written yet.
 
 ### Building & running
 
@@ -90,7 +90,7 @@ make build-api
 make local
 ```
 
-`make local` builds the `api`, `mcp` and `enricher` binaries into `src/.bin` without tests or Docker. To run the whole stack behind the gateway, export `MNEMONIC_OPENAI_API_EMBEDDINGS_KEY` in your shell and run `make up` (`make down` stops it). It starts [deploy/docker-compose.yaml](../deploy/docker-compose.yaml), which uses the images named by `MNEMONIC_API_IMAGE`, `MNEMONIC_MCP_IMAGE` and `MNEMONIC_ENRICHER_IMAGE`, defaulting to the `latest-dev` images on ghcr.io, and publishes the API on `http://localhost:8080`. To run the service directly, copy [.env.example](../.env.example) to `.env` and use the databases from `db/docker-compose.yaml`.
+`make local` builds the `api`, `mcp` and `enricher` binaries into `src/.bin` without tests or Docker. To run the whole stack behind the gateway, export `MNEMONIC_OPENAI_API_EMBEDDINGS_KEY` in your shell and run `docker compose -f deploy/docker-compose.yaml up -d` (`docker compose -f deploy/docker-compose.yaml down` stops it). That file is [deploy/docker-compose.yaml](../deploy/docker-compose.yaml), which uses the images named by `MNEMONIC_API_IMAGE`, `MNEMONIC_MCP_IMAGE` and `MNEMONIC_ENRICHER_IMAGE`, defaulting to the `latest-dev` images on ghcr.io, and publishes the API on `http://localhost:8080`. To run the service directly, copy [.env.example](../.env.example) to `.env` and use the databases from `db/docker-compose.yaml`. That file has no RabbitMQ, so run your own broker on `localhost:5672` (the `guest`/`guest` defaults in `.env.example`); the RabbitMQ in `deploy/docker-compose.yaml` publishes no host port and uses `mnemonic` / `mnemonic_dev`. The egress proxy is reachable only inside that compose network, so a direct run cannot use it.
 
 ### Configuration
 
@@ -113,13 +113,13 @@ The root Makefile provides the supported test entry points:
 
 ```bash
 make tests-unit          # Unit tests with coverage
-make tests-bench         # Internal package benchmarks
+make analyze             # Linters, formatters and security scanners
 make build-api           # Image build plus the full E2E suite
 ```
 
 The E2E suite uses the pre-migrated PostgreSQL and Neo4j images and a local OpenAI stub (`tests/openai-stub`), and requires Docker. It never calls api.openai.com.
 
-`make build-api` is the verification bar. A stack left running by `make up` keeps whatever image it began with, so testing against it says nothing about the current working tree.
+`make build-api` is the verification bar. A stack left running by `docker compose up` keeps whatever image it began with, so testing against it says nothing about the current working tree.
 
 The [golangci-lint configuration](../src/.golangci.yml) sets `run.tests: false` to exclude `*_test.go` files from lint analysis. `go test` still compiles and runs those tests. Keep `pgx` at 5.10.0 for compatibility with `pgxmock` 4.9.0; `pgx` 5.11.0 requires a `TypeMap` method that this mock version does not implement.
 
@@ -128,7 +128,7 @@ The [golangci-lint configuration](../src/.golangci.yml) sets `run.tests: false` 
 Regenerate the tracked Swagger files after changing routes or schemas:
 
 ```bash
-make docs-swagger
+make openapi
 ```
 
 ### Versioning

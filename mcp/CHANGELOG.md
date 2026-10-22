@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - 2026-10-21: Renamed the project back to Mnemonic in the monorepo, dropping the placeholder name "Librarian": the Go module path is `github.com/twistingmercury/mnemonic`, the image is `ghcr.io/twistingmercury/mnemonic-mcp`, every environment variable uses the `MNEMONIC_` prefix and the host ports are the original ones (gateway 8080, 8081 and 8180).
+- 2026-10-22: The Docker build runs the Go unit tests with the race detector (`CGO_ENABLED=1 go test -race`), and the Docker build context is an allowlist in `.dockerignore`.
+- 2026-10-22: The README no longer names `make` targets that were removed (`up`, `down`, `tests-bench`); it gives the `docker compose` command instead, and says CI publishing is not written yet.
+- 2026-10-22: The README no longer calls the deployment unauthenticated: the gateway checks a Keycloak token, and the service has no auth code. It documents the 8081 (MCP), 8080 (health) and 9090 (metrics) ports.
 
 ### Removed
 

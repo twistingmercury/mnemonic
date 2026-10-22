@@ -2,7 +2,7 @@
 
 > **Maturity Level**: Emerging - Pre-seeded database images and schema migrations for the Mnemonic project
 > **Version**: v1.0.0
-
+>
 > - **Emerging**: Prototype, not production-ready, expect breaking changes
 > - **Basic**: Production-ready but actively evolving, expect minor version changes
 > - **Mature**: Stable, battle-tested, changes are rare
@@ -51,20 +51,19 @@ Requires Docker 27+, Docker Compose 2.32+, `bats-core`, and `psql`.
 Build the images locally from the repository root (each script tags the image with the version and `latest`):
 
 ```bash
-make db-build            # both images
-make db-build-postgres   # or one at a time
-make db-build-neo4j
+MNEMONIC_VERSION=v1.0.0 bash db/postgres/build.sh
+MNEMONIC_VERSION=v1.0.0 bash db/neo4j/build.sh
 ```
 
-Set `MNEMONIC_VERSION` to override the git-derived version tag.
+Always set `MNEMONIC_VERSION` (with a `v` prefix, like the existing `v1.0.0-dev` tags). Without it the scripts fall back to `git describe --tags --abbrev=0`, which returns the newest tag of any component (for example `api/v0.5.0`); that contains a slash, so the build fails with an invalid image reference (see [#26](https://github.com/twistingmercury/mnemonic/issues/26)). These scripts do not push and, unlike the service build scripts, do not pass `--no-cache --pull`.
 
 ### Testing
 
 BATS tests verify the schema state after all migrations have been applied.
 
 ```bash
-make db-test-postgres   # PostgreSQL migrations (db/tests/postgres-test-runner.sh)
-make db-test-neo4j      # Neo4j migrations and the Neo4j image (db/tests/neo4j-test-runner.sh)
+bash db/tests/postgres-test-runner.sh   # PostgreSQL migrations
+bash db/tests/neo4j-test-runner.sh      # Neo4j migrations and the Neo4j image
 bats db/tests/bats/schema-entrypoint.bats db/tests/bats/build-scripts.bats   # scripts, no Docker stack needed
 ```
 
@@ -74,7 +73,7 @@ Environment variables (all optional):
 
 | Variable | Default | Used by |
 | --- | --- | --- |
-| `MNEMONIC_VERSION` | latest git tag (any component), else `dev` | `build.sh` scripts: image tag |
+| `MNEMONIC_VERSION` | newest git tag of any component, else `dev` | `build.sh` scripts: image tag |
 | `MNEMONIC_MAX_RETRIES` | `30` | test runners: readiness attempts |
 | `MNEMONIC_RETRY_INTERVAL` | `1` | test runners: seconds between attempts |
 | `MNEMONIC_NEO4J_USER` / `MNEMONIC_NEO4J_PASSWORD` | `neo4j` / `mnemonic_dev` | Neo4j test runner and BATS |
@@ -91,8 +90,4 @@ Variables defined by the third-party tools keep their names: `NEO4J_AUTH`, `POST
 
 This project follows [Semantic Versioning 2.0.0](https://semver.org/).
 
-The `build.sh` scripts derive the image version from the latest git tag of the repository (any component's tag), or take `MNEMONIC_VERSION`:
-
-```bash
-git describe --tags --always
-```
+The `build.sh` scripts take the image version from `MNEMONIC_VERSION`, or else from `git describe --tags --abbrev=0`, which returns the newest tag of any component. Releases are tagged per component (`db/v1.0.0`; `build/version.sh db` reads it), and a prefixed tag such as `db/v1.0.0` contains a slash, which Docker does not allow in an image tag. Until the scripts use `build/version.sh`, always set `MNEMONIC_VERSION` (for example `MNEMONIC_VERSION=v1.0.0`); without it the build fails because the newest tag contains a slash ([#26](https://github.com/twistingmercury/mnemonic/issues/26)).

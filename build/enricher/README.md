@@ -1,8 +1,9 @@
 # mnemonic-enricher build guide
 
 This directory contains the Docker image build and end-to-end test workflow for
-`mnemonic-enricher`. It does not contain a production deployment definition. Image
-publication is handled by GitHub Actions, and deployment is owned downstream.
+`mnemonic-enricher`. It does not contain a production deployment definition.
+Image publication is not set up yet (see [CI publication](#ci-publication)), and
+deployment is owned downstream.
 
 Run the commands in this guide from the repository root.
 
@@ -19,8 +20,8 @@ these stages in order:
 
 1. Builds the final image with no Docker layer cache and a freshly pulled base
    image (`--no-cache --pull`, always on). The Dockerfile runs
-   `goimports`, `golangci-lint`, `govulncheck`, `gosec`, and Go unit tests before
-   compiling the binary.
+   `goimports`, `golangci-lint`, `govulncheck`, `gosec`, and the Go unit tests
+   (with `-race`) before compiling the binary.
 2. Tags the image as both
    `ghcr.io/twistingmercury/mnemonic-enricher:<version>` and
    `ghcr.io/twistingmercury/mnemonic-enricher:latest`. The version defaults to
@@ -31,7 +32,7 @@ these stages in order:
    [README](../../tests/integration/README.md)) with the enricher taken from the
    newly built image and never pulled.
 
-The script never pushes an image; CI does. The stack needs Docker to pull the
+The script never pushes an image; the CI workflows, once written, will. The stack needs Docker to pull the
 pre-migrated PostgreSQL and Neo4j images, RabbitMQ
 (`rabbitmq:3-management-alpine`) and the `latest-dev` api and mcp images from
 GHCR, unless you set `MNEMONIC_API_IMAGE`, `MNEMONIC_MCP_IMAGE` or the matching
@@ -99,12 +100,12 @@ enricher with the other services behind the gateway. Provide the following:
 Then start and stop the stack from the repository root:
 
 ```bash
-make up
-make down
+docker compose -f deploy/docker-compose.yaml up -d
+docker compose -f deploy/docker-compose.yaml down
 ```
 
 The enricher waits for healthy `postgres`, `neo4j` and `rabbitmq` services.
-`make down` keeps the named volumes; remove them with
+`down` keeps the named volumes; remove them with
 `docker compose -f deploy/docker-compose.yaml down --volumes`, which also
 deletes the local PostgreSQL and Neo4j development data.
 
