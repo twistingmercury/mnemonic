@@ -45,6 +45,7 @@ log_info "Context : ${SCRIPT_DIR}"
 # Build
 # ---------------------------------------------------------------------------
 docker build \
+    --no-cache --pull \
     --progress=plain \
     -t "${IMAGE_VERSIONED}" \
     -t "${IMAGE_LATEST}" \

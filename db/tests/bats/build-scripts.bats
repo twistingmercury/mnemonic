@@ -43,6 +43,13 @@ STUB
     grep -qF 'ghcr.io/twistingmercury/mnemonic-postgres:latest' "${DOCKER_LOG}"
 }
 
+@test "postgres build - never uses the cache and always pulls the base" {
+    run bash "${POSTGRES_BUILD}"
+
+    [ "${status}" -eq 0 ]
+    grep -E '^build .*--no-cache' "${DOCKER_LOG}" | grep -qF -- '--pull'
+}
+
 @test "postgres build with the old VERSION name - ignores it" {
     export VERSION="v9.9.9-old"
 
@@ -61,6 +68,13 @@ STUB
     [ "${status}" -eq 0 ]
     grep -qF 'ghcr.io/twistingmercury/mnemonic-neo4j:v9.9.9-test' "${DOCKER_LOG}"
     grep -qF 'ghcr.io/twistingmercury/mnemonic-neo4j:latest' "${DOCKER_LOG}"
+}
+
+@test "neo4j build - never uses the cache and always pulls the base" {
+    run bash "${NEO4J_BUILD}"
+
+    [ "${status}" -eq 0 ]
+    grep -E '^build .*--no-cache' "${DOCKER_LOG}" | grep -qF -- '--pull'
 }
 
 @test "neo4j build with the old VERSION name - ignores it" {

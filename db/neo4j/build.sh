@@ -45,6 +45,7 @@ log_info "Version : ${MNEMONIC_VERSION}"
 log_info "Image   : ${IMAGE_VERSIONED}"
 
 docker build \
+    --no-cache --pull \
     --progress=plain \
     -t "${IMAGE_VERSIONED}" \
     "${SCRIPT_DIR}"

@@ -46,7 +46,7 @@ Both images are self-initializing — the schema is applied by the container its
 
 ### Quick Start
 
-Requires Docker 27+, Docker Compose 2.32+, `bats-core`, and `psql`.
+Requires Docker 27+ and Docker Compose 2.32+. The test runners run `bats` and `psql` from pinned images (`db/tests/run-bats.sh`), so neither needs installing.
 
 Build the images locally from the repository root (each script tags the image with the version and `latest`):
 
@@ -55,7 +55,7 @@ MNEMONIC_VERSION=v1.0.0 bash db/postgres/build.sh
 MNEMONIC_VERSION=v1.0.0 bash db/neo4j/build.sh
 ```
 
-Without `MNEMONIC_VERSION` the scripts tag the image `v<version>`, where `<version>` is what `build/version.sh db` prints (`v1.0.0` with the tag `db/v1.0.0`, `v0.0.0-dev` when no `db/v*` tag exists). These scripts do not push and, unlike the service build scripts, do not pass `--no-cache --pull`.
+Without `MNEMONIC_VERSION` the scripts tag the image `v<version>`, where `<version>` is what `build/version.sh db` prints (`v1.0.0` with the tag `db/v1.0.0`, `v0.0.0-dev` when no `db/v*` tag exists). These scripts do not push, and like the service build scripts they pass `--no-cache --pull`.
 
 ### Testing
 
