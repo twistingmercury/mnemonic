@@ -17,8 +17,6 @@ from mnemonic_e2e.db import Graph
 from mnemonic_e2e.mcp import McpClient
 from mnemonic_e2e.tokens import TokenPool
 
-ENRICH_TIMEOUT_S = 30.0
-
 # The create_with fixture (conftest.py): payload overrides -> the create response.
 CreateWith = Callable[..., ApiResponse]
 # The enriched fixture: concept names -> the created, enriched pattern.
@@ -34,23 +32,6 @@ def graph_content(*concepts: str) -> str:
 def tokens() -> TokenPool:
     # Every word the test patterns have in common, tags and names included.
     return TokenPool(graph_content() + " integ api")
-
-
-def wait_enriched(api: ApiClient, pattern_id: str) -> None:
-    """Poll until the pattern is enriched; a failed enrichment ends the wait and the test."""
-    pattern = wait.until(
-        lambda: api.get(pattern_id).pattern(),
-        f"pattern {pattern_id} to be enriched",
-        ENRICH_TIMEOUT_S,
-        done=lambda p: p.enrichment_status in ("enriched", "failed"),
-    )
-    assert pattern.enrichment_status == "enriched", f"pattern {pattern_id} failed: {pattern.enrichment_error}"
-
-
-def mcp_ok(mcp: McpClient, name: str, args: dict[str, object]) -> str:
-    result = mcp.call_tool(name, args)
-    assert not result.is_error, f"MCP {name}({args}) returned an error: {result.text}"
-    return result.text
 
 
 def graph_context(api: ApiClient, pattern_id: str) -> dict[str, Any]:
@@ -75,7 +56,7 @@ def enriched(api: ApiClient, create_with: CreateWith) -> Enriched:
 
     def create(*concepts: str) -> Pattern:
         pattern = create_with(graph_content(*concepts)).pattern()
-        wait_enriched(api, pattern.id)
+        wait.enriched(api, pattern.id)
         return pattern
 
     return create
@@ -97,11 +78,11 @@ def test_related_patterns_are_ordered_by_similarity_and_limited(
     assert [r["id"] for r in related] == [three.id, two.id, one.id]
     assert [r["strength"] for r in related] == sorted((r["strength"] for r in related), reverse=True)
 
-    text = mcp_ok(mcp, "find_related_patterns", {"pattern_id": source.id})
+    text = mcp.call_ok("find_related_patterns", {"pattern_id": source.id})
     where = positions(text, [three.name, two.name, one.name], "## ")
     assert where == sorted(where), f"find_related_patterns is not ordered by similarity:\n{text}"
 
-    limited = mcp_ok(mcp, "find_related_patterns", {"pattern_id": source.id, "limit": 2})
+    limited = mcp.call_ok("find_related_patterns", {"pattern_id": source.id, "limit": 2})
     assert three.name in limited
     assert two.name in limited
     assert one.name not in limited, f"limit 2 still lists the weakest pattern:\n{limited}"
@@ -113,7 +94,7 @@ def test_graph_context_lists_at_most_ten_related_patterns(
     body = graph_content(f"{tokens.new()}-shared")
     ids = [create_with(body).pattern().id for _ in range(12)]
     for pattern_id in ids:
-        wait_enriched(api, pattern_id)
+        wait.enriched(api, pattern_id)
 
     # Each of the twelve is related to the eleven others.
     assert len(related_ids(api, ids[0])) == 10
@@ -128,7 +109,7 @@ def test_source_is_not_related_to_itself(
 
     assert related_ids(api, source.id) == [other.id]
     assert graph.related_pattern_ids(source.id) == [other.id]
-    text = mcp_ok(mcp, "find_related_patterns", {"pattern_id": source.id})
+    text = mcp.call_ok("find_related_patterns", {"pattern_id": source.id})
     assert f"## {other.name} (" in text
     assert f"## {source.name} (" not in text, f"the source is listed as related to itself:\n{text}"
 
@@ -140,7 +121,7 @@ def test_concepts_are_ordered_by_name(api: ApiClient, mcp: McpClient, enriched: 
 
     assert [c["name"] for c in graph_context(api, pattern.id)["concepts"]] == ordered
 
-    text = mcp_ok(mcp, "get_pattern", {"id": pattern.id})
+    text = mcp.call_ok("get_pattern", {"id": pattern.id})
     where = positions(text, ordered, "- **")
     assert where == sorted(where), f"get_pattern does not list concepts by name:\n{text}"
 
@@ -172,7 +153,7 @@ def test_update_prunes_stale_concepts_and_edges(
 
     updated = api.update(pattern.id, pattern_payload(pattern.name, graph_content(x)))
     assert updated.status == 204, updated.text
-    wait_enriched(api, pattern.id)
+    wait.enriched(api, pattern.id)
 
     assert graph.concepts_of(pattern.id) == [x], "the dropped concepts are still mentioned in the updated pattern"
     assert graph.related_pattern_ids(pattern.id) == [], (

@@ -4,6 +4,10 @@ import time
 import uuid
 from collections.abc import Callable
 
+from mnemonic_e2e.api import ApiClient, Pattern
+
+ENRICH_TIMEOUT_S = 30.0
+
 
 def until[T](
     fn: Callable[[], T],
@@ -32,3 +36,23 @@ def until[T](
 def unique_name(prefix: str) -> str:
     """Return prefix plus 12 hex digits: lowercase, hyphenated, valid as a pattern name."""
     return f"{prefix}-{uuid.uuid4().hex[:12]}"
+
+
+def enriched(api: ApiClient, pattern_id: str, timeout_s: float = ENRICH_TIMEOUT_S) -> Pattern:
+    """Poll until the pattern is enriched and return it; a failed enrichment ends the wait and the test."""
+
+    def fetch() -> Pattern:
+        response = api.get(pattern_id)
+        assert response.status == 200, f"GET pattern {pattern_id}: status {response.status}\nbody: {response.text}"
+        return response.pattern()
+
+    pattern = until(
+        fetch,
+        f"pattern {pattern_id} to be enriched",
+        timeout_s,
+        done=lambda p: p.enrichment_status in ("enriched", "failed"),
+    )
+    assert pattern.enrichment_status == "enriched", (
+        f"pattern {pattern_id} enrichment failed: {pattern.enrichment_error}"
+    )
+    return pattern

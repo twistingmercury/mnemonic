@@ -81,6 +81,12 @@ class McpClient:
         """Call a tool in its own SDK session and return its text and error flag."""
         return asyncio.run(self._call_tool(name, args))
 
+    def call_ok(self, name: str, args: dict[str, Any]) -> str:
+        """Call a tool that must succeed and return its text."""
+        result = self.call_tool(name, args)
+        assert not result.is_error, f"MCP {name}({args}) returned an error: {result.text}"
+        return result.text
+
     async def _call_tool(self, name: str, args: dict[str, Any]) -> ToolResult:
         # The SDK's anyio task groups wrap anything that leaves `async with Client` in an
         # ExceptionGroup, so a JSON-RPC error is caught inside the block, and a group that

@@ -1,8 +1,10 @@
 import re
 
+import httpx
 import pytest
 
-from mnemonic_e2e.wait import unique_name, until
+from mnemonic_e2e.api import ApiClient
+from mnemonic_e2e.wait import enriched, unique_name, until
 
 
 def test_until_returns_the_first_truthy_value() -> None:
@@ -48,3 +50,24 @@ def test_until_accepts_a_custom_done_predicate_and_reports_the_observed_state() 
 
     with pytest.raises(TimeoutError, match="last observed: 'pending'"):
         until(lambda: "pending", "enrichment", 0.1, 0.02, done=lambda s: s == "enriched")
+
+
+def api_answering(*statuses: str) -> ApiClient:
+    answers = iter(statuses)
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        body = {"id": "abc", "name": "n", "enrichment_status": next(answers), "enrichment_error": "boom"}
+        return httpx.Response(200, json=body)
+
+    return ApiClient("http://api.test:8080", transport=httpx.MockTransport(handle))
+
+
+def test_enriched_polls_until_the_pattern_is_enriched() -> None:
+    pattern = enriched(api_answering("pending", "enriched"), "abc")
+
+    assert pattern.enrichment_status == "enriched"
+
+
+def test_enriched_fails_with_the_enrichment_error_when_the_pattern_failed() -> None:
+    with pytest.raises(AssertionError, match="boom"):
+        enriched(api_answering("pending", "failed"), "abc")

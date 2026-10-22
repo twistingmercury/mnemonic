@@ -180,3 +180,18 @@ def test_json_rpc_message_rejects_an_sse_body_without_data() -> None:
 
     with pytest.raises(ValueError, match="no data line"):
         json_rpc_message(response)
+
+
+def test_call_ok_returns_the_text_of_a_successful_call(fake_sdk: type[FakeSdkClient]) -> None:
+    fake_sdk.outcome = types.CallToolResult(content=[types.TextContent(type="text", text="fine")], is_error=False)
+
+    assert McpClient("http://mcp.test:8081").call_ok("get_pattern", {}) == "fine"
+
+
+def test_call_ok_fails_with_the_error_text_of_a_failed_call(fake_sdk: type[FakeSdkClient]) -> None:
+    fake_sdk.outcome = types.CallToolResult(
+        content=[types.TextContent(type="text", text="no such pattern")], is_error=True
+    )
+
+    with pytest.raises(AssertionError, match="no such pattern"):
+        McpClient("http://mcp.test:8081").call_ok("get_pattern", {})

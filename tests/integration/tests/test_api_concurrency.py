@@ -20,8 +20,6 @@ from mnemonic_e2e.api import ApiClient, ApiResponse, pattern_payload
 from mnemonic_e2e.db import Graph
 from mnemonic_e2e.tokens import TokenPool
 
-ENRICH_TIMEOUT_S = 30.0
-
 # The create_with fixture (conftest.py): payload overrides -> the create response.
 CreateWith = Callable[..., ApiResponse]
 
@@ -47,17 +45,6 @@ def concurrently[T](calls: list[Callable[[], T]]) -> list[T]:
 
     with ThreadPoolExecutor(len(calls)) as pool:
         return list(pool.map(run, calls))
-
-
-def wait_enriched(api: ApiClient, pattern_id: str) -> None:
-    """Poll until the pattern is enriched; a failed enrichment ends the wait and the test."""
-    pattern = wait.until(
-        lambda: api.get(pattern_id).pattern(),
-        f"pattern {pattern_id} to be enriched",
-        ENRICH_TIMEOUT_S,
-        done=lambda p: p.enrichment_status in ("enriched", "failed"),
-    )
-    assert pattern.enrichment_status == "enriched", f"pattern {pattern_id} failed: {pattern.enrichment_error}"
 
 
 def test_concurrent_creates_all_succeed(create_with: CreateWith) -> None:
@@ -100,7 +87,7 @@ def test_concurrent_related_patterns_get_one_edge_per_pair(
     content = related_content(tokens.new())
     ids = [r.pattern().id for r in concurrently([partial(create_with, content)] * 5)]
     for pattern_id in ids:
-        wait_enriched(api, pattern_id)
+        wait.enriched(api, pattern_id)
 
     # related_pattern_ids matches RELATED_TO in either direction: one entry per edge.
     edges = {pattern_id: Counter(graph.related_pattern_ids(pattern_id)) for pattern_id in ids}

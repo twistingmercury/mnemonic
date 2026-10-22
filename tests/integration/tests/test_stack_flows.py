@@ -15,7 +15,6 @@ from mnemonic_e2e.mcp import McpClient
 from mnemonic_e2e.stub import StubClient
 from mnemonic_e2e.tokens import TokenPool
 
-ENRICH_TIMEOUT_S = 30.0
 # The enricher's retry sweep runs every 15s: one full interval plus enrichment.
 RETRY_WINDOW_S = 45.0
 # The stub scores a one-word query against a whole chunk at about 0.17; unrelated text scores 0.
@@ -48,20 +47,6 @@ def tokens() -> TokenPool:
     return TokenPool(shared)
 
 
-def wait_enriched(api: ApiClient, pattern_id: str) -> Pattern:
-    """Poll until the pattern is enriched; a failed enrichment ends the wait and the test."""
-    pattern = wait.until(
-        lambda: _fetch(api, pattern_id),
-        f"pattern {pattern_id} to be enriched",
-        ENRICH_TIMEOUT_S,
-        done=lambda p: p.enrichment_status in ("enriched", "failed"),
-    )
-    assert pattern.enrichment_status == "enriched", (
-        f"pattern {pattern_id} enrichment failed: {pattern.enrichment_error}"
-    )
-    return pattern
-
-
 def _fetch(api: ApiClient, pattern_id: str) -> Pattern:
     response = api.get(pattern_id)
     assert response.status == 200, f"GET pattern {pattern_id}: status {response.status}\nbody: {response.text}"
@@ -74,14 +59,8 @@ def api_search(api: ApiClient, query: str) -> list[str]:
     return response.pattern_ids()
 
 
-def mcp_ok(mcp: McpClient, name: str, args: dict[str, object]) -> str:
-    result = mcp.call_tool(name, args)
-    assert not result.is_error, f"MCP {name}({args}) returned an error: {result.text}"
-    return result.text
-
-
 def mcp_search(mcp: McpClient, query: str) -> str:
-    return mcp_ok(mcp, "search_patterns", {"query": query, "threshold": SEARCH_THRESHOLD})
+    return mcp.call_ok("search_patterns", {"query": query, "threshold": SEARCH_THRESHOLD})
 
 
 @pytest.mark.parametrize(
@@ -118,7 +97,7 @@ def test_pattern_flows_from_api_to_mcp(
     p = create_pattern(f"integ-{tok}", pattern_content("", *concepts))
     assert p.enrichment_status == "pending"
 
-    enriched = wait_enriched(api, p.id)
+    enriched = wait.enriched(api, p.id)
     assert enriched.enriched_at, "enriched_at is empty after enrichment"
 
     chunks = api.chunks(p.id)
@@ -128,7 +107,7 @@ def test_pattern_flows_from_api_to_mcp(
     assert p.id in api_search(api, tok)
     assert p.name in mcp_search(mcp, tok)
 
-    text = mcp_ok(mcp, "get_pattern", {"id": p.id})
+    text = mcp.call_ok("get_pattern", {"id": p.id})
     for want in [p.name, "**Enrichment:** enriched", "### Extracted Concepts", *concepts]:
         assert want in text, f"MCP get_pattern is missing {want!r}:\n{text}"
 
@@ -138,11 +117,11 @@ def test_update_reenriches_pattern(
 ) -> None:
     old_word, new_word = tokens.new(), tokens.new()
     p = create_pattern(f"integ-{tokens.new()}", pattern_content(old_word))
-    wait_enriched(api, p.id)
+    wait.enriched(api, p.id)
 
     updated = api.update(p.id, pattern_payload(p.name, pattern_content(new_word)))
     assert updated.status == 204, f"update: status {updated.status}\nbody: {updated.text}"
-    wait_enriched(api, p.id)
+    wait.enriched(api, p.id)
 
     assert p.id in api_search(api, new_word)
     assert p.id not in api_search(api, old_word)
@@ -158,13 +137,13 @@ def test_related_patterns_and_delete(
 
     # Enriched one after the other: the enricher links a pattern to those already in the graph when it syncs.
     a = create_pattern(f"integ-a-{tok}", pattern_content("", *shared))
-    wait_enriched(api, a.id)
+    wait.enriched(api, a.id)
     b = create_pattern(f"integ-b-{tok}", pattern_content("", *shared))
     unrelated = create_pattern(f"integ-c-{tok}", pattern_content("", f"{tok}-unrelated"))
-    wait_enriched(api, b.id)
-    wait_enriched(api, unrelated.id)
+    wait.enriched(api, b.id)
+    wait.enriched(api, unrelated.id)
 
-    text = mcp_ok(mcp, "find_related_patterns", {"pattern_id": a.id})
+    text = mcp.call_ok("find_related_patterns", {"pattern_id": a.id})
     assert b.name in text
     assert unrelated.name not in text, f"find_related_patterns(a) lists a pattern with no shared concepts:\n{text}"
     for concept in shared:
@@ -177,7 +156,7 @@ def test_related_patterns_and_delete(
     gone = mcp.call_tool("get_pattern", {"id": a.id})
     assert gone.is_error, f"MCP get_pattern still returns the deleted pattern:\n{gone.text}"
     assert a.name not in mcp_search(mcp, tok)
-    assert a.name not in mcp_ok(mcp, "find_related_patterns", {"pattern_id": b.id})
+    assert a.name not in mcp.call_ok("find_related_patterns", {"pattern_id": b.id})
 
 
 def test_enricher_retries_failed_job(
