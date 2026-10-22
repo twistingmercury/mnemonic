@@ -1,7 +1,7 @@
 ---
-version: 2
+version: 3
 date: 2026-10-21
-notes: "CI described as not written yet; db/docker-compose.yaml path corrected. License footer corrected."
+notes: "CI described as implemented; db/docker-compose.yaml path corrected. License footer corrected."
 ---
 
 # Database Images — Architecture Overview
@@ -35,7 +35,7 @@ graph LR
         NEO_CYP --> NEO_BUILD
     end
 
-    subgraph GHCR["Image tags (pushed to GHCR by CI, not written yet)"]
+    subgraph GHCR["Image tags (pushed to GHCR by CI)"]
         PG_IMG["mnemonic-postgres:v1.0.0-dev"]
         NEO_IMG["mnemonic-neo4j:v1.0.0-dev"]
         PG_BUILD --> PG_IMG
@@ -57,30 +57,30 @@ graph LR
 
 ## System Model
 
-| Component                | Description                                                                   |
-| ------------------------ | ----------------------------------------------------------------------------- |
-| `db/postgres/`           | SQL schema files (`*.up.sql`) and Dockerfile for the Postgres image           |
-| `db/neo4j/`              | Cypher schema files and Dockerfile/build script for the Neo4j image           |
-| `db/tests/`              | BATS test suites and test runner scripts that verify schema correctness       |
-| `db/docker-compose.yaml` | Local test infrastructure (isolated ports, not used by application services)  |
-| CI workflow              | Not written yet; see [Deployment Architecture](05-deployment-architecture.md) |
+| Component                | Description                                                                               |
+| ------------------------ | ----------------------------------------------------------------------------------------- |
+| `db/postgres/`           | SQL schema files (`*.up.sql`) and Dockerfile for the Postgres image                       |
+| `db/neo4j/`              | Cypher schema files and Dockerfile/build script for the Neo4j image                       |
+| `db/tests/`              | BATS test suites and test runner scripts that verify schema correctness                   |
+| `db/docker-compose.yaml` | Local test infrastructure (isolated ports, not used by application services)              |
+| CI workflow              | `.github/workflows/ci.yaml`; see [Deployment Architecture](05-deployment-architecture.md) |
 
 ## Key Principles
 
 1. **Schema owns its own lifecycle** — changes to the database schema ship as new image tags, reviewed and tested independently of application code.
 2. **Self-initializing images** — containers apply the schema when they start (Postgres on first start with an empty data directory, Neo4j on every start) with no external tooling required at runtime.
 3. **No runtime migration tooling** — application services do not run migrations at startup; they pull images that are already initialized.
-4. **Tested before shipped** — BATS tests verify the schema state after initialization runs; image publishing is meant to be gated on those tests once the CI workflows exist.
+4. **Tested before shipped** — BATS tests verify the schema state after initialization runs; CI publishes the images only after those tests pass.
 5. **Community Edition only** — both images target freely available database editions (pgvector community, Neo4j Community Edition) to avoid licensing constraints.
 
 ## Document Navigation
 
-| #   | Document                                                 | Description                           | Status  |
-| --- | -------------------------------------------------------- | ------------------------------------- | ------- |
-| 00  | [Overview](00-overview.md)                               | This document                         | Current |
-| 02  | [Architectural Decisions](02-architectural-decisions.md) | ADR log                               | Current |
-| 05  | [Deployment Architecture](05-deployment-architecture.md) | Image build; CI/CD (not written yet)  | Current |
-| 08  | [Data Architecture](08-data-architecture.md)             | PostgreSQL and Neo4j schema reference | Current |
+| #  | Document                                                 | Description                           | Status  |
+| -- | -------------------------------------------------------- | ------------------------------------- | ------- |
+| 00 | [Overview](00-overview.md)                               | This document                         | Current |
+| 02 | [Architectural Decisions](02-architectural-decisions.md) | ADR log                               | Current |
+| 05 | [Deployment Architecture](05-deployment-architecture.md) | Image build; CI/CD                    | Current |
+| 08 | [Data Architecture](08-data-architecture.md)             | PostgreSQL and Neo4j schema reference | Current |
 
 **Next:** [Architectural Decisions](02-architectural-decisions.md)
 

@@ -34,13 +34,13 @@ Both images are self-initializing — the schema is applied by the container its
 
 **Neo4j image** (`ghcr.io/twistingmercury/mnemonic-neo4j`): built `FROM neo4j:5` with APOC enabled. The Cypher constraint and index files ship inside the image, and a wrapper entrypoint applies them with `cypher-shell` every time the container starts, then writes `/tmp/schema_ready`. The schema cannot be baked into the image because `/data` is a Docker VOLUME. Health checks should test for `/tmp/schema_ready` (the image's built-in `HEALTHCHECK` does).
 
-**CI**: the workflows are not written yet. When they exist, they are meant to run the BATS suites for both databases on any change under `db/postgres/` or `db/neo4j/`, then build and push both images to GHCR. Nothing is pushed from a local build.
+**CI**: on a change under `db/`, the `db` job runs the BATS suites for both databases and builds both images. A push to `develop` then publishes each image as `latest-dev` and `sha-<short>` (the first 7 characters of the commit SHA). On `main` (dormant until the branch exists) it would publish `latest` and `v<version>` from `build/version.sh db`. Nothing is pushed from a local build. See [Continuous integration](../README.md#continuous-integration).
 
 ## Key Considerations
 
 - `002_create_existence_constraints.cypher` is skipped at startup on Community Edition — existence constraints require Neo4j Enterprise Edition
 - `.down.sql` files are not included; rollback is handled by rebuilding from a prior image tag
-- The build scripts tag each image with the version and `latest`; CI publishes `latest-dev` and `sha-<short>` from `develop` (see the [root README](../README.md#continuous-integration))
+- The build scripts tag each image with the version and `latest`; the CI tags are described under **CI** above
 
 ## Development Considerations
 

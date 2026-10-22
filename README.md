@@ -47,7 +47,7 @@ One workflow, `.github/workflows/ci.yaml`, runs on pull requests to `develop` an
 
 | Job | What it runs |
 | --- | --- |
-| `detect` | `build/detect-components.sh` works out which components the change affects |
+| `detect` | `build/detect-components.sh` works out which components the change affects; a manual run's `component` input overrides it |
 | `static` | `build/static-checks.sh`: shellcheck, hadolint, markdownlint, `helm lint --strict`, the BATS tests for the build tooling and the e2e boundary check. Always runs |
 | `service` | One matrix entry per affected service: `build/<svc>/<svc>.build.sh` |
 | `db` | The PostgreSQL and Neo4j test runners, then both image builds. Runs when `db/` changed |
@@ -58,7 +58,7 @@ One workflow, `.github/workflows/ci.yaml`, runs on pull requests to `develop` an
 
 A service counts as affected when its own code changed or a Go package it imports did. A change to `src/go.mod`, `src/go.sum`, `build/`, `.github/`, `tests/integration/` or `tests/openai-stub/` affects all three services.
 
-Pull requests and manual runs build and test but never push. Only the `publish` job has `packages: write`; it uses `GITHUB_TOKEN`, and runs only when every job passed or was skipped and an image was built. It pushes the same image the build job tested, passed along as a workflow artifact that is kept for 1 day. Re-running only the `publish` job after more than a day fails because the artifact is gone; re-run the whole workflow instead.
+A newer run on the same pull request cancels the older one; each push gets its own concurrency group, so no pushed commit is dropped. Pull requests and manual runs build and test but never push. Only the `publish` job has `packages: write`; it uses `GITHUB_TOKEN`, and runs only when every job passed or was skipped and an image was built. It pushes the same image the build job tested, passed along as a workflow artifact that is kept for 1 day. Re-running only the `publish` job after more than a day fails because the artifact is gone; re-run the whole workflow instead.
 
 | Branch | Tags pushed per affected image |
 | --- | --- |
@@ -71,7 +71,7 @@ To run a component by hand, start the workflow from the Actions tab and pick the
 
 To run the same checks locally:
 
-- `build/static-checks.sh` runs the static checks. It needs Docker Engine 28 or newer, because it uses `--mount type=image`.
+- `build/static-checks.sh` runs the static checks. It needs git and Docker Engine 28 or newer, because it uses `--mount type=image`.
 - `build/<svc>/<svc>.build.sh` builds a service image and runs its e2e tests. It never pushes.
 - `build/changed-components.sh <base-sha> <head-sha>` prints the components a change affects.
 

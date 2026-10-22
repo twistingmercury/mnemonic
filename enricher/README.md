@@ -116,7 +116,7 @@ make tests-unit
 ```
 
 From the repository root, run the Docker-first build and end-to-end pipeline
-(CI will run the same script; the workflows are not written yet):
+(CI runs the same script; see [Continuous integration](../README.md#continuous-integration)):
 
 ```bash
 make build-enricher

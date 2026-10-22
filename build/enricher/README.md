@@ -32,7 +32,7 @@ these stages in order:
    [README](../../tests/integration/README.md)) with the enricher taken from the
    newly built image and never pulled.
 
-The script never pushes an image; the CI workflows, once written, will. The stack needs Docker to pull the
+The script never pushes an image; the CI `publish` job pushes. The stack needs Docker to pull the
 pre-migrated PostgreSQL and Neo4j images, RabbitMQ
 (`rabbitmq:3-management-alpine`) and the `latest-dev` api and mcp images from
 GHCR, unless you set `MNEMONIC_API_IMAGE`, `MNEMONIC_MCP_IMAGE` or the matching
@@ -72,9 +72,9 @@ investigating runtime issues.
 
 ## CI publication
 
-The CI workflows are not written yet, so nothing is published from this
-repository today. The build script is the gate they will run: publication
-should happen only after the image build gates and end-to-end tests pass.
+The CI workflow runs the build script as the gate, and its `publish` job
+pushes the tested image only after the image build gates and end-to-end tests
+pass. See [Continuous integration](../../README.md#continuous-integration).
 Registry publication is distinct from deployment; this repository does not
 define a production rollout.
 

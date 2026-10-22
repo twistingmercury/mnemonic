@@ -1,7 +1,7 @@
 ---
-version: 3
+version: 4
 date: 2026-10-22
-notes: "Enricher graph write described as two transactions, as in SyncPattern."
+notes: "CI gating described as implemented; enricher graph write described as two transactions, as in SyncPattern."
 ---
 
 # Database Images — Data Architecture
@@ -237,7 +237,7 @@ flowchart LR
 - **Postgres:** SQL files named `000001_description.up.sql` … `000010_description.up.sql`, copied into the image and executed in order by `docker-entrypoint-initdb.d` on first container start.
 - **Neo4j:** Cypher files named `001_description.cypher` … `003_description.cypher`, applied via `cypher-shell` by the image's wrapper entrypoint at every container start (002 is skipped unless the edition is Enterprise).
 - **Rollback:** Pull a prior image tag. No down migration files are maintained.
-- **Testing:** BATS test suites in `db/tests/bats/` verify schema state after initialization. Gating image pushes on these tests is the job of the CI workflows, which are not written yet.
+- **Testing:** BATS test suites in `db/tests/bats/` verify schema state after initialization. The CI `db` job runs them, and the `publish` job runs only if they pass.
 - **Adding migrations:** Add new SQL/Cypher files with the next sequence number, add corresponding BATS assertions, open a PR.
 
 ---

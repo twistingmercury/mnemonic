@@ -84,9 +84,9 @@ Each successful script run produces both:
 - `${MNEMONIC_IMAGE_NAME}:latest`
 
 The script never pushes images. Local builds stop after image creation and E2E
-validation. The CI workflows are not written yet; they are meant to invoke
-`build/mcp/mcp.build.sh` directly, authenticate to GHCR after validation, and
-push the tags.
+validation. The CI workflow runs `build/mcp/mcp.build.sh` directly and its
+`publish` job pushes the tested image; see
+[Continuous integration](../../README.md#continuous-integration).
 
 The script removes only its own `mnemonic-e2e-mcp-<pid>` compose project
 (containers, networks, volumes, orphans and compose-built images without a custom

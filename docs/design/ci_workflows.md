@@ -1,7 +1,7 @@
 ---
 version: 6
 date: 2026-10-22
-notes: Records what was built. The static and detect jobs delegate to build/static-checks.sh and build/detect-components.sh, a changed .github/ marks all three services affected, the postgres image no longer bakes in POSTGRES_PASSWORD, and the db build scripts use build/version.sh db and --no-cache --pull.
+notes: Records what was built. Pushes no longer queue; each push runs on its own concurrency group so no commit is dropped. Workflow steps run scripts and tools directly, never the Makefile, which is a local convenience; every tool runs from a pinned Docker image, nothing is installed on the runner. The static and detect jobs delegate to build/static-checks.sh and build/detect-components.sh, a changed .github/ marks all three services affected, the postgres image no longer bakes in POSTGRES_PASSWORD, and the db build scripts use build/version.sh db and --no-cache --pull.
 ---
 
 # CI Workflows
@@ -100,7 +100,7 @@ A new script, `build/changed-components.sh`, prints the components to build for 
 
 Always run, on every trigger, without path filtering (they are cheap):
 
-`build/static-checks.sh` runs all of these in order and stops at the first failure; the `static` job and a local run are the same command (a local run needs Docker Engine 28 or newer, for `--mount type=image`):
+`build/static-checks.sh` runs all of these in order and stops at the first failure; the `static` job and a local run are the same command (a local run needs git and Docker Engine 28 or newer, for `--mount type=image`):
 
 - Static checks: shellcheck, hadolint, markdownlint and `helm lint --strict`, each run directly.
 - Build tooling tests: BATS, run from pinned images, with a pinned `jq` image mounted in because the Go image lacks it.
