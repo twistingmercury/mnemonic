@@ -18,6 +18,20 @@ def test_fail_posts_match_and_count() -> None:
     assert dict(seen[0].url.params) == {"match": "tokabc", "n": "2"}
 
 
+def test_delay_posts_match_and_milliseconds() -> None:
+    seen: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(204)
+
+    StubClient("http://stub.test:8090", transport=httpx.MockTransport(handle)).delay("tokabc", 5000)
+
+    assert seen[0].method == "POST"
+    assert seen[0].url.path == "/control/delay"
+    assert dict(seen[0].url.params) == {"match": "tokabc", "ms": "5000"}
+
+
 def test_reset_posts_to_control_reset() -> None:
     seen: list[httpx.Request] = []
 

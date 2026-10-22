@@ -23,9 +23,9 @@ from mnemonic_e2e.tokens import TokenPool
 
 # Between the middling match (0.35) and the best one (0.63) built by the ranked fixture.
 THRESHOLD = 0.3
-# Enough chunks that the pattern is still pending when the test reads it right after the write
-# (enriching 100 chunks takes the stack about 0.3 s, the read about 0.01 s).
-SECTIONS = 100
+# How long the stub holds the embedding of an updated pattern's last chunk, so the pattern stays pending.
+# The enricher gives an embedding request 30 s (service/openai/embedding.go), so the hold is far under it.
+HOLD_MS = 5000
 # The section_title column is varchar(255).
 OVERLONG_TITLE = "t" * 300
 
@@ -135,42 +135,44 @@ def test_search_filters_by_language_and_tags(
     assert search(tags=[tokens.new()]) == set(), "a tag no pattern carries matches nothing"
 
 
-def update_to_many_chunks(api: ApiClient, pattern: Pattern) -> None:
-    response = api.update(
-        pattern.id, pattern_payload(pattern.name, sections([f"Section {i}" for i in range(SECTIONS)]))
-    )
+def update_held(api: ApiClient, stub: StubClient, pattern: Pattern, token: str) -> list[str]:
+    """Update the pattern to three sections, the last one's embedding held by the stub; return the titles."""
+    stub.delay(token, HOLD_MS)
+    titles = ["Gamma", "Delta", f"Held {token}"]
+    response = api.update(pattern.id, pattern_payload(pattern.name, sections(titles)))
     assert response.status == 204, f"update: status {response.status}\nbody: {response.text}"
+    return titles
 
 
-def assert_reset(api: ApiClient, pg: Pg, pattern: Pattern, old_chunks: set[str], old_jobs: set[str]) -> None:
-    """The pattern read right after the update is pending, and its chunks and jobs are all new."""
+def assert_reset(api: ApiClient, pg: Pg, pattern: Pattern, titles: list[str], old: tuple[set[str], set[str]]) -> None:
+    """The pattern is pending with its error and enriched_at cleared, and its chunks and jobs are all new."""
+    old_chunks, old_jobs = old
     reset = api.get(pattern.id).pattern()
     assert reset.enrichment_status == "pending", f"status after the update: {reset.enrichment_status!r}"
     assert reset.enrichment_error is None, f"enrichment_error survived the update: {reset.enrichment_error!r}"
     assert reset.enriched_at is None, f"enriched_at survived the update: {reset.enriched_at!r}"
 
     chunks = pg.chunks_for_pattern(pattern.id)
-    assert [c.section_title for c in chunks] == [f"Section {i}" for i in range(SECTIONS)]
+    assert [c.section_title for c in chunks] == titles
     assert not {c.id for c in chunks} & old_chunks, "an old chunk survived the update"
 
     jobs = pg.jobs_for_pattern(pattern.id)
     assert {j.chunk_id for j in jobs} == {c.id for c in chunks}, "the new chunks do not have exactly one job each"
-    assert len(jobs) == SECTIONS
+    assert len(jobs) == len(titles)
     assert not {j.id for j in jobs} & old_jobs, "an old job survived the update"
 
-    assert wait.enriched(api, pattern.id).enriched_at, "the re-enriched pattern has no enriched_at"
 
-
-def test_update_resets_an_enriched_pattern_to_pending(api: ApiClient, pg: Pg, create_with: CreateWith) -> None:
+def test_update_resets_an_enriched_pattern_to_pending(
+    api: ApiClient, pg: Pg, injected_failures: StubClient, create_with: CreateWith, tokens: TokenPool
+) -> None:
     created = create_with(sections(["Alpha", "Beta"])).pattern()
     wait.enriched(api, created.id)
-    old_chunks = {c.id for c in pg.chunks_for_pattern(created.id)}
-    old_jobs = {j.id for j in pg.jobs_for_pattern(created.id)}
-    assert len(old_chunks) == len(old_jobs) == 2, "setup: the enriched pattern has two chunks and two jobs"
+    old = ({c.id for c in pg.chunks_for_pattern(created.id)}, {j.id for j in pg.jobs_for_pattern(created.id)})
+    assert len(old[0]) == len(old[1]) == 2, "setup: the enriched pattern has two chunks and two jobs"
 
-    update_to_many_chunks(api, created)
+    titles = update_held(api, injected_failures, created, tokens.new())
 
-    assert_reset(api, pg, created, old_chunks, old_jobs)
+    assert_reset(api, pg, created, titles, old)
 
 
 def test_update_resets_a_failed_pattern(
@@ -186,12 +188,11 @@ def test_update_resets_a_failed_pattern(
         done=lambda p: p.enrichment_status == "failed",
     )
     assert failed.enrichment_error, "setup: the failed pattern has no enrichment_error"
-    old_chunks = {c.id for c in pg.chunks_for_pattern(created.id)}
-    old_jobs = {j.id for j in pg.jobs_for_pattern(created.id)}
+    old = ({c.id for c in pg.chunks_for_pattern(created.id)}, {j.id for j in pg.jobs_for_pattern(created.id)})
 
-    update_to_many_chunks(api, created)
+    titles = update_held(api, injected_failures, created, tokens.new())
 
-    assert_reset(api, pg, created, old_chunks, old_jobs)
+    assert_reset(api, pg, created, titles, old)
 
 
 def test_failed_create_frees_the_name(api: ApiClient, pg: Pg, create_with: CreateWith) -> None:

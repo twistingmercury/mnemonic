@@ -18,6 +18,10 @@ class StubClient:
         """Make the next n embedding requests whose input contains match fail with 500."""
         self._post("/control/fail", match=match, n=str(n))
 
+    def delay(self, match: str, ms: int) -> None:
+        """Make every embedding request whose input contains match wait ms milliseconds before it is answered."""
+        self._post("/control/delay", match=match, ms=str(ms))
+
     def remaining(self, match: str) -> int:
         """How many injected failures for match have not been served yet."""
         response = send(self._client, "GET", self._base_url + "/control/fail", params={"match": match})
@@ -25,7 +29,7 @@ class StubClient:
         return int(response.json()["remaining"])
 
     def reset(self) -> None:
-        """Clear every injected failure."""
+        """Clear every injected failure and delay."""
         self._post("/control/reset")
 
     def healthy(self) -> bool:

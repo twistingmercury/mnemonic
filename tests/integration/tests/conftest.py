@@ -77,7 +77,7 @@ def create_pattern(api: ApiClient) -> Iterator[CreatePattern]:
 
 @pytest.fixture
 def injected_failures(stub: StubClient) -> Iterator[StubClient]:
-    """The stub, with every injected failure cleared when the test ends so none leaks into another test."""
+    """The stub, with every injected failure and delay cleared when the test ends so none leaks into another test."""
     yield stub
     stub.reset()
 
