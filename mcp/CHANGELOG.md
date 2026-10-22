@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- 2026-10-22: The Go integration tests (build tag `integration`) and the `make tests-integration` target; the end-to-end suite in `tests/integration` covers the behavior a client can observe. Scenarios no client can create are no longer tested.
+- 2026-10-22: The Go integration tests (build tag `integration`); the end-to-end suite in `tests/integration` covers the behavior a client can observe. Scenarios no client can create are no longer tested.
 
 ## [0.6.0] - 2026-10-16
 
