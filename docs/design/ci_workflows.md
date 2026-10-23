@@ -1,7 +1,7 @@
 ---
-version: 7
+version: 8
 date: 2026-10-23
-notes: Change detection ignores *.md, *.build.sh and db/tests/ paths, so a change confined to them builds nothing. The db build scripts must be committed executable. The first GitHub runs confirmed the image mount, the jq mount, the artifact download and the GHCR push.
+notes: Names the files the images copy that mark services (src/.golangci.yml, .dockerignore, LICENSE), records the missing-base-SHA failure, narrows the db job's trigger to exclude db/tests/, and states that ci-gate is not yet a required check on develop.
 ---
 
 # CI Workflows
@@ -91,12 +91,13 @@ Proposed by the author and accepted as a starting point ("if it needs changing l
 A new script, `build/changed-components.sh`, prints the components to build for a given base and head commit.
 
 - A service (`api`, `mcp`, `enricher`) is affected when a file under its own directories changed, or when `go list -deps` for its `cmd/<service>` package includes a package whose directory changed.
-- Changes to the shared Go module files (`go.mod`, `go.sum`), to `build/` or to `.github/` mark all three services affected.
+- Changes to the shared Go module files (`go.mod`, `go.sum`), to `src/.golangci.yml`, to the root `.dockerignore`, to `build/` or to `.github/` mark all three services affected. A change to `LICENSE` marks `api`, the only image that copies it.
 - Changes under `db/`, `gateway/`, `deploy/helm/` and `tests/` map to their own jobs below. A change under `tests/integration/` or `tests/openai-stub/` also marks all three services affected, because those tests run in every service's e2e step.
 - On a manual run, the input overrides detection. `build/detect-components.sh` wraps this script for the workflow: it applies the override and prints the `components` and `services` JSON arrays for `$GITHUB_OUTPUT`.
 - The script has BATS tests, like the other build tooling.
 - Before any rule runs, the script drops paths ending in `.md` or `.build.sh` and paths under `db/tests/`. A change confined to those builds nothing, and a doc or db-test file inside a service's package directory no longer marks the services that import that package. Dockerfiles, Go source, `build-lib.sh`, `version.sh`, `.github/` and the `db/*/build.sh` scripts still trigger rebuilds.
 - The static checks still run on every trigger, so docs and Dockerfiles stay linted even when nothing is built.
+- When the base commit is missing from the clone (for example after a force-push), `git diff` fails, so `detect` fails and the run is red until another push. A manual run recovers the checks but never publishes.
 
 `db/postgres/build.sh` and `db/neo4j/build.sh` must be committed executable, because the db job runs them directly; at mode `100644` the first pull request run failed with exit code 126.
 
@@ -115,7 +116,7 @@ Always run, on every trigger, without path filtering (they are cheap):
 Run when their inputs changed:
 
 - One job per affected service: run `build/<n>/<n>.build.sh`. It builds the image from scratch, runs the quality gates and the full e2e suite inside containers.
-- `db/`: the two database test runners (`db/tests/postgres-test-runner.sh`, `db/tests/neo4j-test-runner.sh`) and build of the two database images.
+- `db/` (anything other than `db/tests/`): the two database test runners (`db/tests/postgres-test-runner.sh`, `db/tests/neo4j-test-runner.sh`) and build of the two database images.
 - `gateway/`: the OPA policy checks, the Envoy config validations and the stub-gateway e2e run.
 - `deploy/helm`: lint and template only.
 
@@ -165,7 +166,7 @@ The repo becomes public after everything works. The design is safe for fork PRs 
 
 ## The required check
 
-A job that is skipped by a path filter reports no status, so a required check could hang forever. A final job, `ci-gate`, always runs after all other jobs and passes only if every job that ran succeeded; a skipped job does not count as a failure. It is the only check marked required in branch protection.
+A job that is skipped by a path filter reports no status, so a required check could hang forever. A final job, `ci-gate`, always runs after all other jobs and passes only if every job that ran succeeded; a skipped job does not count as a failure. It is meant to be the only check marked required in branch protection. Branch protection on `develop` does not require it yet (the owner chose to leave protection unchanged), so the goal that a failing run blocks merging is not enforced.
 
 - No job uses `continue-on-error`.
 - "No exceptions" for administrators is a repository setting ("include administrators" in branch protection) that the owner turns on; a workflow cannot enforce it.

@@ -50,13 +50,13 @@ One workflow, `.github/workflows/ci.yaml`, runs on pull requests to `develop` an
 | `detect` | `build/detect-components.sh` works out which components the change affects; a manual run's `component` input overrides it |
 | `static` | `build/static-checks.sh`: shellcheck, hadolint, markdownlint, `helm lint --strict`, the BATS tests for the build tooling and the e2e boundary check. Always runs |
 | `service` | One matrix entry per affected service: `build/<svc>/<svc>.build.sh` |
-| `db` | The PostgreSQL and Neo4j test runners, then both image builds. Runs when `db/` changed |
+| `db` | The PostgreSQL and Neo4j test runners, then both image builds. Runs when `db/` changed, except `db/tests/` |
 | `gateway` | The OPA policy checks, the Envoy config validation and the stub-gateway e2e tests. Runs when `gateway/` changed |
 | `helm` | `helm lint --strict` and `helm template` on the chart. Runs when `deploy/helm/` changed |
-| `ci-gate` | Fails if any job above failed or was cancelled; skipped jobs are fine. This is the single required check |
+| `ci-gate` | Fails if any job above failed or was cancelled; skipped jobs are fine. It is meant to be the single required check, but branch protection on `develop` does not require it yet |
 | `publish` | Pushes the tested images to GHCR (push to `develop` or `main` only) |
 
-A service counts as affected when its own code changed or a Go package it imports did. A change to `src/go.mod`, `src/go.sum`, `build/`, `.github/`, `tests/integration/` or `tests/openai-stub/` affects all three services. Change detection ignores `*.md` files, `*.build.sh` files and anything under `db/tests/`, so a change confined to them builds nothing; the static checks still run. Dockerfiles and source changes still rebuild.
+A service counts as affected when its own code changed or a Go package it imports did. A change to `src/go.mod`, `src/go.sum`, `src/.golangci.yml`, `.dockerignore`, `build/`, `.github/`, `tests/integration/` or `tests/openai-stub/` affects all three services, and a change to `LICENSE` affects api. Change detection ignores `*.md` files, `*.build.sh` files and anything under `db/tests/`, so a change confined to them builds nothing; the static checks still run. Dockerfiles and source changes still rebuild.
 
 A newer run on the same pull request cancels the older one; each push gets its own concurrency group, so no pushed commit is dropped. Pull requests and manual runs build and test but never push. Only the `publish` job has `packages: write`; it uses `GITHUB_TOKEN`, and runs only when every job passed or was skipped and an image was built. It pushes the same image the build job tested, passed along as a workflow artifact that is kept for 1 day. Re-running only the `publish` job after more than a day fails because the artifact is gone; re-run the whole workflow instead.
 
