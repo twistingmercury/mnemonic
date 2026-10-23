@@ -1,6 +1,6 @@
 # Mnemonic
 
-> **Maturity Level**: Emerging - the services work end to end, but the repository is still being consolidated into a monorepo and expects breaking changes.
+> **Maturity Level**: Emerging - the services work end to end, but the repository is still being consolidated into a monorepo and expects breaking changes.  
 > **Version**: versioned per component (see [Versioning](#versioning))
 
 Mnemonic is a shared knowledge base for a team that uses Claude Code. The team curates patterns (conventions, decisions, how things are done here), and Claude Code retrieves them over MCP when it needs context. It runs as a small set of services behind an authenticating gateway.
