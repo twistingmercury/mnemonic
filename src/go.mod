@@ -9,10 +9,10 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
-	github.com/neo4j/neo4j-go-driver/v5 v5.28.5
+	github.com/neo4j/neo4j-go-driver/v5 v5.28.6
 	github.com/pashagolub/pgxmock/v4 v4.9.0
 	github.com/pgvector/pgvector-go v0.4.1
-	github.com/rabbitmq/amqp091-go v1.15.0
+	github.com/rabbitmq/amqp091-go v1.16.0
 	github.com/rs/zerolog v1.35.1
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
@@ -20,7 +20,7 @@ require (
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.1
 	github.com/swaggo/swag v1.16.6
-	github.com/twistingmercury/heartbeat/v2 v2.0.0
+	github.com/twistingmercury/heartbeat/v2 v2.0.1
 	github.com/twistingmercury/otelx/middleware/gin/v2 v2.0.0
 	github.com/twistingmercury/otelx/v2 v2.0.0
 	go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin v0.72.0
