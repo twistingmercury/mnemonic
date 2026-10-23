@@ -77,10 +77,14 @@ mark_service_path() {
     done
 
     case "${path}" in
-        src/go.mod | src/go.sum | build/* | tests/integration/* | tests/openai-stub/* | .github/*)
+        src/go.mod | src/go.sum | src/.golangci.yml | .dockerignore | build/* | tests/integration/* | tests/openai-stub/* | .github/*)
             mark api
             mark enricher
             mark mcp
+            ;;
+        # Only the api image copies the license.
+        LICENSE)
+            mark api
             ;;
     esac
 
