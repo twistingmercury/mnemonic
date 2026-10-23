@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mnemonic-e2e"
-version = "0.0.1"
+version = "0.0.3"
 description = "Black-box end-to-end suite for the Mnemonic stack"
 requires-python = ">=3.13"
 dependencies = [
