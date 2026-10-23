@@ -82,11 +82,43 @@ run_after_change() {
     assert_output "mcp"
 }
 
-@test "changed-components service build folder - marks only that service" {
-    run_after_change "build/enricher/enricher.build.sh"
+@test "changed-components service Dockerfile - marks only that service" {
+    run_after_change "build/enricher/Dockerfile"
 
     assert_success
     assert_output "enricher"
+}
+
+@test "changed-components build script only - prints nothing" {
+    run_after_change "build/enricher/enricher.build.sh"
+
+    assert_success
+    assert_output ""
+}
+
+@test "changed-components markdown in a component folder - prints nothing" {
+    run_after_change "db/README.md"
+
+    assert_success
+    assert_output ""
+}
+
+@test "changed-components markdown in a service package - marks nothing" {
+    run_after_change "src/internal/shared/README.md"
+
+    assert_success
+    assert_output ""
+}
+
+@test "changed-components markdown beside source - marks only for the source" {
+    add_file "build/api/README.md" "change"
+    add_file "src/internal/api/x.go" "change"
+    commit_all "change"
+
+    run "${SCRIPT_PATH}" HEAD~1 HEAD
+
+    assert_success
+    assert_output "api"
 }
 
 @test "changed-components shared package - marks its importers" {

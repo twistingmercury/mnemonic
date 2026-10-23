@@ -23,13 +23,28 @@ mark() {
     return 0
 }
 
+# Docs and the *.build.sh drivers do not change what an image contains, so a
+# change to them alone rebuilds nothing. grep exits 1 when every path was
+# dropped, which is not an error here.
+drop_ignored_paths() {
+    local grep_status=0
+
+    grep -Ev '\.md$|\.build\.sh$' || grep_status=$?
+
+    if [ "${grep_status}" -gt 1 ]; then
+        return "${grep_status}"
+    fi
+
+    return 0
+}
+
 changed_paths() {
     local base_sha="${1}"
     local head_sha="${2}"
 
     # No trailing return: the pipeline status must reach the caller, because
     # errexit is off inside a command substitution.
-    git -C "${PROJ_ROOT}" diff --name-only --no-renames -z "${base_sha}" "${head_sha}" | tr '\0' '\n'
+    git -C "${PROJ_ROOT}" diff --name-only --no-renames -z "${base_sha}" "${head_sha}" | tr '\0' '\n' | drop_ignored_paths
 }
 
 changed_dirs() {
