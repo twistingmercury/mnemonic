@@ -38,6 +38,7 @@ If you are new to the codebase, read the design docs in this order — each buil
 
 - [What Is Mnemonic?](concept.md) and [Requirements](requirements.md), with the [Requirements Traceability Matrix](requirements-traceability.md)
 - [Architecture](architecture/system/README.md): system, communication, data, security, deployment and observability; database images under [architecture/dbs](architecture/dbs/README.md); MCP tools under [architecture/mnemonic](architecture/mnemonic/README.md)
+- [Compose Variants and the Wiki](compose_variants_and_wiki.md): the plain and gateway Docker Compose stacks, and the wiki written against them
 - [CI Workflows](ci_workflows.md): design of the continuous integration workflows, which `.github/workflows/ci.yaml` implements
 - Diagrams: concept diagrams for each iteration ([MVP 1](diagrams/01-concept-local-iteration.md), [MVP 2](diagrams/02-concept-local-iteration.md), [MVP 3](diagrams/03-concept-local-iteration.md), [MVP 4](diagrams/04-concept-local-iteration.md), [MVP 5](diagrams/05-concept-cloud-iteration.md)), the [POST activity diagram](diagrams/post-pattern-flow.md) and the [build pipeline diagram](diagrams/example-go-ci-cd-diagram.md)
 - [Glossary](reference/glossary.md) and [Pattern File Schema](reference/pattern-schema.md)

@@ -94,6 +94,6 @@ build/version.sh api
 | [`build/`](build/) | Image build scripts and Dockerfiles, plus version tooling |
 | [`db/`](db/README.md) | The PostgreSQL (pgvector) and Neo4j images and their tests |
 | [`gateway/`](gateway/README.md) | Envoy, OPA and Keycloak configuration and the gateway tests |
-| [`deploy/`](deploy/) | The local Docker Compose stack and the Helm chart |
+| [`deploy/`](deploy/) | Two local Docker Compose stacks (`docker-compose.noauth.yaml` with no authentication, `docker-compose.yaml` behind the gateway) and the Helm chart |
 | [`tests/`](tests/integration/README.md) | End-to-end tests, the OpenAI stub and the BATS tests |
 | [`docs/design/`](docs/design/README.md) | Architecture and design documents |

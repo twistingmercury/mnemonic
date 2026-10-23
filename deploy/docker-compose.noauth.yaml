@@ -1,0 +1,132 @@
+# Local Mnemonic stack with NO authentication: the API (8080) and the MCP
+# server (8081) are published straight to the host, so anyone who can reach
+# those ports can read and write the knowledge base. Use it on a local machine
+# or a trusted network only. For the stack with authentication, see
+# docker-compose.yaml (Envoy, OPA and Keycloak).
+#
+# The three services call OpenAI themselves, so they hold the key: set
+# MNEMONIC_OPENAI_API_KEY in the shell that starts the stack.
+#
+# The Mnemonic images default to ghcr.io/twistingmercury/<name>:latest-dev and
+# are pulled when missing. To run local builds instead, set MNEMONIC_API_IMAGE,
+# MNEMONIC_MCP_IMAGE and MNEMONIC_ENRICHER_IMAGE.
+#
+# This stack and docker-compose.yaml both publish 8080 and 8081: stop one
+# before starting the other.
+
+name: mnemonic-noauth
+
+x-service-env: &service-env
+  MNEMONIC_DATABASE_POSTGRES_HOST: postgres
+  MNEMONIC_DATABASE_POSTGRES_PASSWORD: mnemonic_dev
+  MNEMONIC_DATABASE_POSTGRES_SSL_MODE: disable
+  MNEMONIC_DATABASE_NEO4J_URI: bolt://neo4j:7687
+  MNEMONIC_DATABASE_NEO4J_PASSWORD: mnemonic_dev
+  MNEMONIC_OPENAI_API_KEY: ${MNEMONIC_OPENAI_API_KEY:?set MNEMONIC_OPENAI_API_KEY}
+  MNEMONIC_OPENAI_BASE_URL: ${MNEMONIC_OPENAI_BASE_URL:-https://api.openai.com/v1}
+  MNEMONIC_LOGGING_LEVEL: debug
+
+services:
+  mnemonic-api:
+    image: ${MNEMONIC_API_IMAGE:-ghcr.io/twistingmercury/mnemonic-api:latest-dev}
+    pull_policy: missing
+    restart: unless-stopped
+    environment:
+      <<: *service-env
+      MNEMONIC_QUEUE_RABBITMQ_HOST: rabbitmq
+      MNEMONIC_QUEUE_RABBITMQ_USER: mnemonic
+      MNEMONIC_QUEUE_RABBITMQ_PASSWORD: mnemonic_dev
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  mnemonic-mcp:
+    image: ${MNEMONIC_MCP_IMAGE:-ghcr.io/twistingmercury/mnemonic-mcp:latest-dev}
+    pull_policy: missing
+    restart: unless-stopped
+    environment:
+      <<: *service-env
+      MNEMONIC_MCP_PORT: 8081
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+
+  mnemonic-enricher:
+    image: ${MNEMONIC_ENRICHER_IMAGE:-ghcr.io/twistingmercury/mnemonic-enricher:latest-dev}
+    pull_policy: missing
+    restart: unless-stopped
+    environment:
+      <<: *service-env
+      MNEMONIC_QUEUE_PROVIDER: rabbitmq
+      MNEMONIC_QUEUE_RABBITMQ_HOST: rabbitmq
+      MNEMONIC_QUEUE_RABBITMQ_USER: mnemonic
+      MNEMONIC_QUEUE_RABBITMQ_PASSWORD: mnemonic_dev
+      MNEMONIC_QUEUE_RABBITMQ_QUEUE: enrichment-jobs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  postgres:
+    image: ghcr.io/twistingmercury/mnemonic-postgres:v1.0.0-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mnemonic
+      POSTGRES_USER: mnemonic
+      POSTGRES_PASSWORD: mnemonic_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mnemonic"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  neo4j:
+    image: ghcr.io/twistingmercury/mnemonic-neo4j:v1.0.0-dev
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: neo4j/mnemonic_dev
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+      NEO4J_dbms_security_procedures_allowlist: apoc.*
+    # Neo4j needs about 10s to stop; the default 10s grace period ends in SIGKILL.
+    stop_grace_period: 30s
+    volumes:
+      - neo4j_data:/data
+    # The marker file is written once the image has applied its schema, so
+    # dependents never start against a database without its constraints.
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/schema_ready && cypher-shell -u neo4j -p mnemonic_dev 'RETURN 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: mnemonic
+      RABBITMQ_DEFAULT_PASS: mnemonic_dev
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  neo4j_data:
