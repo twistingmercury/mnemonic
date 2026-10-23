@@ -18,7 +18,7 @@ notes: "CI described as implemented; db build scripts use build/version.sh db; r
 
 ## Deployment Overview
 
-The `db/` component does not deploy running services. Its output is two Docker images. Application services pull these images and run them as database containers. The images are published to GitHub Container Registry (GHCR) by CI once the workflows exist (see [CI/CD](#cicd)); no workflow is written yet.
+The `db/` component does not deploy running services. Its output is two Docker images. Application services pull these images and run them as database containers. The images are published to GitHub Container Registry (GHCR) by the CI `publish` job (see [CI/CD](#cicd)).
 
 ```mermaid
 graph LR
