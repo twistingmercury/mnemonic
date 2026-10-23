@@ -156,6 +156,27 @@ run_after_change() {
     assert_output "$(printf 'api\nenricher\nmcp')"
 }
 
+@test "changed-components golangci config - marks all three services" {
+    run_after_change "src/.golangci.yml"
+
+    assert_success
+    assert_output $'api\nenricher\nmcp'
+}
+
+@test "changed-components dockerignore - marks all three services" {
+    run_after_change ".dockerignore"
+
+    assert_success
+    assert_output $'api\nenricher\nmcp'
+}
+
+@test "changed-components license - marks only api" {
+    run_after_change "LICENSE"
+
+    assert_success
+    assert_output "api"
+}
+
 @test "changed-components tests integration - marks all three services" {
     run_after_change "tests/integration/test_x.py"
 

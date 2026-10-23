@@ -34,7 +34,7 @@ Both images are self-initializing — the schema is applied by the container its
 
 **Neo4j image** (`ghcr.io/twistingmercury/mnemonic-neo4j`): built `FROM neo4j:5` with APOC enabled. The Cypher constraint and index files ship inside the image, and a wrapper entrypoint applies them with `cypher-shell` every time the container starts, then writes `/tmp/schema_ready`. The schema cannot be baked into the image because `/data` is a Docker VOLUME. Health checks should test for `/tmp/schema_ready` (the image's built-in `HEALTHCHECK` does).
 
-**CI**: on a change under `db/`, the `db` job runs the BATS suites for both databases and builds both images. A push to `develop` then publishes each image as `latest-dev` and `sha-<short>` (the first 7 characters of the commit SHA). On `main` (dormant until the branch exists) it would publish `latest` and `v<version>` from `build/version.sh db`. Nothing is pushed from a local build. See [Continuous integration](../README.md#continuous-integration).
+**CI**: on a change under `db/` (other than `db/tests/`), the `db` job runs the BATS suites for both databases and builds both images. A push to `develop` then publishes each image as `latest-dev` and `sha-<short>` (the first 7 characters of the commit SHA). On `main` (dormant until the branch exists) it would publish `latest` and `v<version>` from `build/version.sh db`. Nothing is pushed from a local build. See [Continuous integration](../README.md#continuous-integration).
 
 ## Key Considerations
 
