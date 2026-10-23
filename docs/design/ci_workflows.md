@@ -1,7 +1,7 @@
 ---
-version: 6
-date: 2026-10-22
-notes: Records what was built. Pushes no longer queue; each push runs on its own concurrency group so no commit is dropped. Workflow steps run scripts and tools directly, never the Makefile, which is a local convenience; every tool runs from a pinned Docker image, nothing is installed on the runner. The static and detect jobs delegate to build/static-checks.sh and build/detect-components.sh, a changed .github/ marks all three services affected, the postgres image no longer bakes in POSTGRES_PASSWORD, and the db build scripts use build/version.sh db and --no-cache --pull.
+version: 7
+date: 2026-10-23
+notes: Change detection ignores *.md, *.build.sh and db/tests/ paths, so a change confined to them builds nothing. The db build scripts must be committed executable. The first GitHub runs confirmed the image mount, the jq mount, the artifact download and the GHCR push.
 ---
 
 # CI Workflows
@@ -95,6 +95,12 @@ A new script, `build/changed-components.sh`, prints the components to build for 
 - Changes under `db/`, `gateway/`, `deploy/helm/` and `tests/` map to their own jobs below. A change under `tests/integration/` or `tests/openai-stub/` also marks all three services affected, because those tests run in every service's e2e step.
 - On a manual run, the input overrides detection. `build/detect-components.sh` wraps this script for the workflow: it applies the override and prints the `components` and `services` JSON arrays for `$GITHUB_OUTPUT`.
 - The script has BATS tests, like the other build tooling.
+- Before any rule runs, the script drops paths ending in `.md` or `.build.sh` and paths under `db/tests/`. A change confined to those builds nothing, and a doc or db-test file inside a service's package directory no longer marks the services that import that package. Dockerfiles, Go source, `build-lib.sh`, `version.sh`, `.github/` and the `db/*/build.sh` scripts still trigger rebuilds.
+- The static checks still run on every trigger, so docs and Dockerfiles stay linted even when nothing is built.
+
+`db/postgres/build.sh` and `db/neo4j/build.sh` must be committed executable, because the db job runs them directly; at mode `100644` the first pull request run failed with exit code 126.
+
+The first runs on GitHub confirmed the `--mount type=image` trick on Docker 28, the pinned `jq` mount, the artifact download with `merge-multiple`, and the GHCR push from `develop` (`latest-dev` and `sha-<short>` for api, mcp, enricher, postgres and neo4j). The gateway and helm jobs have not run on GitHub yet.
 
 ## Jobs
 

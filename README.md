@@ -56,7 +56,7 @@ One workflow, `.github/workflows/ci.yaml`, runs on pull requests to `develop` an
 | `ci-gate` | Fails if any job above failed or was cancelled; skipped jobs are fine. This is the single required check |
 | `publish` | Pushes the tested images to GHCR (push to `develop` or `main` only) |
 
-A service counts as affected when its own code changed or a Go package it imports did. A change to `src/go.mod`, `src/go.sum`, `build/`, `.github/`, `tests/integration/` or `tests/openai-stub/` affects all three services.
+A service counts as affected when its own code changed or a Go package it imports did. A change to `src/go.mod`, `src/go.sum`, `build/`, `.github/`, `tests/integration/` or `tests/openai-stub/` affects all three services. Change detection ignores `*.md` files, `*.build.sh` files and anything under `db/tests/`, so a change confined to them builds nothing; the static checks still run. Dockerfiles and source changes still rebuild.
 
 A newer run on the same pull request cancels the older one; each push gets its own concurrency group, so no pushed commit is dropped. Pull requests and manual runs build and test but never push. Only the `publish` job has `packages: write`; it uses `GITHUB_TOKEN`, and runs only when every job passed or was skipped and an image was built. It pushes the same image the build job tested, passed along as a workflow artifact that is kept for 1 day. Re-running only the `publish` job after more than a day fails because the artifact is gone; re-run the whole workflow instead.
 
