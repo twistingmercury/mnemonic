@@ -1,9 +1,9 @@
 #!/usr/bin/env bats
 # BATS tests for db/postgres/build.sh and db/neo4j/build.sh.
 #
-# docker and git are stand-ins placed in TEST_DIR that record their arguments,
-# so no image is built or retagged. The image names and the version knob are
-# the contract under test.
+# docker is a stand-in placed in TEST_DIR that records its arguments, so no
+# image is built or retagged. The image names and the version knob are the
+# contract under test; the default version is covered in build-version.bats.
 
 POSTGRES_BUILD="${BATS_TEST_DIRNAME}/../../postgres/build.sh"
 NEO4J_BUILD="${BATS_TEST_DIRNAME}/../../neo4j/build.sh"
@@ -14,8 +14,7 @@ setup() {
     mkdir -p "${TEST_DIR}/bin"
 
     write_docker_stub
-    printf '#!/usr/bin/env bash\nexit 1\n' > "${TEST_DIR}/bin/git"
-    chmod 0755 "${TEST_DIR}/bin/docker" "${TEST_DIR}/bin/git"
+    chmod 0755 "${TEST_DIR}/bin/docker"
     export PATH="${TEST_DIR}/bin:${PATH}"
 }
 
@@ -34,14 +33,6 @@ fi
 STUB
 }
 
-@test "postgres build with no version - tags mnemonic-postgres dev and latest" {
-    run bash "${POSTGRES_BUILD}"
-
-    [ "${status}" -eq 0 ]
-    grep -qF 'ghcr.io/twistingmercury/mnemonic-postgres:dev' "${DOCKER_LOG}"
-    grep -qF 'ghcr.io/twistingmercury/mnemonic-postgres:latest' "${DOCKER_LOG}"
-}
-
 @test "postgres build with MNEMONIC_VERSION - tags that version" {
     export MNEMONIC_VERSION="v9.9.9-test"
 
@@ -49,6 +40,14 @@ STUB
 
     [ "${status}" -eq 0 ]
     grep -qF 'ghcr.io/twistingmercury/mnemonic-postgres:v9.9.9-test' "${DOCKER_LOG}"
+    grep -qF 'ghcr.io/twistingmercury/mnemonic-postgres:latest' "${DOCKER_LOG}"
+}
+
+@test "postgres build - never uses the cache and always pulls the base" {
+    run bash "${POSTGRES_BUILD}"
+
+    [ "${status}" -eq 0 ]
+    grep -E '^build .*--no-cache' "${DOCKER_LOG}" | grep -qF -- '--pull'
 }
 
 @test "postgres build with the old VERSION name - ignores it" {
@@ -61,14 +60,6 @@ STUB
     [ "${output}" = "0" ]
 }
 
-@test "neo4j build with no version - tags mnemonic-neo4j dev and latest" {
-    run bash "${NEO4J_BUILD}"
-
-    [ "${status}" -eq 0 ]
-    grep -qF 'ghcr.io/twistingmercury/mnemonic-neo4j:dev' "${DOCKER_LOG}"
-    grep -qF 'ghcr.io/twistingmercury/mnemonic-neo4j:latest' "${DOCKER_LOG}"
-}
-
 @test "neo4j build with MNEMONIC_VERSION - tags that version" {
     export MNEMONIC_VERSION="v9.9.9-test"
 
@@ -76,6 +67,14 @@ STUB
 
     [ "${status}" -eq 0 ]
     grep -qF 'ghcr.io/twistingmercury/mnemonic-neo4j:v9.9.9-test' "${DOCKER_LOG}"
+    grep -qF 'ghcr.io/twistingmercury/mnemonic-neo4j:latest' "${DOCKER_LOG}"
+}
+
+@test "neo4j build - never uses the cache and always pulls the base" {
+    run bash "${NEO4J_BUILD}"
+
+    [ "${status}" -eq 0 ]
+    grep -E '^build .*--no-cache' "${DOCKER_LOG}" | grep -qF -- '--pull'
 }
 
 @test "neo4j build with the old VERSION name - ignores it" {

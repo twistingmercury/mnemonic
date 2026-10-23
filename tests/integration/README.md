@@ -140,8 +140,8 @@ sweep quickly.
 
 ## Continuous Integration
 
-The CI workflows are not written yet. When they are, they should run the build
-script of each changed component, the same as a local run.
+The CI workflow runs the build script of each affected service, the same as a
+local run. See [Continuous integration](../../README.md#continuous-integration).
 
 ## Development Considerations
 

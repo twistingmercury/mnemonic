@@ -61,7 +61,7 @@ wait_for_postgres(){
     printf "Waiting for PostgreSQL to be ready...\n"
 
     while [ "$retries" -lt "$max_retries" ]; do
-        if PGPASSWORD=mnemonic_dev psql -h localhost -p 5435 -U mnemonic -d mnemonic -c '\q' 2>/dev/null; then
+        if docker compose -f "${DOCKER_COMPOSE}" exec -T postgres psql -U mnemonic -d mnemonic -c '\q' 2>/dev/null; then
             printf "PostgreSQL is ready\n"
             return 0
         fi
@@ -82,7 +82,7 @@ run_tests(){
     fi
 
     printf "\nRunning BATS tests...\n"
-    if ! bats "${BATS_DIR}/migrations.bats"; then
+    if ! "${THIS_DIR}/run-bats.sh" "${BATS_DIR}/migrations.bats"; then
         printf "ERROR: BATS tests failed\n" >&2
         return 1
     fi

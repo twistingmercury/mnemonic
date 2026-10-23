@@ -1,0 +1,292 @@
+name: CI
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+  workflow_dispatch:
+    inputs:
+      component:
+        description: Component to build, or all of them
+        type: choice
+        default: all
+        options: [all, api, mcp, enricher, db, gateway, helm]
+
+permissions:
+  contents: read
+
+# A newer run on the same pull request replaces the older one. A push gets its
+# own group: GitHub drops older pending runs of a shared group, and the next
+# run's base is the previous push, so a dropped commit would never be built.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  detect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      components: ${{ steps.detect.outputs.components }}
+      services: ${{ steps.detect.outputs.services }}
+    steps:
+      # Full history: the change detection diffs against the base commit.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # The base is the PR base, the commit before a push, or all zeros on a
+      # manual run, which makes every component affected.
+      - name: Detect affected components
+        id: detect
+        env:
+          MNEMONIC_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || '0000000000000000000000000000000000000000' }}
+          MNEMONIC_COMPONENT: ${{ inputs.component }}
+        run: |
+          set -euo pipefail
+          build/detect-components.sh "${MNEMONIC_BASE_SHA}" "${GITHUB_SHA}" "${MNEMONIC_COMPONENT}" >> "${GITHUB_OUTPUT}"
+
+  static:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Static checks
+        run: build/static-checks.sh
+
+  # A matrix needs at least one entry, so the job is skipped when no service is
+  # affected. The script builds the image, runs the e2e suite and never pushes.
+  service:
+    needs: detect
+    if: needs.detect.outputs.services != '[]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        component: ${{ fromJSON(needs.detect.outputs.services) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Build and test
+        env:
+          MNEMONIC_COMPONENT: ${{ matrix.component }}
+        run: build/"${MNEMONIC_COMPONENT}"/"${MNEMONIC_COMPONENT}".build.sh
+
+      # The publish job pushes this exact tested image. Only pushes upload it;
+      # the trigger limits pushes to develop and main.
+      - name: Save the image
+        if: github.event_name == 'push'
+        env:
+          MNEMONIC_COMPONENT: ${{ matrix.component }}
+        run: docker save --output "${RUNNER_TEMP}/image-${MNEMONIC_COMPONENT}.tar" "ghcr.io/twistingmercury/mnemonic-${MNEMONIC_COMPONENT}:latest"
+
+      - name: Upload the image
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: image-${{ matrix.component }}
+          path: ${{ runner.temp }}/image-${{ matrix.component }}.tar
+          if-no-files-found: error
+          retention-days: 1
+
+  # The runners start the compose stack and run the tests from pinned images;
+  # the build scripts then build the images, uncached.
+  db:
+    needs: detect
+    if: contains(fromJSON(needs.detect.outputs.components), 'db')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: PostgreSQL migration tests
+        run: db/tests/postgres-test-runner.sh
+
+      - name: Neo4j migration and image tests
+        run: db/tests/neo4j-test-runner.sh
+
+      - name: Build the PostgreSQL image
+        run: db/postgres/build.sh
+
+      - name: Build the Neo4j image
+        run: db/neo4j/build.sh
+
+      # The publish job pushes these exact tested images. Only pushes upload
+      # them; the trigger limits pushes to develop and main.
+      - name: Save the images
+        if: github.event_name == 'push'
+        run: |
+          docker save --output "${RUNNER_TEMP}/image-postgres.tar" ghcr.io/twistingmercury/mnemonic-postgres:latest
+          docker save --output "${RUNNER_TEMP}/image-neo4j.tar" ghcr.io/twistingmercury/mnemonic-neo4j:latest
+
+      - name: Upload the PostgreSQL image
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: image-postgres
+          path: ${{ runner.temp }}/image-postgres.tar
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload the Neo4j image
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: image-neo4j
+          path: ${{ runner.temp }}/image-neo4j.tar
+          if-no-files-found: error
+          retention-days: 1
+
+  # OPA, Envoy and Go all run from pinned images. The e2e tests reach the
+  # gateway on the host ports, so the Go container uses the host network.
+  gateway:
+    needs: detect
+    if: contains(fromJSON(needs.detect.outputs.components), 'gateway')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: OPA policy checks
+        run: |
+          opa() {
+            docker run --rm -v "${PWD}/gateway/opa/policy:/policy:ro" \
+              openpolicyagent/opa:1.4.2-envoy-static@sha256:b2c1902605be6fd7abd7da5910acdc49d856f5212a7ac1705dd103b78f968bbd "$@"
+          }
+          opa fmt --list --fail /policy
+          opa check --strict /policy
+          opa test -v /policy
+
+      - name: Envoy config validation
+        run: |
+          envoy() {
+            docker run --rm -v "${PWD}/gateway/envoy:/cfg:ro" "$@" \
+              envoyproxy/envoy:v1.34.1@sha256:007da57c2c328a90bd4e6d99b70bd899132f1b4a9426ccafe25437cf84a60c14 \
+              envoy --mode validate -c "${config}"
+          }
+          config=/cfg/envoy.yaml envoy
+          config=/cfg/envoy-egress.yaml envoy -e MNEMONIC_OPENAI_API_EMBEDDINGS_KEY=validate-only
+
+      # The stub build is uncached; up does not rebuild what is built.
+      - name: Start the gateway with stub services
+        run: |
+          docker compose -f gateway/test/compose.stub.yaml build --no-cache --pull
+          docker compose -f gateway/test/compose.stub.yaml up -d --wait --wait-timeout 240
+
+      - name: Run the e2e tests
+        run: |
+          docker run --rm --network host -v "${PWD}/gateway/test/e2e:/e2e:ro" -w /e2e \
+            -e GOCACHE=/tmp/gocache \
+            golang:1.27.3-bookworm@sha256:972b4110ba0f47539a975c31e52c64765e1ff19f2d74469ae4a595c6676e80a5 \
+            go test -count=1 -v ./...
+
+      - name: Stop the gateway
+        if: always()
+        run: docker compose -f gateway/test/compose.stub.yaml down
+
+  helm:
+    needs: detect
+    if: contains(fromJSON(needs.detect.outputs.components), 'helm')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Lint and render the chart
+        run: |
+          helm() {
+            docker run --rm -v "${PWD}:/repo:ro" -w /repo \
+              alpine/helm:4.3.1@sha256:e3f8d5c462d75470fbb1fce79ad5c20063657096d1f98c0fcea869e2600e2e5e "$@"
+          }
+          helm lint --strict deploy/helm/mnemonic
+          helm template deploy/helm/mnemonic
+
+  # The one required check. It runs even when a job it needs failed or was
+  # skipped, and fails on a failure or a cancellation (detection included); a
+  # skipped job is fine.
+  ci-gate:
+    if: always()
+    needs: [detect, static, service, db, gateway, helm]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check the results of the jobs this run needed
+        env:
+          MNEMONIC_NEEDS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          jq -e 'all(.[]; .result != "failure" and .result != "cancelled")' <<<"${MNEMONIC_NEEDS}"
+
+  # Pushes the images the build jobs tested and saved: the same bytes, retagged.
+  # The only job with packages: write. It runs only on a push to develop or
+  # main when every job it needs succeeded or was skipped (detection included),
+  # and only when an image was built (a gateway or helm change alone has none).
+  publish:
+    needs: [detect, static, service, db, gateway, helm]
+    if: >-
+      always()
+      && github.event_name == 'push'
+      && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
+      && needs.detect.result == 'success'
+      && !contains(needs.*.result, 'failure')
+      && !contains(needs.*.result, 'cancelled')
+      && (needs.detect.outputs.services != '[]' || contains(fromJSON(needs.detect.outputs.components), 'db'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      # Full history and tags: version.sh reads the component tags on main.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Only the build jobs of affected components uploaded an image artifact.
+      - name: Download the images
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: image-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/images
+
+      - name: Log in to GHCR
+        env:
+          MNEMONIC_GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: docker login ghcr.io --username "${GITHUB_ACTOR}" --password-stdin <<<"${MNEMONIC_GHCR_TOKEN}"
+
+      # The db component is the postgres and neo4j images; gateway and helm have
+      # none. Each tar holds only the :latest tag, so every tag is made from it.
+      - name: Tag and push the images
+        env:
+          MNEMONIC_COMPONENTS: ${{ needs.detect.outputs.components }}
+          MNEMONIC_BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          images="$(jq -r '.[] | if . == "db" then "postgres", "neo4j" elif . == "gateway" or . == "helm" then empty else . end' <<<"${MNEMONIC_COMPONENTS}")"
+          while IFS= read -r image; do
+            repo="ghcr.io/twistingmercury/mnemonic-${image}"
+            docker load --input "${RUNNER_TEMP}/images/image-${image}.tar"
+            tags="$(build/publish-tags.sh "${MNEMONIC_BRANCH}" "${image}" "${GITHUB_SHA}")"
+            while IFS= read -r tag; do
+              docker tag "${repo}:latest" "${repo}:${tag}"
+              docker push "${repo}:${tag}" || { printf '::error::push of mnemonic-%s failed; permission_denied means twistingmercury/mnemonic lacks Write under Manage Actions access for that package\n' "${image}"; exit 1; }
+            done <<<"${tags}"
+          done <<<"${images}"

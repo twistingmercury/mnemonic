@@ -1,7 +1,7 @@
 ---
-version: 3
+version: 4
 date: 2026-10-22
-notes: "Rollback example no longer cites a tag that does not exist in the registry."
+notes: "CI described as implemented; db build scripts use build/version.sh db; rollback example no longer cites a tag that does not exist in the registry."
 ---
 
 # Database Images — Deployment Architecture
@@ -18,7 +18,7 @@ notes: "Rollback example no longer cites a tag that does not exist in the regist
 
 ## Deployment Overview
 
-The `db/` component does not deploy running services. Its output is two Docker images. Application services pull these images and run them as database containers. The images are published to GitHub Container Registry (GHCR) by CI once the workflows exist (see [CI/CD](#cicd)); no workflow is written yet.
+The `db/` component does not deploy running services. Its output is two Docker images. Application services pull these images and run them as database containers. The images are published to GitHub Container Registry (GHCR) by the CI `publish` job (see [CI/CD](#cicd)).
 
 ```mermaid
 graph LR
@@ -41,8 +41,8 @@ graph LR
 
     SQL --> PG_SH --> PG
     CYP --> NEO_SH --> NEO
-    PG -. "pushed by CI (not written yet)" .-> PG_REG
-    NEO -. "pushed by CI (not written yet)" .-> NEO_REG
+    PG -. "pushed by CI" .-> PG_REG
+    NEO -. "pushed by CI" .-> NEO_REG
 ```
 
 ## Image Build Pipeline
@@ -52,7 +52,7 @@ graph LR
 Built with a standard `docker build` (`db/postgres/build.sh`). The `Dockerfile` is in `db/postgres/`:
 
 1. `FROM pgvector/pgvector:pg16`
-2. Sets `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` environment variables
+2. Sets the `POSTGRES_DB` and `POSTGRES_USER` environment variables; the caller supplies `POSTGRES_PASSWORD`
 3. Copies all `*.up.sql` files into `/docker-entrypoint-initdb.d/`
 
 On first container start with an empty data directory, Postgres runs the init scripts in filename order, applying all 10 migrations (`000001` to `000010`) automatically. No external tooling required.
@@ -76,18 +76,18 @@ Every Cypher file is idempotent, so restarting a container against an existing v
 
 ## CI/CD
 
-The CI workflows are not written yet: the repository has no `.github/workflows/` directory, so nothing builds or pushes the database images automatically. This page therefore describes only what exists:
+The CI workflow (`.github/workflows/ci.yaml`) builds, tests and publishes the database images; see [Continuous integration](../../../../README.md#continuous-integration). The local pieces are:
 
-- `db/postgres/build.sh` and `db/neo4j/build.sh` build and tag the images locally. They never push. Always set `MNEMONIC_VERSION` (for example `MNEMONIC_VERSION=v1.0.0 bash db/postgres/build.sh`): without it the build fails because the newest git tag of any component contains a slash (issue [#26](https://github.com/twistingmercury/mnemonic/issues/26)).
+- `db/postgres/build.sh` and `db/neo4j/build.sh` build and tag the images locally. They never push. Set `MNEMONIC_VERSION` to override the version (for example `MNEMONIC_VERSION=v1.0.0 bash db/postgres/build.sh`); without it the scripts use `build/version.sh db`.
 - `db/tests/postgres-test-runner.sh`, `db/tests/neo4j-test-runner.sh` and the BATS suites under `db/tests/bats/` test the schema; see the [db README](../../../../db/README.md) for how to run them.
 
-The intended flow for every component, as set out in the monorepo plan, is that the build script builds the image and runs its tests, and CI then logs in to GHCR and pushes the result. The triggers, jobs and tag rules are settled in [ci_workflows.md](../../ci_workflows.md): a push to develop publishes `latest-dev` and `sha-<short>`; publishing runs on a push to develop or main, not on a tag.
+For every component the build script builds the image and runs its tests, and the CI `publish` job then logs in to GHCR and pushes the tested image. The triggers, jobs and tag rules are settled in [ci_workflows.md](../../ci_workflows.md): a push to develop publishes `latest-dev` and `sha-<short>`; publishing runs on a push to develop or main, not on a tag.
 
 ## Image Tagging Strategy
 
-Both build scripts tag the image with a version and with `latest`. The version is `MNEMONIC_VERSION` when set, otherwise the result of `git describe --tags --abbrev=0`, falling back to `dev` when no tags exist. The monorepo uses component tags (`db/vX.Y.Z`), and `build/version.sh db` already resolves the version for that prefix, but these two scripts do not use it yet and do not match on the prefix.
+Both build scripts tag the image with a version and with `latest`. The version is `MNEMONIC_VERSION` when set, otherwise `v` plus the result of `build/version.sh db` (from the `db/vX.Y.Z` tags; `0.0.0-dev` when there is none).
 
-The `-dev` suffix scheme (`:latest-dev`, `:v1.0.0-dev`) is what the consumers reference today. It is applied when images are pushed, not by the build scripts, so it will be defined by the CI workflows.
+The `-dev` suffix scheme (`:latest-dev`, `:v1.0.0-dev`) is what the consumers reference today. The CI `publish` job pushes only `latest-dev` and `sha-<short>` from `develop`; it does not push a `-dev` version tag.
 
 Application services pin a specific tag rather than a floating one: the compose files (`deploy/docker-compose.yaml`, `tests/integration/docker-compose.yaml`) and the Helm chart (`deploy/helm/mnemonic/values.yaml`) all use `:v1.0.0-dev`. Picking up a schema change therefore means bumping that tag in those files (step 5 below).
 

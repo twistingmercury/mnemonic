@@ -8,11 +8,14 @@
 #
 # Usage: bash db/neo4j/build.sh
 #
-# Set the MNEMONIC_VERSION environment variable to override the git-derived version.
+# The image is tagged with both the db component version (from build/version.sh)
+# and 'latest'. Set the MNEMONIC_VERSION environment variable to override that
+# version.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJ_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 # ---------------------------------------------------------------------------
 # Logging helpers
@@ -28,7 +31,7 @@ log_success() {
 # ---------------------------------------------------------------------------
 # Version and image names
 # ---------------------------------------------------------------------------
-MNEMONIC_VERSION="${MNEMONIC_VERSION:-$(git describe --tags --abbrev=0 2>/dev/null || echo 'dev')}"
+MNEMONIC_VERSION="${MNEMONIC_VERSION:-v$("${PROJ_ROOT}/build/version.sh" db)}"
 
 IMAGE_BASE="ghcr.io/twistingmercury/mnemonic-neo4j"
 IMAGE_VERSIONED="${IMAGE_BASE}:${MNEMONIC_VERSION}"
@@ -42,6 +45,7 @@ log_info "Version : ${MNEMONIC_VERSION}"
 log_info "Image   : ${IMAGE_VERSIONED}"
 
 docker build \
+    --no-cache --pull \
     --progress=plain \
     -t "${IMAGE_VERSIONED}" \
     "${SCRIPT_DIR}"

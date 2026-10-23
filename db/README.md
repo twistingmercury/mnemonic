@@ -34,19 +34,19 @@ Both images are self-initializing — the schema is applied by the container its
 
 **Neo4j image** (`ghcr.io/twistingmercury/mnemonic-neo4j`): built `FROM neo4j:5` with APOC enabled. The Cypher constraint and index files ship inside the image, and a wrapper entrypoint applies them with `cypher-shell` every time the container starts, then writes `/tmp/schema_ready`. The schema cannot be baked into the image because `/data` is a Docker VOLUME. Health checks should test for `/tmp/schema_ready` (the image's built-in `HEALTHCHECK` does).
 
-**CI**: the workflows are not written yet. When they exist, they are meant to run the BATS suites for both databases on any change under `db/postgres/` or `db/neo4j/`, then build and push both images to GHCR. Nothing is pushed from a local build.
+**CI**: on a change under `db/`, the `db` job runs the BATS suites for both databases and builds both images. A push to `develop` then publishes each image as `latest-dev` and `sha-<short>` (the first 7 characters of the commit SHA). On `main` (dormant until the branch exists) it would publish `latest` and `v<version>` from `build/version.sh db`. Nothing is pushed from a local build. See [Continuous integration](../README.md#continuous-integration).
 
 ## Key Considerations
 
 - `002_create_existence_constraints.cypher` is skipped at startup on Community Edition — existence constraints require Neo4j Enterprise Edition
 - `.down.sql` files are not included; rollback is handled by rebuilding from a prior image tag
-- The build scripts tag each image with the version and `latest`; which tags CI publishes is decided when its workflows are written
+- The build scripts tag each image with the version and `latest`; the CI tags are described under **CI** above
 
 ## Development Considerations
 
 ### Quick Start
 
-Requires Docker 27+, Docker Compose 2.32+, `bats-core`, and `psql`.
+Requires Docker Engine 28+ (the test runners use `--mount type=image`) and Docker Compose 2.32+. The test runners run `bats` and `psql` from pinned images (`db/tests/run-bats.sh`), so neither needs installing.
 
 Build the images locally from the repository root (each script tags the image with the version and `latest`):
 
@@ -55,7 +55,7 @@ MNEMONIC_VERSION=v1.0.0 bash db/postgres/build.sh
 MNEMONIC_VERSION=v1.0.0 bash db/neo4j/build.sh
 ```
 
-Always set `MNEMONIC_VERSION` (with a `v` prefix, like the existing `v1.0.0-dev` tags). Without it the scripts fall back to `git describe --tags --abbrev=0`, which returns the newest tag of any component (for example `api/v0.5.0`); that contains a slash, so the build fails with an invalid image reference (see [#26](https://github.com/twistingmercury/mnemonic/issues/26)). These scripts do not push and, unlike the service build scripts, do not pass `--no-cache --pull`.
+Without `MNEMONIC_VERSION` the scripts tag the image `v<version>`, where `<version>` is what `build/version.sh db` prints (`v1.0.0` with the tag `db/v1.0.0`, `v0.0.0-dev` when no `db/v*` tag exists). These scripts do not push, and like the service build scripts they pass `--no-cache --pull`.
 
 ### Testing
 
@@ -73,7 +73,7 @@ Environment variables (all optional):
 
 | Variable | Default | Used by |
 | --- | --- | --- |
-| `MNEMONIC_VERSION` | newest git tag of any component, else `dev` | `build.sh` scripts: image tag |
+| `MNEMONIC_VERSION` | `v` plus the output of `build/version.sh db` | `build.sh` scripts: image tag |
 | `MNEMONIC_MAX_RETRIES` | `30` | test runners: readiness attempts |
 | `MNEMONIC_RETRY_INTERVAL` | `1` | test runners: seconds between attempts |
 | `MNEMONIC_NEO4J_USER` / `MNEMONIC_NEO4J_PASSWORD` | `neo4j` / `mnemonic_dev` | Neo4j test runner and BATS |
@@ -90,4 +90,4 @@ Variables defined by the third-party tools keep their names: `NEO4J_AUTH`, `POST
 
 This project follows [Semantic Versioning 2.0.0](https://semver.org/).
 
-The `build.sh` scripts take the image version from `MNEMONIC_VERSION`, or else from `git describe --tags --abbrev=0`, which returns the newest tag of any component. Releases are tagged per component (`db/v1.0.0`; `build/version.sh db` reads it), and a prefixed tag such as `db/v1.0.0` contains a slash, which Docker does not allow in an image tag. Until the scripts use `build/version.sh`, always set `MNEMONIC_VERSION` (for example `MNEMONIC_VERSION=v1.0.0`); without it the build fails because the newest tag contains a slash ([#26](https://github.com/twistingmercury/mnemonic/issues/26)).
+The `build.sh` scripts take the image version from `MNEMONIC_VERSION`, or else from `build/version.sh db`, which reads the newest `db/v*` tag and the scripts prefix with `v` (`db/v1.0.0` gives the image tag `v1.0.0`). Tags of other components never affect it.

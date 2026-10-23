@@ -70,22 +70,22 @@ build_lib::e2e_run() {
         --exit-code-from mnemonic-tests
 }
 
-# Prints the image compose will use for one component and its pull policy.
+# Prints the image compose will use for one service and its pull policy.
 build_lib::e2e_report_image() {
-    local component="${1}"
+    local service="${1}"
     local upper
     local image_var
     local policy_var
     local image
     local policy
 
-    upper="$(printf "%s" "${component}" | tr '[:lower:]' '[:upper:]')"
+    upper="$(printf "%s" "${service}" | tr '[:lower:]' '[:upper:]')"
     image_var="MNEMONIC_${upper}_IMAGE"
     policy_var="MNEMONIC_${upper}_PULL_POLICY"
-    image="${!image_var:-ghcr.io/twistingmercury/mnemonic-${component}:latest-dev}"
+    image="${!image_var:-ghcr.io/twistingmercury/mnemonic-${service}:latest-dev}"
     policy="${!policy_var:-always}"
 
-    printf "%s image: %s (pull: %s)\n" "${component}" "${image}" "${policy}"
+    printf "%s image: %s (pull: %s)\n" "${service}" "${image}" "${policy}"
 
     return 0
 }
@@ -95,14 +95,14 @@ build_lib::e2e_report_image() {
 # components keep whatever the caller set, or the compose defaults.
 build_lib::e2e_select_images() {
     local upper
-    local component
+    local service
 
     upper="$(printf "%s" "${COMPONENT}" | tr '[:lower:]' '[:upper:]')"
     export "MNEMONIC_${upper}_IMAGE=${MNEMONIC_IMAGE_NAME}:${MNEMONIC_IMAGE_TAG}"
     export "MNEMONIC_${upper}_PULL_POLICY=never"
 
-    for component in api mcp enricher; do
-        build_lib::e2e_report_image "${component}"
+    for service in api mcp enricher; do
+        build_lib::e2e_report_image "${service}"
     done
 
     return 0

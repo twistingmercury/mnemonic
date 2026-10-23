@@ -174,7 +174,7 @@ run_tests(){
     export MNEMONIC_NEO4J_PASSWORD
 
     printf "\nRunning BATS tests...\n"
-    if ! bats "${BATS_DIR}/neo4j-migrations.bats"; then
+    if ! "${THIS_DIR}/run-bats.sh" "${BATS_DIR}/neo4j-migrations.bats"; then
         printf "ERROR: BATS tests failed\n" >&2
         return 1
     fi
@@ -194,7 +194,7 @@ build_image(){
 
     MNEMONIC_NEO4J_IMAGE="mnemonic-neo4j:test-$$"
     printf "\nBuilding image %s...\n" "${MNEMONIC_NEO4J_IMAGE}"
-    if ! docker build -q -t "${MNEMONIC_NEO4J_IMAGE}" "${NEO4J_MIG_DIR}" >/dev/null; then
+    if ! docker build --no-cache --pull -q -t "${MNEMONIC_NEO4J_IMAGE}" "${NEO4J_MIG_DIR}" >/dev/null; then
         printf "ERROR: Failed to build %s\n" "${MNEMONIC_NEO4J_IMAGE}" >&2
         return 1
     fi
@@ -214,7 +214,7 @@ run_image_tests(){
     export MNEMONIC_NEO4J_PASSWORD
 
     printf "\nRunning image BATS tests...\n"
-    if ! bats "${BATS_DIR}/neo4j-image.bats"; then
+    if ! "${THIS_DIR}/run-bats.sh" "${BATS_DIR}/neo4j-image.bats"; then
         printf "ERROR: image BATS tests failed\n" >&2
         return 1
     fi

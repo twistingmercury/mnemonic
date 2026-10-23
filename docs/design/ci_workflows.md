@@ -1,7 +1,7 @@
 ---
-version: 4
+version: 6
 date: 2026-10-22
-notes: Workflow steps run scripts and tools directly, never the Makefile, which is a local convenience; every tool runs from a pinned Docker image, nothing is installed on the runner.
+notes: Records what was built. Pushes no longer queue; each push runs on its own concurrency group so no commit is dropped. Workflow steps run scripts and tools directly, never the Makefile, which is a local convenience; every tool runs from a pinned Docker image, nothing is installed on the runner. The static and detect jobs delegate to build/static-checks.sh and build/detect-components.sh, a changed .github/ marks all three services affected, the postgres image no longer bakes in POSTGRES_PASSWORD, and the db build scripts use build/version.sh db and --no-cache --pull.
 ---
 
 # CI Workflows
@@ -91,17 +91,19 @@ Proposed by the author and accepted as a starting point ("if it needs changing l
 A new script, `build/changed-components.sh`, prints the components to build for a given base and head commit.
 
 - A service (`api`, `mcp`, `enricher`) is affected when a file under its own directories changed, or when `go list -deps` for its `cmd/<service>` package includes a package whose directory changed.
-- Changes to the shared Go module files (`go.mod`, `go.sum`) or to `build/` mark all three services affected.
+- Changes to the shared Go module files (`go.mod`, `go.sum`), to `build/` or to `.github/` mark all three services affected.
 - Changes under `db/`, `gateway/`, `deploy/helm/` and `tests/` map to their own jobs below. A change under `tests/integration/` or `tests/openai-stub/` also marks all three services affected, because those tests run in every service's e2e step.
-- On a manual run, the input overrides detection.
+- On a manual run, the input overrides detection. `build/detect-components.sh` wraps this script for the workflow: it applies the override and prints the `components` and `services` JSON arrays for `$GITHUB_OUTPUT`.
 - The script has BATS tests, like the other build tooling.
 
 ## Jobs
 
 Always run, on every trigger, without path filtering (they are cheap):
 
+`build/static-checks.sh` runs all of these in order and stops at the first failure; the `static` job and a local run are the same command (a local run needs git and Docker Engine 28 or newer, for `--mount type=image`):
+
 - Static checks: shellcheck, hadolint, markdownlint and `helm lint --strict`, each run directly.
-- Build tooling tests: `bats tests/bats`.
+- Build tooling tests: BATS, run from pinned images, with a pinned `jq` image mounted in because the Go image lacks it.
 - Boundary check: `build/check-e2e-boundary.sh`.
 
 Run when their inputs changed:
@@ -119,7 +121,7 @@ A separate job runs only on a push to `develop` or `main`, only after all jobs f
 
 - The job logs in to GHCR with the built-in `GITHUB_TOKEN` and pushes the images. Only this job has `packages: write`; every other job has the least permissions it needs.
 - From `develop`, each affected component is tagged `latest-dev` and `sha-<short>`, never a version tag. From `main` (dormant until the branch exists), each affected component is tagged `latest` and its version from `build/version.sh <component>`.
-- The `db/postgres/build.sh` and `db/neo4j/build.sh` scripts take their version from `git describe --tags --abbrev=0`, which matches any tag. With prefixed tags that returns another component's tag (for example `mcp/v0.6.0`), which is not even a valid Docker tag. They must switch to `build/version.sh db` before the db images are published.
+- The `db/postgres/build.sh` and `db/neo4j/build.sh` scripts take their version from `build/version.sh db` and build with `--no-cache --pull`. The postgres image no longer bakes in a default `POSTGRES_PASSWORD`.
 - The pushed image must be the one that was tested: the build job saves the image as a workflow artifact (or the push job rebuilds with the identical command). Choosing between the two is left to the builder, with the preference stated under [Left to the builder](#left-to-the-builder).
 - Pull requests and manual runs never run this job.
 
@@ -171,13 +173,12 @@ These are the author's calls, not agreed with the owner:
 - The manual run picks a component but never pushes.
 - `ci-gate` fails when the detection job fails or is cancelled, not only when a build fails.
 - The exact tested image reaches the publish job by save and load. `build/build-lib.sh` already leaves the tagged image in place after the run (teardown removes only unnamed images), so the build job runs `docker save` on it and uploads the file as a workflow artifact.
-- Concurrency: pushes to `develop` and `main` queue and are never cancelled mid-publish; a newer run on the same pull request cancels the older one.
+- Concurrency: a newer run on the same pull request cancels the older one. Pushes do not queue: GitHub keeps one pending run per concurrency group and cancels older pending ones even without `cancel-in-progress`, which would drop a commit that is never built or published (the next run's base is `event.before`). So each push gets its own group, keyed on the commit SHA, and nothing is dropped or cancelled. The cost: runs of quick successive pushes can finish out of order, so `latest-dev` can briefly point at an older commit; `sha-<short>` is always right.
 
 ## Left to the builder
 
 - Workflow file layout (one file with jobs, or a few files).
 - Passing the tested image to the push job. Preference: save and load the exact image, so the pushed bytes are the tested bytes.
 - Whether the `golang-tooling` image is public or needs a login step on the runner.
-- Switching the `db` build scripts to `build/version.sh db`, with BATS coverage.
 - Concurrency settings and timeouts.
 - Job naming, so branch protection can reference `ci-gate`.
