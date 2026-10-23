@@ -1,0 +1,40 @@
+version: 2
+
+# Every Dependabot pull request runs the full CI, and a change to go.mod or
+# tests/ rebuilds all three services, so updates arrive weekly and minor and
+# patch bumps share one pull request per ecosystem. A major bump gets its own.
+updates:
+  - package-ecosystem: gomod
+    directory: /src
+    schedule:
+      interval: weekly
+    groups:
+      go-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: gomod
+    directory: /tests/openai-stub
+    schedule:
+      interval: weekly
+    groups:
+      go-minor-patch:
+        update-types: [minor, patch]
+
+  # uv, not pip: the project is locked by uv.lock.
+  - package-ecosystem: uv
+    directory: /tests/integration
+    schedule:
+      interval: weekly
+    groups:
+      python-minor-patch:
+        update-types: [minor, patch]
+
+  # The workflow pins each action by commit SHA with a version comment;
+  # Dependabot moves both together.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions-minor-patch:
+        update-types: [minor, patch]
