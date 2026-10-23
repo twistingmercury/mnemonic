@@ -11,6 +11,12 @@ updates:
     groups:
       go-minor-patch:
         update-types: [minor, patch]
+    ignore:
+      # pgx 5.11 added TypeMap() to pgx.Rows; pgxmock v4.9.0 doesn't implement
+      # it, so the repository tests stop compiling. Drop this once pgxmock ships
+      # a compatible release.
+      - dependency-name: github.com/jackc/pgx/v5
+        versions: [">=5.11.0"]
 
   - package-ecosystem: gomod
     directory: /tests/openai-stub
