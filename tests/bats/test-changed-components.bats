@@ -103,6 +103,20 @@ run_after_change() {
     assert_output ""
 }
 
+@test "changed-components db tests only - prints nothing" {
+    run_after_change "db/tests/postgres-test-runner.sh"
+
+    assert_success
+    assert_output ""
+}
+
+@test "changed-components db build script - maps to db" {
+    run_after_change "db/postgres/build.sh"
+
+    assert_success
+    assert_output "db"
+}
+
 @test "changed-components markdown in a service package - marks nothing" {
     run_after_change "src/internal/shared/README.md"
 

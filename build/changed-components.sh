@@ -23,13 +23,13 @@ mark() {
     return 0
 }
 
-# Docs and the *.build.sh drivers do not change what an image contains, so a
-# change to them alone rebuilds nothing. grep exits 1 when every path was
-# dropped, which is not an error here.
+# Docs, the *.build.sh drivers and the db tests do not change what an image
+# contains, so a change to them alone rebuilds nothing. grep exits 1 when every
+# path was dropped, which is not an error here.
 drop_ignored_paths() {
     local grep_status=0
 
-    grep -Ev '\.md$|\.build\.sh$' || grep_status=$?
+    grep -Ev '\.md$|\.build\.sh$|^db/tests/' || grep_status=$?
 
     if [ "${grep_status}" -gt 1 ]; then
         return "${grep_status}"
